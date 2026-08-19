@@ -5,7 +5,7 @@ public extension Notification.Name {
 }
 
 public enum KeyboardPreferences {
-    public static let appGroupID = "group.app.access.keyboard"
+    public static let appGroupID = "group.6M3Z27M69P.app.access.keyboard"
     public static let bethModeEnabledKey = "bethModeEnabled"
     public static let extensionHasFullAccessKey = "extensionHasFullAccess"
 

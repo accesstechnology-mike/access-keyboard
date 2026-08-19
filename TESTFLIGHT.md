@@ -24,9 +24,9 @@ In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/re
 | --- | --- |
 | App ID | `app.access.keyboard` |
 | App ID | `app.access.keyboard.extension` |
-| App Group | `group.app.access.keyboard` |
+| App Group | `group.6M3Z27M69P.app.access.keyboard` |
 
-On **both** App IDs, enable App Groups and tick `group.app.access.keyboard`. The keyboard extension will not see Beth mode without that group.
+On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.keyboard`. The keyboard extension will not see Beth mode without that group.
 
 ## 2. App Store Connect record
 
@@ -120,7 +120,7 @@ Settings → General → Keyboard → Keyboards → Add New Keyboard… → acce
 Then open that keyboard and enable Allow Full Access.
 
 Full Access is required for two things only:
-1. Share the Beth-mode colour toggle with the keyboard extension through App Group group.app.access.keyboard.
+1. Share the Beth-mode colour toggle with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
 2. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
 
 Keystrokes are not sent off the device. Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI with store disabled and does not keep the text. Password fields are skipped.
