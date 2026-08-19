@@ -4,6 +4,8 @@
 <dict>
 	<key>AKFixProxyURL</key>
 	<string>$(AK_FIX_PROXY_URL)</string>
+	<key>AKFixProxySecret</key>
+	<string>$(AK_FIX_PROXY_SECRET)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

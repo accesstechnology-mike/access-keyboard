@@ -2,7 +2,7 @@
 
 This is an iPad-only keyboard (`access: keyboard`). Archive the **AccessKeyboard** scheme. That already embeds `AccessKeyboardExtension`. You cannot do the upload from Linux; the last mile is Xcode on a Mac signed into team `6M3Z27M69P`.
 
-Release builds call the live Fix proxy at `https://access-keyboard.vercel.app/api/fix`. Debug builds still call `http://127.0.0.1:8787/api/fix`.
+Release builds call the live Fix proxy at `https://access-keyboard.vercel.app/api/fix`. Debug builds still call `http://127.0.0.1:8787/api/fix`. Both send `Authorization: Bearer` with `AK_FIX_PROXY_SECRET`. That value is not in git: copy `Secrets.xcconfig.example` to `Secrets.xcconfig`, and put the same string in Vercel as `FIX_PROXY_SECRET` (Production and Preview). GitHub deploys do not wipe Vercel env vars. Do not enable Vercel Authentication; the keyboard cannot log in.
 
 ## 0. Confirm the project is ready
 
@@ -132,4 +132,4 @@ The in-app Type screen uses the same keyboard without Full Access, so you can te
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
 - Keep `MARKETING_VERSION` at `0.1.0` until you intend a user-visible version change.
-- If Fix starts failing for testers, check the Vercel deployment and `OPENAI_API_KEY` on that project. Do not point Release back at `127.0.0.1`.
+- If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match. Do not point Release back at `127.0.0.1`.

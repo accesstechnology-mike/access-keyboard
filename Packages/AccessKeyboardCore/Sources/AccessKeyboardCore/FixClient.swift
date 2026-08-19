@@ -19,9 +19,11 @@ public protocol FixClient: Sendable {
 
 public struct URLSessionFixClient: FixClient {
     public let endpoint: URL
+    public let secret: String
 
-    public init(endpoint: URL) {
+    public init(endpoint: URL, secret: String) {
         self.endpoint = endpoint
+        self.secret = secret
     }
 
     public static func configuredEndpointString(from bundle: Bundle = .main) -> String? {
@@ -37,13 +39,21 @@ public struct URLSessionFixClient: FixClient {
               let endpoint = URL(string: trimmed) else {
             return nil
         }
-        return URLSessionFixClient(endpoint: endpoint)
+        guard let rawSecret = bundle.object(forInfoDictionaryKey: "AKFixProxySecret") as? String else {
+            return nil
+        }
+        let secret = rawSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !secret.isEmpty else {
+            return nil
+        }
+        return URLSessionFixClient(endpoint: endpoint, secret: secret)
     }
 
     public func fix(_ text: String) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 20
         request.httpBody = try JSONEncoder().encode(FixRequestBody(text: text))
 

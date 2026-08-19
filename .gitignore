@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+Secrets.xcconfig
 xcuserdata/
 DerivedData/
 *.xcuserstate

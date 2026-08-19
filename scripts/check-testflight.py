@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import plistlib
 import re
 import struct
@@ -74,6 +75,11 @@ def check_info_plists() -> None:
             error(f"{rel} AKFixProxyURL is {url!r}, expected $(AK_FIX_PROXY_URL)")
         else:
             note(f"{rel} reads AKFixProxyURL from the build setting")
+        secret = info.get("AKFixProxySecret")
+        if secret != "$(AK_FIX_PROXY_SECRET)":
+            error(f"{rel} AKFixProxySecret is {secret!r}, expected $(AK_FIX_PROXY_SECRET)")
+        else:
+            note(f"{rel} reads AKFixProxySecret from the build setting")
 
 
 def check_privacy() -> None:
@@ -187,6 +193,67 @@ def check_project() -> None:
         note(f"Release Fix URL is {RELEASE_FIX_URL}")
 
 
+def load_fix_proxy_secret() -> str:
+    env_secret = os.environ.get("FIX_PROXY_SECRET", "").strip()
+    if env_secret:
+        return env_secret
+
+    xcconfig = ROOT / "Secrets.xcconfig"
+    if xcconfig.exists():
+        for raw in xcconfig.read_text().splitlines():
+            line = raw.strip()
+            if line.startswith("AK_FIX_PROXY_SECRET"):
+                _, _, value = line.partition("=")
+                token = value.strip().strip('"').strip("'")
+                if token:
+                    return token
+
+    env_local = ROOT / "proxy" / ".env.local"
+    if env_local.exists():
+        for raw in env_local.read_text().splitlines():
+            line = raw.strip()
+            if line.startswith("FIX_PROXY_SECRET="):
+                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if token:
+                    return token
+    return ""
+
+
+def check_secret_wiring() -> None:
+    gitignore = (ROOT / ".gitignore").read_text()
+    if "Secrets.xcconfig" not in gitignore:
+        error(".gitignore does not ignore Secrets.xcconfig")
+    else:
+        note("Secrets.xcconfig is gitignored")
+
+    example = ROOT / "Secrets.xcconfig.example"
+    if not example.exists():
+        error("Secrets.xcconfig.example is missing")
+    elif "AK_FIX_PROXY_SECRET" not in example.read_text():
+        error("Secrets.xcconfig.example does not define AK_FIX_PROXY_SECRET")
+    else:
+        note("Secrets.xcconfig.example names AK_FIX_PROXY_SECRET")
+
+    shared = ROOT / "Shared.xcconfig"
+    if not shared.exists():
+        error("Shared.xcconfig is missing")
+    elif 'Secrets.xcconfig' not in shared.read_text():
+        error("Shared.xcconfig does not include Secrets.xcconfig")
+    else:
+        note("Shared.xcconfig includes Secrets.xcconfig")
+
+    example_env = (ROOT / "proxy" / ".env.example").read_text()
+    if "FIX_PROXY_SECRET=" not in example_env:
+        error("proxy/.env.example is missing FIX_PROXY_SECRET")
+    else:
+        note("proxy/.env.example includes FIX_PROXY_SECRET")
+
+    if not load_fix_proxy_secret():
+        error("FIX_PROXY_SECRET is not set locally; copy Secrets.xcconfig.example to Secrets.xcconfig")
+    else:
+        note("a local Fix proxy secret is present")
+
+
 def check_privacy_page() -> None:
     page = ROOT / "proxy/public/privacy.html"
     text = page.read_text()
@@ -197,10 +264,17 @@ def check_privacy_page() -> None:
 
 
 def check_live_proxy() -> None:
+    secret = load_fix_proxy_secret()
+    if not secret:
+        error("cannot probe the live Fix proxy without FIX_PROXY_SECRET")
+        return
     request = urllib.request.Request(
         RELEASE_FIX_URL,
         data=json.dumps({"text": "teh cat sat"}).encode(),
-        headers={"content-type": "application/json"},
+        headers={
+            "content-type": "application/json",
+            "authorization": f"Bearer {secret}",
+        },
         method="POST",
     )
     try:
@@ -230,6 +304,7 @@ def main() -> int:
     check_privacy()
     check_entitlements()
     check_project()
+    check_secret_wiring()
     check_privacy_page()
     check_live_proxy()
 

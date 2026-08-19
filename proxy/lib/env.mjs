@@ -42,4 +42,8 @@ export function requireConfig() {
     console.error("OPENAI_BASE_URL is missing");
     process.exit(1);
   }
+  if (!process.env.FIX_PROXY_SECRET?.trim()) {
+    console.error("FIX_PROXY_SECRET is missing");
+    process.exit(1);
+  }
 }

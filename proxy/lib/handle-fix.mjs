@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { loadLocalEnv } from "./env.mjs";
 
 const INSTRUCTIONS = [
@@ -16,6 +17,14 @@ export async function handleFixRequest(request) {
 
   if (request.method !== "POST") {
     return json({ error: "method_not_allowed" }, 405);
+  }
+
+  const expectedSecret = process.env.FIX_PROXY_SECRET?.trim() ?? "";
+  if (!expectedSecret) {
+    return json({ error: "misconfigured" }, 500);
+  }
+  if (!bearerMatches(request, expectedSecret)) {
+    return json({ error: "unauthorized" }, 401);
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -112,6 +121,17 @@ function outputText(payload) {
 
 function ensureTrailingSlash(url) {
   return url.endsWith("/") ? url : `${url}/`;
+}
+
+function bearerMatches(request, expected) {
+  const header = request.headers.get("authorization") ?? "";
+  const presented = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+  const left = Buffer.from(presented);
+  const right = Buffer.from(expected);
+  if (left.length !== right.length) {
+    return false;
+  }
+  return timingSafeEqual(left, right);
 }
 
 function json(body, status) {
