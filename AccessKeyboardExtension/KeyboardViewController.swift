@@ -40,8 +40,8 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
-        if let traits = textInput as? UITextInputTraits {
-            keyboard.engine.traits = .from(traits)
+        if let textInput {
+            keyboard.engine.traits = .from(textInput)
         }
         keyboard.engine.documentDidChange()
     }
