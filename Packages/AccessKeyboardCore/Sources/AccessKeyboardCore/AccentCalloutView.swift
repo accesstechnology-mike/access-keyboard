@@ -24,16 +24,24 @@ final class AccentCalloutView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(options: [String], from keyFrame: CGRect, in parent: UIView, appearance: KeyboardAppearance) {
+    func show(
+        options: [String],
+        from keyFrame: CGRect,
+        in parent: UIView,
+        appearance: KeyboardAppearance,
+        letterFill: UIColor? = nil
+    ) {
         self.options = options
         self.appearance = appearance
-        backgroundColor = appearance.calloutFill
+        let fill = letterFill ?? appearance.calloutFill
+        let text = letterFill.map { BethColorMap.foreground(for: $0) } ?? appearance.textColor
+        backgroundColor = fill
         buttons.forEach { $0.removeFromSuperview() }
         buttons = options.enumerated().map { index, value in
             let button = UIButton(type: .system)
             button.setTitle(value, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 22, weight: .regular)
-            button.setTitleColor(appearance.textColor, for: .normal)
+            button.setTitleColor(text, for: .normal)
             button.tag = index
             button.addTarget(self, action: #selector(selectOption(_:)), for: .touchUpInside)
             addSubview(button)

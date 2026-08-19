@@ -19,12 +19,16 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
         keyboard.engine.host = self
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
+        keyboard.engine.fixClient = URLSessionFixClient.fromBundle()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
+        keyboard.engine.networkAllowed = hasFullAccess
+        KeyboardPreferences.extensionHasFullAccess = hasFullAccess
+        keyboard.applyCurrentPreferences()
         keyboard.engine.documentDidChange()
         updateHeight()
     }

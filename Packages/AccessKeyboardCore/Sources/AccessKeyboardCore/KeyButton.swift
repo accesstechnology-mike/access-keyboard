@@ -164,12 +164,16 @@ final class KeyButton: UIControl {
     private func applyChrome() {
         backgroundColor = appearance.fill(
             for: spec.style,
+            character: letterCharacter,
             pressed: isHighlighted,
             highlightedModifier: isModifierHighlighted
         )
         let color = spec.style == .primary && !isHighlighted
             ? appearance.primaryTextColor
-            : appearance.foreground(for: spec.style == .primary && isHighlighted ? .letter : spec.style)
+            : appearance.foreground(
+                for: spec.style == .primary && isHighlighted ? .letter : spec.style,
+                character: letterCharacter
+            )
         label.textColor = color
         symbolView.tintColor = color
         secondaryLabel.textColor = appearance.secondaryTextColor
@@ -184,7 +188,7 @@ final class KeyButton: UIControl {
         case .text(let value):
             label.isHidden = false
             symbolView.isHidden = true
-            label.text = value
+            label.text = displayedLabel(for: value)
             let isModifier = spec.style != .letter
             label.font = .systemFont(
                 ofSize: isModifier ? metrics.modifierFontSize : metrics.letterFontSize,
@@ -208,6 +212,23 @@ final class KeyButton: UIControl {
             return shifted
         }
         return spec.display
+    }
+
+    private var letterCharacter: String? {
+        if case .character(let text) = spec.action {
+            return text
+        }
+        return nil
+    }
+
+    private func displayedLabel(for value: String) -> String {
+        guard appearance.usesBethLetterColors,
+              spec.style == .letter,
+              value.count == 1,
+              value.first?.isLetter == true else {
+            return value
+        }
+        return value.lowercased()
     }
 
     private func configureAccessibility() {

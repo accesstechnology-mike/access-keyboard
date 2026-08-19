@@ -11,6 +11,12 @@ struct RootView: View {
                     Label("Type", systemImage: "keyboard")
                 }
                 NavigationLink {
+                    SettingsView()
+                        .navigationTitle("Settings")
+                } label: {
+                    Label("Settings", systemImage: "slider.horizontal.3")
+                }
+                NavigationLink {
                     SetupView()
                         .navigationTitle("Enable system-wide")
                 } label: {

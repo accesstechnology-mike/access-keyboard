@@ -13,6 +13,7 @@ public struct KeyboardAppearance {
     public var secondaryTextColor: UIColor
     public var shadowColor: UIColor
     public var calloutFill: UIColor
+    public var usesBethLetterColors: Bool
 
     public init(
         backgroundColor: UIColor,
@@ -26,7 +27,8 @@ public struct KeyboardAppearance {
         primaryTextColor: UIColor,
         secondaryTextColor: UIColor,
         shadowColor: UIColor,
-        calloutFill: UIColor
+        calloutFill: UIColor,
+        usesBethLetterColors: Bool = false
     ) {
         self.backgroundColor = backgroundColor
         self.letterFill = letterFill
@@ -40,6 +42,7 @@ public struct KeyboardAppearance {
         self.secondaryTextColor = secondaryTextColor
         self.shadowColor = shadowColor
         self.calloutFill = calloutFill
+        self.usesBethLetterColors = usesBethLetterColors
     }
 
     public static func system(for style: UIUserInterfaceStyle) -> KeyboardAppearance {
@@ -77,7 +80,12 @@ public struct KeyboardAppearance {
         }
     }
 
-    public func fill(for style: KeyStyle, pressed: Bool, highlightedModifier: Bool) -> UIColor {
+    public func fill(
+        for style: KeyStyle,
+        character: String? = nil,
+        pressed: Bool,
+        highlightedModifier: Bool
+    ) -> UIColor {
         if highlightedModifier, !pressed {
             switch style {
             case .letter, .space:
@@ -85,6 +93,9 @@ public struct KeyboardAppearance {
             case .modifier, .primary:
                 return letterFill
             }
+        }
+        if let bethFill = bethFill(for: style, character: character) {
+            return pressed ? BethColorMap.pressedFill(for: bethFill) : bethFill
         }
         switch style {
         case .letter, .space:
@@ -96,11 +107,19 @@ public struct KeyboardAppearance {
         }
     }
 
-    public func foreground(for style: KeyStyle) -> UIColor {
+    public func foreground(for style: KeyStyle, character: String? = nil) -> UIColor {
+        if let bethFill = bethFill(for: style, character: character) {
+            return BethColorMap.foreground(for: bethFill)
+        }
         switch style {
         case .letter, .space: return textColor
         case .modifier: return modifierTextColor
         case .primary: return primaryTextColor
         }
+    }
+
+    private func bethFill(for style: KeyStyle, character: String?) -> UIColor? {
+        guard usesBethLetterColors, style == .letter, let character else { return nil }
+        return BethColorMap.fill(for: character)
     }
 }

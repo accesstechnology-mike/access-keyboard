@@ -62,6 +62,8 @@ final class TypingViewController: UIViewController, KeyboardHost {
         keyboardView.engine.host = self
         keyboardView.engine.needsInputModeSwitchKey = true
         keyboardView.engine.traits = KeyboardTraits.from(textView)
+        keyboardView.engine.fixClient = URLSessionFixClient.fromBundle()
+        keyboardView.engine.networkAllowed = true
 
         let caption = UILabel()
         caption.text = "This is the same keyboard you’ll enable for other apps. Tap below and type."

@@ -11,6 +11,7 @@ public final class KeyboardView: UIView {
     private var currentMetrics: LayoutMetrics?
     private var appearance = KeyboardAppearance.system(for: .light)
     private var callout: AccentCalloutView?
+    private var preferenceObservation: KeyboardPreferenceObservation?
     private let predictionBar = PredictionBarView()
     private let haptics = UIImpactFeedbackGenerator(style: .light)
 
@@ -40,8 +41,16 @@ public final class KeyboardView: UIView {
             self?.haptics.impactOccurred(intensity: 0.55)
             self?.engine.applyPrediction(prediction)
         }
+        predictionBar.onFix = { [weak self] in
+            UIDevice.current.playInputClick()
+            self?.haptics.impactOccurred(intensity: 0.55)
+            self?.engine.requestFix()
+        }
         addSubview(predictionBar)
         updateAppearance()
+        preferenceObservation = KeyboardPreferences.observe { [weak self] in
+            self?.applyCurrentPreferences()
+        }
         haptics.prepare()
     }
 
@@ -83,8 +92,14 @@ public final class KeyboardView: UIView {
         CGSize(width: UIView.noIntrinsicMetric, height: preferredHeight)
     }
 
+    public func applyCurrentPreferences() {
+        updateAppearance()
+        reloadKeys()
+    }
+
     private func updateAppearance() {
         appearance = KeyboardAppearance.system(for: traitCollection.userInterfaceStyle)
+        appearance.usesBethLetterColors = KeyboardPreferences.bethModeEnabled
         backgroundColor = appearance.backgroundColor
     }
 
@@ -134,6 +149,7 @@ public final class KeyboardView: UIView {
         guard engine.showsPredictions else { return }
         predictionBar.update(
             predictions: engine.predictions(),
+            fixStatus: engine.fixStatus,
             appearance: appearance,
             fontSize: metrics.modifierFontSize + 2
         )
@@ -319,7 +335,8 @@ public final class KeyboardView: UIView {
             self?.engine.handleCharacter(value)
             self?.callout = nil
         }
-        view.show(options: options, from: keyFrame, in: self, appearance: appearance)
+        let letterFill = appearance.usesBethLetterColors ? BethColorMap.fill(for: options[0]) : nil
+        view.show(options: options, from: keyFrame, in: self, appearance: appearance, letterFill: letterFill)
         callout = view
     }
 }

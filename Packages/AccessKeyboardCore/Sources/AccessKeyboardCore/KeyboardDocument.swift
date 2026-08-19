@@ -5,7 +5,11 @@ public protocol KeyboardDocument: AnyObject {
     func insertText(_ text: String)
     func deleteBackward()
     var documentContextBeforeInput: String? { get }
+    var documentContextAfterInput: String? { get }
     var selectedText: String? { get }
+    var entireText: String? { get }
+    func adjustTextPosition(byCharacterOffset offset: Int)
+    func replaceEntireText(_ text: String) -> Bool
 }
 
 @MainActor
@@ -63,8 +67,22 @@ public final class DocumentProxyAdapter: KeyboardDocument {
         proxy.documentContextBeforeInput
     }
 
+    public var documentContextAfterInput: String? {
+        proxy.documentContextAfterInput
+    }
+
     public var selectedText: String? {
         proxy.selectedText
+    }
+
+    public var entireText: String? { nil }
+
+    public func adjustTextPosition(byCharacterOffset offset: Int) {
+        proxy.adjustTextPosition(byCharacterOffset: offset)
+    }
+
+    public func replaceEntireText(_ text: String) -> Bool {
+        false
     }
 }
 
@@ -115,9 +133,36 @@ public final class TextViewDocument: KeyboardDocument {
         return textView.text(in: range)
     }
 
+    public var documentContextAfterInput: String? {
+        guard let textView else { return nil }
+        guard let selected = textView.selectedTextRange,
+              let range = textView.textRange(from: selected.end, to: textView.endOfDocument) else {
+            return nil
+        }
+        return textView.text(in: range)
+    }
+
     public var selectedText: String? {
         guard let textView, let range = textView.selectedTextRange else { return nil }
         return textView.text(in: range)
+    }
+
+    public var entireText: String? {
+        textView?.text
+    }
+
+    public func adjustTextPosition(byCharacterOffset offset: Int) {
+        guard let textView, let selected = textView.selectedTextRange,
+              let position = textView.position(from: selected.start, offset: offset) else { return }
+        textView.selectedTextRange = textView.textRange(from: position, to: position)
+    }
+
+    public func replaceEntireText(_ text: String) -> Bool {
+        guard let textView else { return false }
+        activate(textView)
+        textView.text = text
+        moveCursorToEnd(textView)
+        return true
     }
 
     private func activate(_ textView: UITextView) {

@@ -26,6 +26,9 @@ public final class KeyboardEngine {
     }
 
     public var onChange: (() -> Void)?
+    public var fixClient: (any FixClient)?
+    public var networkAllowed: Bool = false
+    public private(set) var fixStatus: FixStatus = .idle
 
     private var undoStack: [UndoRecord] = []
     private var redoStack: [UndoRecord] = []
@@ -41,6 +44,9 @@ public final class KeyboardEngine {
     }
 
     public func documentDidChange() {
+        if fixStatus == .failed {
+            fixStatus = .idle
+        }
         applyAutocapitalization()
         applyKeyboardTypeHint()
         notify()
@@ -101,6 +107,36 @@ public final class KeyboardEngine {
             before: document?.documentContextBeforeInput,
             memory: memory
         )
+    }
+
+    public func requestFix() {
+        guard fixStatus != .running else { return }
+        guard !traits.isSecureTextEntry else {
+            failFix()
+            return
+        }
+        guard networkAllowed, let client = fixClient else {
+            failFix()
+            return
+        }
+
+        let original = currentDocumentText()
+        guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+
+        fixStatus = .running
+        notify()
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let fixed = try await client.fix(original)
+                self.applyFixedText(original: original, fixed: fixed)
+            } catch {
+                self.failFix()
+            }
+        }
     }
 
     public func applyPrediction(_ prediction: Prediction) {
@@ -189,6 +225,9 @@ public final class KeyboardEngine {
         case .delete(let text):
             document?.insertText(text)
             redoStack.append(record)
+        case .replace(let deleted, let inserted):
+            replaceDocument(from: inserted, to: deleted)
+            redoStack.append(record)
         }
     }
 
@@ -201,7 +240,63 @@ public final class KeyboardEngine {
         case .delete:
             document?.deleteBackward()
             undoStack.append(record)
+        case .replace(let deleted, let inserted):
+            replaceDocument(from: deleted, to: inserted)
+            undoStack.append(record)
         }
+    }
+
+    private func applyFixedText(original: String, fixed: String) {
+        if original != fixed {
+            if document?.replaceEntireText(fixed) == true {
+                undoStack.append(.replace(deleted: original, inserted: fixed))
+                redoStack.removeAll()
+            } else {
+                replaceHarvested(original, with: fixed)
+            }
+            applyAutocapitalization()
+        }
+        fixStatus = .idle
+        notify()
+        if original != fixed {
+            UIAccessibility.post(notification: .announcement, argument: "Text fixed")
+        }
+    }
+
+    private func replaceHarvested(_ original: String, with fixed: String) {
+        let after = document?.documentContextAfterInput ?? ""
+        document?.adjustTextPosition(byCharacterOffset: (after as NSString).length)
+        for _ in original {
+            document?.deleteBackward()
+        }
+        document?.insertText(fixed)
+        undoStack.append(.replace(deleted: original, inserted: fixed))
+        redoStack.removeAll()
+    }
+
+    private func replaceDocument(from current: String, to next: String) {
+        if document?.replaceEntireText(next) == true {
+            return
+        }
+        for _ in current {
+            document?.deleteBackward()
+        }
+        document?.insertText(next)
+    }
+
+    private func currentDocumentText() -> String {
+        if let entire = document?.entireText {
+            return entire
+        }
+        return (document?.documentContextBeforeInput ?? "")
+            + (document?.selectedText ?? "")
+            + (document?.documentContextAfterInput ?? "")
+    }
+
+    private func failFix() {
+        fixStatus = .failed
+        notify()
+        UIAccessibility.post(notification: .announcement, argument: "Fix failed")
     }
 
     private func applyAutocapitalization() {
@@ -268,4 +363,5 @@ public final class KeyboardEngine {
 private enum UndoRecord {
     case insert(String)
     case delete(String)
+    case replace(deleted: String, inserted: String)
 }
