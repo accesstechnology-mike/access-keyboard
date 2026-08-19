@@ -1,0 +1,12 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+*.xcuserstate
+.swiftpm/
+.build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.idea/
