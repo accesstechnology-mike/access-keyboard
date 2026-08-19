@@ -19,9 +19,9 @@ NOTES: list[str] = []
 
 RELEASE_FIX_URL = "https://access-keyboard.vercel.app/api/fix"
 DEBUG_FIX_URL = "http://127.0.0.1:8787/api/fix"
-BUNDLE_ID = "app.access.keyboard"
-EXTENSION_BUNDLE_ID = "app.access.keyboard.extension"
 TEAM = "6M3Z27M69P"
+BUNDLE_ID = f"app.access.keyboard.{TEAM}"
+EXTENSION_BUNDLE_ID = f"app.access.keyboard.{TEAM}.extension"
 APP_GROUP = f"group.{TEAM}.app.access.keyboard"
 MARKETING_VERSION = "0.1.0"
 

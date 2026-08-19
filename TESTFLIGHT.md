@@ -22,8 +22,8 @@ In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/re
 
 | Kind | Identifier |
 | --- | --- |
-| App ID | `app.access.keyboard` |
-| App ID | `app.access.keyboard.extension` |
+| App ID | `app.access.keyboard.6M3Z27M69P` |
+| App ID | `app.access.keyboard.6M3Z27M69P.extension` |
 | App Group | `group.6M3Z27M69P.app.access.keyboard` |
 
 On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.keyboard`. The keyboard extension will not see Beth mode without that group.
@@ -34,8 +34,8 @@ On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.key
 2. Platform: **iOS**.
 3. Name: `access: keyboard`.
 4. Primary language: English (UK) if that is the team default, otherwise English (US). The keyboard’s primary language is `en-US`.
-5. Bundle ID: `app.access.keyboard`.
-6. SKU: use the bundle ID (`app.access.keyboard`) unless you already have a SKU scheme.
+5. Bundle ID: `app.access.keyboard.6M3Z27M69P`.
+6. SKU: use the bundle ID (`app.access.keyboard.6M3Z27M69P`) unless you already have a SKU scheme.
 7. User Access: Full Access.
 
 This app is **iPad only** (`TARGETED_DEVICE_FAMILY = 2`) and needs **iPadOS 18.0**. Do not add iPhone in App Store Connect.
