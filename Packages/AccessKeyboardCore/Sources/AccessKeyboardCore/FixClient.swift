@@ -24,12 +24,17 @@ public struct URLSessionFixClient: FixClient {
         self.endpoint = endpoint
     }
 
-    public static func fromBundle(_ bundle: Bundle = .main) -> URLSessionFixClient? {
+    public static func configuredEndpointString(from bundle: Bundle = .main) -> String? {
         guard let raw = bundle.object(forInfoDictionaryKey: "AKFixProxyURL") as? String else {
             return nil
         }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let endpoint = URL(string: trimmed), !trimmed.isEmpty else {
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    public static func fromBundle(_ bundle: Bundle = .main) -> URLSessionFixClient? {
+        guard let trimmed = configuredEndpointString(from: bundle),
+              let endpoint = URL(string: trimmed) else {
             return nil
         }
         return URLSessionFixClient(endpoint: endpoint)

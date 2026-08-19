@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>access: keyboard privacy</title>
+</head>
+<body>
+  <p>access: keyboard is an assistive iPad keyboard.</p>
+  <p>Full Access is requested so Beth mode can be shared with the keyboard extension, and so Fix can call the correction proxy. Keystrokes stay on the device. Tapping Fix sends the current field’s text to that proxy and does not store it there.</p>
+  <p>The Release proxy is <code>https://access-keyboard.vercel.app/api/fix</code>. It forwards that field to OpenAI with <code>store</code> disabled. Ordinary keystrokes are not sent. Password fields are skipped.</p>
+  <p>Beth mode and learned predictions stay in the app group on the iPad.</p>
+</body>
+</html>

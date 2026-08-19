@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>AKFixProxyURL</key>
-	<string>http://127.0.0.1:8787/api/fix</string>
+	<string>$(AK_FIX_PROXY_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

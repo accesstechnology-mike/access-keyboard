@@ -53,8 +53,45 @@ let image = NSImage(size: size, flipped: false) { rect in
 }
 
 guard let tiff = image.tiffRepresentation,
-      let rep = NSBitmapImageRep(data: tiff),
-      let png = rep.representation(using: .png, properties: [:]) else {
+      let sourced = NSBitmapImageRep(data: tiff) else {
+    fputs("Failed to encode PNG\n", stderr)
+    exit(1)
+}
+
+// App Store Connect rejects 1024 icons that still have an alpha channel,
+// even when every pixel is opaque.
+guard let flattened = sourced.converting(to: .sRGB, renderingIntent: .default) else {
+    fputs("Failed to convert icon to sRGB\n", stderr)
+    exit(1)
+}
+let opaque = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: flattened.pixelsWide,
+    pixelsHigh: flattened.pixelsHigh,
+    bitsPerSample: 8,
+    samplesPerPixel: 3,
+    hasAlpha: false,
+    isPlanar: false,
+    colorSpaceName: .calibratedRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 24
+)
+guard let opaque else {
+    fputs("Failed to allocate opaque icon bitmap\n", stderr)
+    exit(1)
+}
+guard let context = NSGraphicsContext(bitmapImageRep: opaque) else {
+    fputs("Failed to draw opaque icon\n", stderr)
+    exit(1)
+}
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = context
+NSImage(cgImage: flattened.cgImage!, size: NSSize(width: flattened.pixelsWide, height: flattened.pixelsHigh))
+    .draw(in: NSRect(x: 0, y: 0, width: flattened.pixelsWide, height: flattened.pixelsHigh))
+context.flushGraphics()
+NSGraphicsContext.restoreGraphicsState()
+
+guard let png = opaque.representation(using: .png, properties: [:]) else {
     fputs("Failed to encode PNG\n", stderr)
     exit(1)
 }
