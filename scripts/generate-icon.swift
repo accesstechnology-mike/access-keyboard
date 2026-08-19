@@ -1,17 +1,22 @@
 #!/usr/bin/env swift
 import AppKit
 
+// Colours from https://www.accesstechnology.co.uk
+let field = NSColor(srgbRed: 26 / 255, green: 44 / 255, blue: 65 / 255, alpha: 1)
+let surface = NSColor(srgbRed: 245 / 255, green: 247 / 255, blue: 250 / 255, alpha: 1)
+let shiftColor = NSColor(srgbRed: 36 / 255, green: 118 / 255, blue: 237 / 255, alpha: 1)
+let accent = NSColor(srgbRed: 51 / 255, green: 222 / 255, blue: 207 / 255, alpha: 1)
+
 let size = NSSize(width: 1024, height: 1024)
 let image = NSImage(size: size, flipped: false) { rect in
-    NSColor(srgbRed: 0.33, green: 0.42, blue: 0.50, alpha: 1).setFill()
+    field.setFill()
     rect.fill()
 
-    let keyboardRect = NSRect(x: 168, y: 250, width: 688, height: 430)
+    let keyboardRect = NSRect(x: 168, y: 297, width: 688, height: 430)
     let keyboardPath = NSBezierPath(roundedRect: keyboardRect, xRadius: 48, yRadius: 48)
-    NSColor(srgbRed: 0.82, green: 0.84, blue: 0.87, alpha: 1).setFill()
+    surface.setFill()
     keyboardPath.fill()
 
-    let keyColor = NSColor.white
     let rows = [10, 9, 7]
     let keySize: CGFloat = 48
     let gap: CGFloat = 12
@@ -21,12 +26,12 @@ let image = NSImage(size: size, flipped: false) { rect in
         var x = keyboardRect.midX - rowWidth / 2
         if rowIndex == 2 {
             let shift = NSRect(x: x - 72, y: y, width: 60, height: keySize)
-            NSColor(srgbRed: 0.68, green: 0.71, blue: 0.75, alpha: 1).setFill()
+            shiftColor.setFill()
             NSBezierPath(roundedRect: shift, xRadius: 10, yRadius: 10).fill()
         }
         for _ in 0..<count {
             let keyRect = NSRect(x: x, y: y, width: keySize, height: keySize)
-            keyColor.setFill()
+            field.setFill()
             NSBezierPath(roundedRect: keyRect, xRadius: 10, yRadius: 10).fill()
             x += keySize + gap
         }
@@ -34,20 +39,8 @@ let image = NSImage(size: size, flipped: false) { rect in
     }
 
     let space = NSRect(x: keyboardRect.midX - 160, y: keyboardRect.minY + 36, width: 320, height: 44)
-    NSColor.white.setFill()
+    accent.setFill()
     NSBezierPath(roundedRect: space, xRadius: 10, yRadius: 10).fill()
-
-    let badge = NSRect(x: 392, y: 118, width: 240, height: 72)
-    NSColor(srgbRed: 0.00, green: 0.48, blue: 1.00, alpha: 1).setFill()
-    NSBezierPath(roundedRect: badge, xRadius: 36, yRadius: 36).fill()
-
-    let symbolConfig = NSImage.SymbolConfiguration(pointSize: 34, weight: .bold)
-        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-    if let symbol = NSImage(systemSymbolName: "accessibility", accessibilityDescription: nil)?
-        .withSymbolConfiguration(symbolConfig) {
-        let symbolRect = NSRect(x: badge.midX - 17, y: badge.midY - 17, width: 34, height: 34)
-        symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1)
-    }
 
     return true
 }

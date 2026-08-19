@@ -5,8 +5,24 @@ struct AboutView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("access: keyboard")
-                    .font(.largeTitle.weight(.bold))
+                HStack(alignment: .center, spacing: 16) {
+                    Image("CompanyMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("access: keyboard")
+                            .font(.largeTitle.weight(.bold))
+                        Text("access: technology")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("access: keyboard, from access: technology")
+
                 Text("An assistive iPad keyboard that starts from the standard iPadOS layout, especially the large iPad Pro board. Extra tools come later without throwing away the layout you already know.")
                     .foregroundStyle(.secondary)
 
