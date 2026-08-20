@@ -32,8 +32,8 @@ struct RootView: View {
                 }
                 .navigationTitle("access: keyboard")
                 .toolbarBackground(.visible, for: .navigationBar)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
             }
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
             NavigationStack {
                 TypingScreen()
