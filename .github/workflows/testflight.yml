@@ -1,0 +1,28 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write local secrets
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          AK_FIX_PROXY_SECRET: ${{ secrets.AK_FIX_PROXY_SECRET }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+          printf 'AK_FIX_PROXY_SECRET = %s\n' "$AK_FIX_PROXY_SECRET" > Secrets.xcconfig
+
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+        run: sh scripts/upload-testflight.sh

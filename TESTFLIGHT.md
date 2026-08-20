@@ -128,6 +128,20 @@ Keystrokes are not sent off the device. Tapping Fix sends the current field’s 
 The in-app Type screen uses the same keyboard without Full Access, so you can test layout, Beth mode, and Fix before enabling the system keyboard.
 ```
 
+## 4b. Upload from this repo
+
+The App Store Connect `.p8` is not in git. Locally it lives in `secrets/` (see `AppStoreConnect.env.example`). GitHub Actions uses repository secrets.
+
+```sh
+sh scripts/upload-testflight.sh
+```
+
+That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. From any machine with `gh`:
+
+```sh
+gh workflow dispatch testflight.yml
+```
+
 ## After the first build
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
