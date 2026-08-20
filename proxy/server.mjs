@@ -17,11 +17,15 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/fix") {
       const body = await readBody(req);
+      const headers = {
+        "content-type": req.headers["content-type"] ?? "application/json",
+      };
+      if (typeof req.headers.authorization === "string") {
+        headers.authorization = req.headers.authorization;
+      }
       const request = new Request(url, {
         method: "POST",
-        headers: {
-          "content-type": req.headers["content-type"] ?? "application/json",
-        },
+        headers,
         body,
       });
       const response = await handleFixRequest(request);

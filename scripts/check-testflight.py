@@ -17,8 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ERRORS: list[str] = []
 NOTES: list[str] = []
 
-RELEASE_FIX_URL = "https://access-keyboard.vercel.app/api/fix"
-DEBUG_FIX_URL = "http://127.0.0.1:8787/api/fix"
+FIX_URL = "https://access-keyboard.vercel.app/api/fix"
 TEAM = "6M3Z27M69P"
 BUNDLE_ID = f"app.access.keyboard.{TEAM}"
 EXTENSION_BUNDLE_ID = f"app.access.keyboard.{TEAM}.extension"
@@ -169,28 +168,14 @@ def check_project() -> None:
     else:
         note("export compliance is set to exempt (HTTPS only)")
 
-    debug_urls = set()
-    release_urls = set()
-    for match in re.finditer(
-        r"/\* (Debug|Release) \*/ = \{.*?AK_FIX_PROXY_URL = ([^;]+);",
-        pbxproj,
-        flags=re.S,
-    ):
-        url = quoted(match.group(2))
-        if match.group(1) == "Debug":
-            debug_urls.add(url)
-        else:
-            release_urls.add(url)
-
-    if debug_urls != {DEBUG_FIX_URL}:
-        error(f"Debug AK_FIX_PROXY_URL is {sorted(debug_urls)}, expected {DEBUG_FIX_URL}")
+    fix_urls = {
+        quoted(value)
+        for value in setting_values(pbxproj, "AK_FIX_PROXY_URL")
+    }
+    if fix_urls != {FIX_URL}:
+        error(f"AK_FIX_PROXY_URL is {sorted(fix_urls)}, expected {FIX_URL} on every configuration")
     else:
-        note(f"Debug Fix URL is {DEBUG_FIX_URL}")
-
-    if release_urls != {RELEASE_FIX_URL}:
-        error(f"Release AK_FIX_PROXY_URL is {sorted(release_urls)}, expected {RELEASE_FIX_URL}")
-    else:
-        note(f"Release Fix URL is {RELEASE_FIX_URL}")
+        note(f"Fix URL is {FIX_URL} on every configuration")
 
 
 def load_fix_proxy_secret() -> str:
@@ -257,7 +242,7 @@ def check_secret_wiring() -> None:
 def check_privacy_page() -> None:
     page = ROOT / "proxy/public/privacy.html"
     text = page.read_text()
-    if RELEASE_FIX_URL not in text:
+    if FIX_URL not in text:
         error("proxy/public/privacy.html does not name the live Fix URL")
     else:
         note("privacy page names the live Fix URL")
@@ -269,7 +254,7 @@ def check_live_proxy() -> None:
         error("cannot probe the live Fix proxy without FIX_PROXY_SECRET")
         return
     request = urllib.request.Request(
-        RELEASE_FIX_URL,
+        FIX_URL,
         data=json.dumps({"text": "teh cat sat"}).encode(),
         headers={
             "content-type": "application/json",

@@ -6,18 +6,5 @@
 	<string>$(AK_FIX_PROXY_URL)</string>
 	<key>AKFixProxySecret</key>
 	<string>$(AK_FIX_PROXY_SECRET)</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>127.0.0.1</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-		</dict>
-	</dict>
 </dict>
 </plist>
