@@ -41,6 +41,7 @@ final class TypingViewController: UIViewController, KeyboardHost {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        edgesForExtendedLayout = .bottom
         view.backgroundColor = .systemBackground
 
         textView.font = .preferredFont(forTextStyle: .body)
@@ -63,7 +64,8 @@ final class TypingViewController: UIViewController, KeyboardHost {
         keyboardView.engine.needsInputModeSwitchKey = true
         keyboardView.engine.traits = KeyboardTraits.from(textView)
         keyboardView.engine.fixClient = URLSessionFixClient.fromBundle()
-        keyboardView.engine.networkAllowed = true
+        keyboardView.engine.networkAllowed = keyboardView.engine.fixClient != nil
+        URLSessionFixClient.persistConfigurationFromBundle()
 
         let caption = UILabel()
         caption.text = "This is the same keyboard you’ll enable for other apps. Tap below and type."
@@ -98,9 +100,16 @@ final class TypingViewController: UIViewController, KeyboardHost {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        syncTopSafeAreaIfNeeded()
         textView.locksFirstResponder = true
         textView.becomeFirstResponder()
         keyboardView.engine.documentDidChange()
+        keyboardHeightConstraint?.constant = keyboardView.preferredHeight
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        syncTopSafeAreaIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -127,4 +136,17 @@ final class TypingViewController: UIViewController, KeyboardHost {
     func dismissKeyboard() {}
 
     var needsInputModeSwitchKey: Bool { true }
+
+    /// NavigationSplitView can report a zero top safe area on the first layout pass,
+    /// which draws the Type screen under the status bar until the next navigation.
+    private func syncTopSafeAreaIfNeeded() {
+        guard let window = view.window else { return }
+        let frameInWindow = view.convert(view.bounds, to: window)
+        let overlap = window.safeAreaInsets.top - frameInWindow.minY
+        if overlap > 0.5 {
+            additionalSafeAreaInsets.top = overlap
+        } else if additionalSafeAreaInsets.top > 0, view.safeAreaInsets.top - additionalSafeAreaInsets.top > 0 {
+            additionalSafeAreaInsets.top = 0
+        }
+    }
 }

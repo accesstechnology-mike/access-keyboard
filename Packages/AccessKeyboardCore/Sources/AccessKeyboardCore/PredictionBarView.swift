@@ -5,16 +5,16 @@ final class PredictionBarView: UIView {
     var onFix: (() -> Void)?
 
     private var predictions: [Prediction] = []
-    private let fixButton = UIButton(type: .system)
+    private let fixButton = FixBarButton()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let buttons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
     private let separators = [UIView(), UIView(), UIView()]
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        fixButton.addTarget(self, action: #selector(tapFix), for: .touchUpInside)
-        fixButton.isAccessibilityElement = true
-        fixButton.clipsToBounds = true
+        fixButton.onTap = { [weak self] in
+            self?.onFix?()
+        }
         addSubview(fixButton)
         spinner.hidesWhenStopped = true
         spinner.isUserInteractionEnabled = false
@@ -29,6 +29,7 @@ final class PredictionBarView: UIView {
             addSubview(button)
         }
         separators.forEach { separator in
+            separator.isUserInteractionEnabled = false
             addSubview(separator)
         }
     }
@@ -46,15 +47,11 @@ final class PredictionBarView: UIView {
     ) {
         self.predictions = predictions
         let running = fixStatus == .running
-        fixButton.setTitle(running ? "" : "Fix", for: .normal)
+        fixButton.configure(title: running ? "" : "Fix", fontSize: fontSize, appearance: appearance)
         fixButton.isEnabled = !running
-        fixButton.backgroundColor = appearance.primaryFill
-        fixButton.setTitleColor(appearance.primaryTextColor, for: .normal)
-        fixButton.titleLabel?.font = .systemFont(ofSize: fontSize, weight: .semibold)
         fixButton.accessibilityLabel = running
             ? "Fix in progress"
             : (fixStatus == .failed ? "Fix failed, try again" : "Fix typing errors")
-        fixButton.accessibilityTraits = .button
         if running {
             spinner.startAnimating()
         } else {
@@ -118,8 +115,67 @@ final class PredictionBarView: UIView {
         guard predictions.indices.contains(sender.tag) else { return }
         onSelect?(predictions[sender.tag])
     }
+}
 
-    @objc private func tapFix() {
-        onFix?()
+/// UIButton target-action is unreliable inside `UIInputViewController`. The letter
+/// keys already use `UIControl` tracking; Fix uses the same path.
+private final class FixBarButton: UIControl {
+    var onTap: (() -> Void)?
+
+    private let titleLabel = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isExclusiveTouch = true
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        clipsToBounds = true
+        titleLabel.textAlignment = .center
+        titleLabel.isUserInteractionEnabled = false
+        addSubview(titleLabel)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(title: String, fontSize: CGFloat, appearance: KeyboardAppearance) {
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        titleLabel.textColor = appearance.primaryTextColor
+        backgroundColor = appearance.primaryFill
+        accessibilityLabel = title.isEmpty ? "Fix in progress" : "Fix typing errors"
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        titleLabel.frame = bounds
+    }
+
+    override var isHighlighted: Bool {
+        didSet { alpha = isHighlighted ? 0.75 : 1 }
+    }
+
+    override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        isHighlighted = true
+        return true
+    }
+
+    override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        isHighlighted = bounds.insetBy(dx: -12, dy: -12).contains(touch.location(in: self))
+        return true
+    }
+
+    override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        let inside = bounds.insetBy(dx: -12, dy: -12).contains(touch?.location(in: self) ?? .zero)
+        isHighlighted = false
+        if inside, isEnabled {
+            onTap?()
+        }
+    }
+
+    override func cancelTracking(with event: UIEvent?) {
+        isHighlighted = false
     }
 }

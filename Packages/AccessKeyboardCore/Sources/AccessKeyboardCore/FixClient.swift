@@ -36,10 +36,31 @@ public struct URLSessionFixClient: FixClient {
 
     public static func fromBundle(_ bundle: Bundle = .main) -> URLSessionFixClient? {
         guard let trimmed = configuredEndpointString(from: bundle),
-              let endpoint = URL(string: trimmed) else {
+              let endpoint = URL(string: trimmed),
+              endpoint.scheme == "https" || endpoint.scheme == "http" else {
             return nil
         }
         guard let rawSecret = bundle.object(forInfoDictionaryKey: "AKFixProxySecret") as? String else {
+            return nil
+        }
+        let secret = rawSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !secret.isEmpty, !secret.hasPrefix("$(") else {
+            return nil
+        }
+        return URLSessionFixClient(endpoint: endpoint, secret: secret)
+    }
+
+    public static func fromAppGroup() -> URLSessionFixClient? {
+        let suite = KeyboardPreferences.suite
+        guard let rawURL = suite.string(forKey: KeyboardPreferences.fixEndpointKey) else {
+            return nil
+        }
+        let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let endpoint = URL(string: trimmed),
+              endpoint.scheme == "https" || endpoint.scheme == "http" else {
+            return nil
+        }
+        guard let rawSecret = suite.string(forKey: KeyboardPreferences.fixSecretKey) else {
             return nil
         }
         let secret = rawSecret.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -49,15 +70,27 @@ public struct URLSessionFixClient: FixClient {
         return URLSessionFixClient(endpoint: endpoint, secret: secret)
     }
 
+    public static func persistConfigurationFromBundle(_ bundle: Bundle = .main) {
+        guard let client = fromBundle(bundle) else { return }
+        persist(client)
+    }
+
+    public static func persist(_ client: URLSessionFixClient) {
+        let suite = KeyboardPreferences.suite
+        suite.set(client.endpoint.absoluteString, forKey: KeyboardPreferences.fixEndpointKey)
+        suite.set(client.secret, forKey: KeyboardPreferences.fixSecretKey)
+    }
+
     public func fix(_ text: String) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 20
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpBody = try JSONEncoder().encode(FixRequestBody(text: text))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Self.session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw FixError.requestFailed
         }
@@ -68,6 +101,16 @@ public struct URLSessionFixClient: FixClient {
         }
         return body.text
     }
+
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.waitsForConnectivity = false
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 25
+        configuration.httpCookieStorage = nil
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration)
+    }()
 }
 
 private struct FixRequestBody: Encodable {

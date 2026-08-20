@@ -19,23 +19,35 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
         keyboard.engine.host = self
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
-        keyboard.engine.fixClient = URLSessionFixClient.fromBundle()
+        configureFixClient()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
-        keyboard.engine.networkAllowed = hasFullAccess
         KeyboardPreferences.extensionHasFullAccess = hasFullAccess
+        configureFixClient()
         keyboard.applyCurrentPreferences()
         keyboard.engine.documentDidChange()
+        updateHeight()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        KeyboardPreferences.extensionHasFullAccess = hasFullAccess
+        configureFixClient()
         updateHeight()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
+        updateHeight()
+    }
+
+    override func updateViewConstraints() {
+        super.updateViewConstraints()
         updateHeight()
     }
 
@@ -57,12 +69,27 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         keyboard.extraBottomInset = view.safeAreaInsets.bottom
         let height = keyboard.preferredHeight
         if let heightConstraint {
-            heightConstraint.constant = height
+            if abs(heightConstraint.constant - height) > 0.5 {
+                heightConstraint.constant = height
+            }
         } else {
             let constraint = view.heightAnchor.constraint(equalToConstant: height)
             constraint.priority = UILayoutPriority(999)
             constraint.isActive = true
             heightConstraint = constraint
         }
+    }
+
+    /// iOS can report `hasFullAccess` as false on the first appearance even after
+    /// the user enabled it. Still attach a client and allow the request; the
+    /// system will reject the connection if Open Access is actually off.
+    private func configureFixClient() {
+        if let client = URLSessionFixClient.fromBundle() {
+            URLSessionFixClient.persist(client)
+            keyboard.engine.fixClient = client
+        } else {
+            keyboard.engine.fixClient = URLSessionFixClient.fromAppGroup()
+        }
+        keyboard.engine.networkAllowed = keyboard.engine.fixClient != nil
     }
 }

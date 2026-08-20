@@ -47,9 +47,53 @@ public struct KeyboardTraits: Equatable {
     }
 }
 
+enum DocumentProxyWait {
+    static func yield() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+    }
+}
+
+public enum DocumentTextAssembler {
+    public static func combined(
+        before: String?,
+        selected: String?,
+        after: String?,
+        fallback: String = ""
+    ) -> String {
+        let live = (before ?? "") + (selected ?? "") + (after ?? "")
+        return preferred(live: live, shadow: fallback)
+    }
+
+    public static func preferred(live: String, shadow: String) -> String {
+        let liveEmpty = live.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let shadowEmpty = shadow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if liveEmpty { return shadow }
+        if shadowEmpty { return live }
+        if live.count >= shadow.count { return live }
+        if shadow.hasSuffix(live) || shadow.contains(live) {
+            return shadow
+        }
+        return live
+    }
+
+    public static func utf16Length(_ text: String) -> Int {
+        (text as NSString).length
+    }
+}
+
 @MainActor
 public final class DocumentProxyAdapter: KeyboardDocument {
     private let proxy: UITextDocumentProxy
+    private var shadow = ""
 
     public init(_ proxy: UITextDocumentProxy) {
         self.proxy = proxy
@@ -57,10 +101,20 @@ public final class DocumentProxyAdapter: KeyboardDocument {
 
     public func insertText(_ text: String) {
         proxy.insertText(text)
+        shadow += text
+        if let live = rawLiveText(), live.count >= shadow.count {
+            shadow = live
+        }
     }
 
     public func deleteBackward() {
         proxy.deleteBackward()
+        if !shadow.isEmpty {
+            shadow.removeLast()
+        }
+        if let live = rawLiveText() {
+            shadow = DocumentTextAssembler.preferred(live: live, shadow: shadow)
+        }
     }
 
     public var documentContextBeforeInput: String? {
@@ -75,14 +129,47 @@ public final class DocumentProxyAdapter: KeyboardDocument {
         proxy.selectedText
     }
 
-    public var entireText: String? { nil }
+    public var entireText: String? {
+        let assembled = DocumentTextAssembler.combined(
+            before: proxy.documentContextBeforeInput,
+            selected: proxy.selectedText,
+            after: proxy.documentContextAfterInput,
+            fallback: shadow
+        )
+        if !assembled.isEmpty {
+            shadow = assembled
+        }
+        return assembled.isEmpty ? nil : assembled
+    }
 
     public func adjustTextPosition(byCharacterOffset offset: Int) {
         proxy.adjustTextPosition(byCharacterOffset: offset)
     }
 
     public func replaceEntireText(_ text: String) -> Bool {
-        false
+        let after = proxy.documentContextAfterInput ?? ""
+        guard after.isEmpty else {
+            return false
+        }
+        let current = entireText ?? ""
+        guard !current.isEmpty else {
+            proxy.insertText(text)
+            shadow = text
+            return true
+        }
+        for _ in current {
+            proxy.deleteBackward()
+        }
+        proxy.insertText(text)
+        shadow = text
+        return true
+    }
+
+    private func rawLiveText() -> String? {
+        let live = (proxy.documentContextBeforeInput ?? "")
+            + (proxy.selectedText ?? "")
+            + (proxy.documentContextAfterInput ?? "")
+        return live.isEmpty ? nil : live
     }
 }
 

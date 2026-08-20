@@ -120,8 +120,9 @@ public final class KeyboardEngine {
             return
         }
 
-        let original = currentDocumentText()
-        guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let snapshot = currentDocumentText()
+        if snapshot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            failFix()
             return
         }
 
@@ -130,9 +131,14 @@ public final class KeyboardEngine {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
+            let original = await self.harvestDocumentText(fallback: snapshot)
+            guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                self.failFix()
+                return
+            }
             do {
                 let fixed = try await client.fix(original)
-                self.applyFixedText(original: original, fixed: fixed)
+                await self.applyFixedText(original: original, fixed: fixed)
             } catch {
                 self.failFix()
             }
@@ -246,13 +252,13 @@ public final class KeyboardEngine {
         }
     }
 
-    private func applyFixedText(original: String, fixed: String) {
+    private func applyFixedText(original: String, fixed: String) async {
         if original != fixed {
             if document?.replaceEntireText(fixed) == true {
                 undoStack.append(.replace(deleted: original, inserted: fixed))
                 redoStack.removeAll()
             } else {
-                replaceHarvested(original, with: fixed)
+                await replaceHarvested(original, with: fixed)
             }
             applyAutocapitalization()
         }
@@ -263,15 +269,41 @@ public final class KeyboardEngine {
         }
     }
 
-    private func replaceHarvested(_ original: String, with fixed: String) {
+    private func replaceHarvested(_ original: String, with fixed: String) async {
         let after = document?.documentContextAfterInput ?? ""
-        document?.adjustTextPosition(byCharacterOffset: (after as NSString).length)
-        for _ in original {
+        if !after.isEmpty {
+            document?.adjustTextPosition(byCharacterOffset: DocumentTextAssembler.utf16Length(after))
+            await DocumentProxyWait.yield()
+        }
+        let before = document?.documentContextBeforeInput ?? original
+        for _ in before {
             document?.deleteBackward()
         }
         document?.insertText(fixed)
         undoStack.append(.replace(deleted: original, inserted: fixed))
         redoStack.removeAll()
+    }
+
+    private func harvestDocumentText(fallback: String) async -> String {
+        if let entire = document?.entireText, !entire.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return entire
+        }
+        let after = document?.documentContextAfterInput ?? ""
+        if !after.isEmpty {
+            document?.adjustTextPosition(byCharacterOffset: DocumentTextAssembler.utf16Length(after))
+            await DocumentProxyWait.yield()
+        }
+        let assembled = DocumentTextAssembler.combined(
+            before: document?.documentContextBeforeInput,
+            selected: document?.selectedText,
+            after: document?.documentContextAfterInput,
+            fallback: fallback
+        )
+        if !after.isEmpty {
+            document?.adjustTextPosition(byCharacterOffset: -DocumentTextAssembler.utf16Length(after))
+            await DocumentProxyWait.yield()
+        }
+        return assembled
     }
 
     private func replaceDocument(from current: String, to next: String) {
@@ -285,12 +317,12 @@ public final class KeyboardEngine {
     }
 
     private func currentDocumentText() -> String {
-        if let entire = document?.entireText {
-            return entire
-        }
-        return (document?.documentContextBeforeInput ?? "")
-            + (document?.selectedText ?? "")
-            + (document?.documentContextAfterInput ?? "")
+        DocumentTextAssembler.combined(
+            before: document?.documentContextBeforeInput,
+            selected: document?.selectedText,
+            after: document?.documentContextAfterInput,
+            fallback: document?.entireText ?? ""
+        )
     }
 
     private func failFix() {

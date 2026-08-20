@@ -62,6 +62,14 @@ public final class KeyboardView: UIView {
         }
     }
 
+    public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if !predictionBar.isHidden, predictionBar.frame.contains(point) {
+            let local = convert(point, to: predictionBar)
+            return predictionBar.hitTest(local, with: event) ?? predictionBar
+        }
+        return super.hitTest(point, with: event)
+    }
+
     public override func layoutSubviews() {
         super.layoutSubviews()
         let layout = engine.layout(for: bounds.size, idiom: idiom)
@@ -80,8 +88,12 @@ public final class KeyboardView: UIView {
     }
 
     public var preferredHeight: CGFloat {
-        let layoutClass = LayoutClassResolver.resolve(size: bounds.size.width > 0 ? bounds.size : CGSize(width: 1024, height: 300), idiom: idiom)
-        let metrics = LayoutMetrics.metrics(for: layoutClass, bounds: bounds.size, safeBottom: extraBottomInset)
+        let size = LayoutClassResolver.referenceSize(
+            bounds: bounds.size,
+            fallback: superview?.bounds.size ?? window?.bounds.size
+        )
+        let layoutClass = LayoutClassResolver.resolve(size: size, idiom: idiom)
+        let metrics = LayoutMetrics.metrics(for: layoutClass, bounds: size, safeBottom: extraBottomInset)
         if engine.showsPredictions {
             return metrics.preferredHeight
         }

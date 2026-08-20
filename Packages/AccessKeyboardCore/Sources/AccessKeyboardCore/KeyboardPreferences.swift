@@ -8,6 +8,8 @@ public enum KeyboardPreferences {
     public static let appGroupID = "group.6M3Z27M69P.app.access.keyboard"
     public static let bethModeEnabledKey = "bethModeEnabled"
     public static let extensionHasFullAccessKey = "extensionHasFullAccess"
+    public static let fixEndpointKey = "fixProxyEndpoint"
+    public static let fixSecretKey = "fixProxySecret"
 
     private static let darwinName = CFNotificationName("app.access.keyboard.preferencesDidChange" as CFString)
 

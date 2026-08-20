@@ -3,37 +3,43 @@ import SwiftUI
 struct RootView: View {
     var body: some View {
         NavigationSplitView {
-            List {
-                NavigationLink {
-                    TypingScreen()
-                        .navigationTitle("Type")
-                } label: {
-                    Label("Type", systemImage: "keyboard")
+            NavigationStack {
+                List {
+                    NavigationLink {
+                        TypingScreen()
+                            .navigationTitle("Type")
+                    } label: {
+                        Label("Type", systemImage: "keyboard")
+                    }
+                    NavigationLink {
+                        SettingsView()
+                            .navigationTitle("Settings")
+                    } label: {
+                        Label("Settings", systemImage: "slider.horizontal.3")
+                    }
+                    NavigationLink {
+                        SetupView()
+                            .navigationTitle("Enable system-wide")
+                    } label: {
+                        Label("Enable system-wide", systemImage: "gear")
+                    }
+                    NavigationLink {
+                        AboutView()
+                            .navigationTitle("About")
+                    } label: {
+                        Label("About", systemImage: "heart.text.square")
+                    }
                 }
-                NavigationLink {
-                    SettingsView()
-                        .navigationTitle("Settings")
-                } label: {
-                    Label("Settings", systemImage: "slider.horizontal.3")
-                }
-                NavigationLink {
-                    SetupView()
-                        .navigationTitle("Enable system-wide")
-                } label: {
-                    Label("Enable system-wide", systemImage: "gear")
-                }
-                NavigationLink {
-                    AboutView()
-                        .navigationTitle("About")
-                } label: {
-                    Label("About", systemImage: "heart.text.square")
-                }
+                .navigationTitle("access: keyboard")
+                .toolbarBackground(.visible, for: .navigationBar)
             }
-            .navigationTitle("access: keyboard")
             .navigationSplitViewColumnWidth(min: 220, ideal: 260)
         } detail: {
-            TypingScreen()
-                .navigationTitle("Type")
+            NavigationStack {
+                TypingScreen()
+                    .navigationTitle("Type")
+                    .toolbarBackground(.visible, for: .navigationBar)
+            }
         }
     }
 }
