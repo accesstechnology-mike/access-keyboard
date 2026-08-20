@@ -46,6 +46,7 @@ mkdir -p "$WORK"
 python3 "$ROOT/scripts/app_store_connect.py" write-export-options "$WORK/ExportOptions.plist"
 
 ARCHIVE="$WORK/AccessKeyboard.xcarchive"
+TEAM="$(python3 "$ROOT/scripts/app_store_connect.py" team)"
 xcodebuild \
   -project "$ROOT/AccessKeyboard.xcodeproj" \
   -scheme AccessKeyboard \
@@ -56,6 +57,8 @@ xcodebuild \
   -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
   -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+  DEVELOPMENT_TEAM="$TEAM" \
+  CODE_SIGN_STYLE=Automatic \
   archive
 
 xcodebuild \
@@ -66,6 +69,7 @@ xcodebuild \
   -allowProvisioningUpdates \
   -authenticationKeyPath "$KEY_PATH" \
   -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
-  -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+  -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+  DEVELOPMENT_TEAM="$TEAM"
 
 echo "Uploaded build $BUILD to App Store Connect / TestFlight."

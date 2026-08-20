@@ -252,6 +252,11 @@ def cmd_export_options(path: Path) -> int:
     return 0
 
 
+def cmd_team() -> int:
+    print(unique_setting(PBXPROJ.read_text(), "DEVELOPMENT_TEAM"))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -261,6 +266,7 @@ def main() -> int:
     set_p.add_argument("build", type=int)
     export_p = sub.add_parser("write-export-options")
     export_p.add_argument("path", type=Path)
+    sub.add_parser("team")
     args = parser.parse_args()
     if args.cmd == "ping":
         return cmd_ping()
@@ -270,6 +276,8 @@ def main() -> int:
         return cmd_set_build(args.build)
     if args.cmd == "write-export-options":
         return cmd_export_options(args.path)
+    if args.cmd == "team":
+        return cmd_team()
     return 1
 
 
