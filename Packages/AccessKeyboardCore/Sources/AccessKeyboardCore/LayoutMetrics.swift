@@ -23,10 +23,16 @@ public struct LayoutMetrics: Equatable {
             + bottomInset
     }
 
-    public static func metrics(for layoutClass: LayoutClass, bounds: CGSize, safeBottom: CGFloat) -> LayoutMetrics {
+    public static func metrics(
+        for layoutClass: LayoutClass,
+        bounds: CGSize,
+        safeBottom: CGFloat,
+        rowCount: Int? = nil
+    ) -> LayoutMetrics {
+        var metrics: LayoutMetrics
         switch layoutClass {
         case .compact:
-            return LayoutMetrics(
+            metrics = LayoutMetrics(
                 sideInset: 3,
                 topInset: 8,
                 bottomInset: max(4, safeBottom > 0 ? 4 : 6),
@@ -42,7 +48,7 @@ public struct LayoutMetrics: Equatable {
             )
         case .iPad:
             let landscape = bounds.width > bounds.height
-            return LayoutMetrics(
+            metrics = LayoutMetrics(
                 sideInset: 8,
                 topInset: 10,
                 bottomInset: 10,
@@ -58,7 +64,7 @@ public struct LayoutMetrics: Equatable {
             )
         case .iPadPro:
             let landscape = bounds.width > bounds.height
-            return LayoutMetrics(
+            metrics = LayoutMetrics(
                 sideInset: 6,
                 topInset: 10,
                 bottomInset: 10,
@@ -73,5 +79,12 @@ public struct LayoutMetrics: Equatable {
                 rowCount: 5
             )
         }
+        if let rowCount, rowCount != metrics.rowCount {
+            let scale = CGFloat(metrics.rowCount) / CGFloat(max(rowCount, 1))
+            metrics.keyHeight = max(34, (metrics.keyHeight * min(1, scale * 1.08)).rounded())
+            metrics.rowSpacing = max(6, (metrics.rowSpacing * min(1, scale)).rounded())
+            metrics.rowCount = rowCount
+        }
+        return metrics
     }
 }
