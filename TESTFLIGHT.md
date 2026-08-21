@@ -1,6 +1,6 @@
 # TestFlight, step by step
 
-This is an iPad-only keyboard (`access: keyboard`). Archive the **AccessKeyboard** scheme. That already embeds `AccessKeyboardExtension`. You cannot do the upload from Linux; the last mile is Xcode on a Mac signed into team `6M3Z27M69P`.
+This is an iPad-only keyboard (`access: keyboard`). Archive the **AccessKeyboard** scheme. That already embeds `AccessKeyboardExtension`. You cannot do the upload from Linux; the last mile is Xcode on a Mac signed into team `A688GUK8XK` (Access Technology North Limited).
 
 Debug and Release builds call the live Fix proxy at `https://access-keyboard.vercel.app/api/fix`. Both send `Authorization: Bearer` with `AK_FIX_PROXY_SECRET`. That value is not in git: copy `Secrets.xcconfig.example` to `Secrets.xcconfig`, and put the same string in Vercel as `FIX_PROXY_SECRET` (Production and Preview). GitHub deploys do not wipe Vercel env vars. Do not enable Vercel Authentication; the keyboard cannot log in.
 
@@ -18,7 +18,7 @@ If you change the app after a TestFlight upload, bump `CURRENT_PROJECT_VERSION` 
 
 ## 1. Apple Developer identifiers
 
-In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list) for team `6M3Z27M69P`, create these if they are missing. Automatic signing will often create them the first time you archive, but App Groups do not always appear on their own.
+In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list) for team `A688GUK8XK`, create these if they are missing. Automatic signing will often create them the first time you archive, but App Groups do not always appear on their own.
 
 | Kind | Identifier |
 | --- | --- |
@@ -62,9 +62,9 @@ Internal TestFlight does not need a public privacy-policy URL. External testers 
 ## 4. Archive and upload from Xcode
 
 1. Open `AccessKeyboard.xcodeproj` on a Mac.
-2. Sign in to Xcode with the Apple ID for team `6M3Z27M69P`.
+2. Sign in to Xcode with the Apple ID for team `A688GUK8XK`.
 3. Select the **AccessKeyboard** scheme, **Any iOS Device (arm64)** — not a simulator.
-4. Confirm both targets use **Automatically manage signing** and team `6M3Z27M69P`.
+4. Confirm both targets use **Automatically manage signing** and team `A688GUK8XK`.
 5. Product → **Archive**. That uses Release, so Fix will hit the Vercel URL.
 6. Organizer → **Distribute App** → **App Store Connect** → **Upload**.
 7. Leave “Upload your app’s symbols” on. Do not choose Development or Ad Hoc; those never reach TestFlight.
@@ -126,6 +126,20 @@ Full Access is required for two things only:
 Keystrokes are not sent off the device. Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI with store disabled and does not keep the text. Password fields are skipped.
 
 The in-app Type screen uses the same keyboard without Full Access, so you can test layout, Beth mode, and Fix before enabling the system keyboard.
+```
+
+## 4b. Upload from this repo
+
+The App Store Connect `.p8` is not in git. Locally it lives in `secrets/` (see `AppStoreConnect.env.example`). GitHub Actions uses repository secrets.
+
+```sh
+sh scripts/upload-testflight.sh
+```
+
+That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. From any machine with `gh`:
+
+```sh
+gh workflow dispatch testflight.yml
 ```
 
 ## After the first build

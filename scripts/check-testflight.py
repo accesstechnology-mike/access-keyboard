@@ -18,10 +18,10 @@ ERRORS: list[str] = []
 NOTES: list[str] = []
 
 FIX_URL = "https://access-keyboard.vercel.app/api/fix"
-TEAM = "6M3Z27M69P"
-BUNDLE_ID = f"app.access.keyboard.{TEAM}"
-EXTENSION_BUNDLE_ID = f"app.access.keyboard.{TEAM}.extension"
-APP_GROUP = f"group.{TEAM}.app.access.keyboard"
+TEAM = "A688GUK8XK"
+BUNDLE_ID = "app.access.keyboard.6M3Z27M69P"
+EXTENSION_BUNDLE_ID = "app.access.keyboard.6M3Z27M69P.extension"
+APP_GROUP = "group.6M3Z27M69P.app.access.keyboard"
 MARKETING_VERSION = "0.1.0"
 
 

@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 Secrets.xcconfig
+secrets/
+*.p8
+AppStoreConnect.env
 xcuserdata/
 DerivedData/
 *.xcuserstate
@@ -14,3 +17,4 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 .idea/
+build/
