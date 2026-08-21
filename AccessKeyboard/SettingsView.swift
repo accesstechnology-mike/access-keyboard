@@ -5,20 +5,7 @@ struct SettingsView: View {
     @AppStorage(KeyboardPreferences.letterLayoutKey, store: KeyboardPreferences.suite)
     private var letterLayoutRaw = LetterLayout.qwerty.rawValue
 
-    @AppStorage(KeyboardPreferences.handednessKey, store: KeyboardPreferences.suite)
-    private var handednessRaw = Handedness.standard.rawValue
-
-    @AppStorage(KeyboardPreferences.keyColouringKey, store: KeyboardPreferences.suite)
-    private var keyColouringRaw = KeyColouring.none.rawValue
-
-    @AppStorage(KeyboardPreferences.contrastThemeKey, store: KeyboardPreferences.suite)
-    private var contrastThemeRaw = ContrastTheme.system.rawValue
-
-    @AppStorage(KeyboardPreferences.literacyFontEnabledKey, store: KeyboardPreferences.suite)
-    private var literacyFontEnabled = false
-
-    @AppStorage(KeyboardPreferences.bethModeEnabledKey, store: KeyboardPreferences.suite)
-    private var bethModeEnabled = false
+    @State private var colourOptionRaw = KeyboardPreferences.colourOption.rawValue
 
     @State private var extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
 
@@ -41,45 +28,19 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker("Handedness", selection: $handednessRaw) {
-                    ForEach(Handedness.allCases) { value in
-                        Text(value.title).tag(value.rawValue)
-                    }
-                }
-            } footer: {
-                Text("On ABC and Frequency, Right mirrors each row so the home cell sits top-right. On QWERTY, Hands colouring marks the left and right halves; Left or Right dims the other side.")
-            }
-
-            Section {
-                Picker("Key colouring", selection: $keyColouringRaw) {
-                    ForEach(KeyColouring.allCases) { value in
+                Picker("Colours", selection: $colourOptionRaw) {
+                    ForEach(ColourOption.allCases) { value in
                         Text(value.title).tag(value.rawValue)
                     }
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Hands split the QWERTY halves. Beth uses Beth Moulam’s synesthetic colours. High-contrast themes turn colouring off. Shift still types capitals; Beth and the literacy font keep letter keycaps lowercase.")
+                    Text("System keeps the ordinary iPad key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Beth uses Beth Moulam’s synesthetic colours. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black.")
                     Link(
                         "Beth’s article on synaesthesia",
                         destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
                     )
                 }
-            }
-
-            Section {
-                Picker("Contrast", selection: $contrastThemeRaw) {
-                    ForEach(ContrastTheme.allCases) { value in
-                        Text(value.title).tag(value.rawValue)
-                    }
-                }
-            } footer: {
-                Text("Black on white, white on black, yellow on black, and black on yellow replace decorative key colours so the board stays high contrast.")
-            }
-
-            Section {
-                Toggle("Literacy font", isOn: $literacyFontEnabled)
-            } footer: {
-                Text("Uses a literacy face with a single-story handwritten a — the form people actually write — and keeps letter keycaps lowercase.")
             }
 
             Section {
@@ -102,23 +63,16 @@ struct SettingsView: View {
         }
         .onAppear {
             extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
-            migrateLegacyBethIfNeeded()
+            KeyboardPreferences.persistMigratedColourOptionIfNeeded()
+            colourOptionRaw = KeyboardPreferences.colourOption.rawValue
         }
         .onChange(of: letterLayoutRaw) { _, _ in KeyboardPreferences.notify() }
-        .onChange(of: handednessRaw) { _, _ in KeyboardPreferences.notify() }
-        .onChange(of: keyColouringRaw) { _, newValue in
-            bethModeEnabled = newValue == KeyColouring.beth.rawValue
-            KeyboardPreferences.notify()
-        }
-        .onChange(of: contrastThemeRaw) { _, _ in KeyboardPreferences.notify() }
-        .onChange(of: literacyFontEnabled) { _, _ in KeyboardPreferences.notify() }
-    }
-
-    private func migrateLegacyBethIfNeeded() {
-        if KeyboardPreferences.suite.string(forKey: KeyboardPreferences.keyColouringKey) == nil,
-           bethModeEnabled {
-            keyColouringRaw = KeyColouring.beth.rawValue
-            KeyboardPreferences.notify()
+        .onChange(of: colourOptionRaw) { _, newValue in
+            if let option = ColourOption(rawValue: newValue) {
+                KeyboardPreferences.colourOption = option
+            } else {
+                KeyboardPreferences.notify()
+            }
         }
     }
 }

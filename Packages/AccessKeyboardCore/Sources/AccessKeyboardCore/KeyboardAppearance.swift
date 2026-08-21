@@ -13,11 +13,8 @@ public struct KeyboardAppearance {
     public var secondaryTextColor: UIColor
     public var shadowColor: UIColor
     public var calloutFill: UIColor
+    public var colour: ColourOption
     public var usesBethLetterColors: Bool
-    public var keyColouring: KeyColouring
-    public var handedness: Handedness
-    public var usesLiteracyFont: Bool
-    public var keepsLetterKeycapsLowercase: Bool
 
     public init(
         backgroundColor: UIColor,
@@ -32,11 +29,8 @@ public struct KeyboardAppearance {
         secondaryTextColor: UIColor,
         shadowColor: UIColor,
         calloutFill: UIColor,
-        usesBethLetterColors: Bool = false,
-        keyColouring: KeyColouring = .none,
-        handedness: Handedness = .standard,
-        usesLiteracyFont: Bool = false,
-        keepsLetterKeycapsLowercase: Bool = false
+        colour: ColourOption = .system,
+        usesBethLetterColors: Bool = false
     ) {
         self.backgroundColor = backgroundColor
         self.letterFill = letterFill
@@ -50,35 +44,19 @@ public struct KeyboardAppearance {
         self.secondaryTextColor = secondaryTextColor
         self.shadowColor = shadowColor
         self.calloutFill = calloutFill
+        self.colour = colour
         self.usesBethLetterColors = usesBethLetterColors
-        self.keyColouring = keyColouring
-        self.handedness = handedness
-        self.usesLiteracyFont = usesLiteracyFont
-        self.keepsLetterKeycapsLowercase = keepsLetterKeycapsLowercase
     }
 
     public static func resolved(
-        contrast: ContrastTheme,
-        colouring: KeyColouring,
-        handedness: Handedness,
-        usesLiteracyFont: Bool,
+        colour: ColourOption,
         style: UIUserInterfaceStyle
     ) -> KeyboardAppearance {
-        let effectiveColouring = contrast.overridesColouring ? KeyColouring.none : colouring
         var appearance: KeyboardAppearance
-        switch contrast {
-        case .system:
+        switch colour {
+        case .system, .vowels, .beth:
             appearance = system(for: style)
-        case .blackOnWhite:
-            appearance = highContrast(
-                background: .white,
-                keyFill: .white,
-                modifierFill: UIColor(white: 0.9, alpha: 1),
-                text: .black,
-                primaryFill: .black,
-                primaryText: .white
-            )
-        case .whiteOnBlack:
+        case .highContrastWhite:
             appearance = highContrast(
                 background: .black,
                 keyFill: UIColor(white: 0.12, alpha: 1),
@@ -87,7 +65,7 @@ public struct KeyboardAppearance {
                 primaryFill: .white,
                 primaryText: .black
             )
-        case .yellowOnBlack:
+        case .highContrastYellow:
             appearance = highContrast(
                 background: .black,
                 keyFill: UIColor(white: 0.08, alpha: 1),
@@ -96,21 +74,9 @@ public struct KeyboardAppearance {
                 primaryFill: AccessColouring.highContrastYellow,
                 primaryText: .black
             )
-        case .blackOnYellow:
-            appearance = highContrast(
-                background: AccessColouring.highContrastYellow,
-                keyFill: AccessColouring.highContrastYellow,
-                modifierFill: UIColor(red: 0.95, green: 0.82, blue: 0, alpha: 1),
-                text: .black,
-                primaryFill: .black,
-                primaryText: AccessColouring.highContrastYellow
-            )
         }
-        appearance.keyColouring = effectiveColouring
-        appearance.handedness = handedness
-        appearance.usesBethLetterColors = effectiveColouring == .beth
-        appearance.usesLiteracyFont = usesLiteracyFont
-        appearance.keepsLetterKeycapsLowercase = usesLiteracyFont || effectiveColouring == .beth
+        appearance.colour = colour
+        appearance.usesBethLetterColors = colour == .beth
         return appearance
     }
 
@@ -178,7 +144,7 @@ public struct KeyboardAppearance {
 
     public func foreground(for style: KeyStyle, character: String? = nil) -> UIColor {
         if let overlay = decorativeFill(for: style, character: character) {
-            return AccessColouring.foreground(for: overlay, colouring: keyColouring)
+            return AccessColouring.foreground(for: overlay)
         }
         switch style {
         case .letter, .space: return textColor
@@ -189,14 +155,7 @@ public struct KeyboardAppearance {
 
     private func decorativeFill(for style: KeyStyle, character: String?) -> UIColor? {
         guard style == .letter, let character else { return nil }
-        if usesBethLetterColors {
-            return BethColorMap.fill(for: character)
-        }
-        return AccessColouring.fill(
-            colouring: keyColouring,
-            character: character,
-            handedness: handedness
-        )
+        return AccessColouring.fill(colour: colour, character: character)
     }
 
     private static func highContrast(

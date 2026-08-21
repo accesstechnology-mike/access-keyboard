@@ -164,8 +164,7 @@ public final class KeyboardEngine {
             layoutClass: layoutClass,
             needsInputModeSwitchKey: needsInputModeSwitchKey,
             returnKeyType: traits.returnKeyType,
-            letterLayout: KeyboardPreferences.letterLayout,
-            handedness: KeyboardPreferences.handedness
+            letterLayout: KeyboardPreferences.letterLayout
         )
     }
 

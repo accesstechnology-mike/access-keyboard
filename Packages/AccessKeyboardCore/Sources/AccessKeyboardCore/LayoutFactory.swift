@@ -7,8 +7,7 @@ public enum LayoutFactory {
         layoutClass: LayoutClass,
         needsInputModeSwitchKey: Bool,
         returnKeyType: UIReturnKeyType,
-        letterLayout: LetterLayout = .qwerty,
-        handedness: Handedness = .standard
+        letterLayout: LetterLayout = .qwerty
     ) -> KeyboardLayout {
         switch layoutClass {
         case .compact:
@@ -17,8 +16,7 @@ public enum LayoutFactory {
                 shift: shift,
                 needsGlobe: needsInputModeSwitchKey,
                 returnKeyType: returnKeyType,
-                letterLayout: letterLayout,
-                handedness: handedness
+                letterLayout: letterLayout
             )
         case .iPad:
             return iPadLayout(
@@ -26,8 +24,7 @@ public enum LayoutFactory {
                 shift: shift,
                 needsGlobe: needsInputModeSwitchKey,
                 returnKeyType: returnKeyType,
-                letterLayout: letterLayout,
-                handedness: handedness
+                letterLayout: letterLayout
             )
         case .iPadPro:
             return iPadProLayout(
@@ -35,8 +32,7 @@ public enum LayoutFactory {
                 shift: shift,
                 needsGlobe: needsInputModeSwitchKey,
                 returnKeyType: returnKeyType,
-                letterLayout: letterLayout,
-                handedness: handedness
+                letterLayout: letterLayout
             )
         }
     }
@@ -48,8 +44,7 @@ public enum LayoutFactory {
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        letterLayout: LetterLayout,
-        handedness: Handedness
+        letterLayout: LetterLayout
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
@@ -58,11 +53,10 @@ public enum LayoutFactory {
                 rows = compactFrequencyRows(
                     shift: shift,
                     needsGlobe: needsGlobe,
-                    returnKeyType: returnKeyType,
-                    handedness: handedness
+                    returnKeyType: returnKeyType
                 )
             } else {
-                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                let map = LetterMaps.frameRows(for: letterLayout)
                 rows = [
                     KeyboardRow(keys: letters(map.top, shift: shift)),
                     KeyboardRow(keys: letters(map.home, shift: shift)),
@@ -97,10 +91,9 @@ public enum LayoutFactory {
     private static func compactFrequencyRows(
         shift: ShiftState,
         needsGlobe: Bool,
-        returnKeyType: UIReturnKeyType,
-        handedness: Handedness
+        returnKeyType: UIReturnKeyType
     ) -> [KeyboardRow] {
-        let freq = LetterMaps.frequencyRows(handedness: handedness)
+        let freq = LetterMaps.frequencyRows()
         var rows = freq.dropLast().map { KeyboardRow(keys: letters($0, shift: shift)) }
         if let last = freq.last {
             rows.append(
@@ -133,8 +126,7 @@ public enum LayoutFactory {
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        letterLayout: LetterLayout,
-        handedness: Handedness
+        letterLayout: LetterLayout
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
@@ -144,11 +136,10 @@ public enum LayoutFactory {
                     shift: shift,
                     needsGlobe: needsGlobe,
                     returnKeyType: returnKeyType,
-                    handedness: handedness,
                     pro: false
                 )
             } else {
-                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                let map = LetterMaps.frameRows(for: letterLayout)
                 rows = [
                     KeyboardRow(keys: letters(map.top, shift: shift) + [backspace(compact: false, width: .unit(1.5))]),
                     KeyboardRow(keys: letters(map.home, shift: shift) + [
@@ -201,8 +192,7 @@ public enum LayoutFactory {
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        letterLayout: LetterLayout,
-        handedness: Handedness
+        letterLayout: LetterLayout
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
@@ -212,11 +202,10 @@ public enum LayoutFactory {
                     shift: shift,
                     needsGlobe: needsGlobe,
                     returnKeyType: returnKeyType,
-                    handedness: handedness,
                     pro: true
                 )
             } else {
-                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                let map = LetterMaps.frameRows(for: letterLayout)
                 rows = [
                     KeyboardRow(keys: numberRow(shift: shift) + [backspace(compact: false, width: .unit(1.8))]),
                     KeyboardRow(keys: [
@@ -295,10 +284,9 @@ public enum LayoutFactory {
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        handedness: Handedness,
         pro: Bool
     ) -> [KeyboardRow] {
-        let freq = LetterMaps.frequencyRows(handedness: handedness)
+        let freq = LetterMaps.frequencyRows()
         var rows: [KeyboardRow] = []
         if pro {
             rows.append(KeyboardRow(keys: [tabKey()] + letters(freq[0], shift: shift) + [backspace(compact: false, width: .unit(1.8))]))

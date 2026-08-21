@@ -188,10 +188,9 @@ final class KeyButton: UIControl {
         case .text(let value):
             label.isHidden = false
             symbolView.isHidden = true
-            label.text = displayedLabel(for: value)
+            label.text = value
             let isModifier = spec.style != .letter
             if spec.style == .letter,
-               appearance.usesLiteracyFont,
                let literacy = LiteracyFont.uiFont(ofSize: metrics.letterFontSize) {
                 label.font = literacy
             } else {
@@ -225,16 +224,6 @@ final class KeyButton: UIControl {
             return text
         }
         return nil
-    }
-
-    private func displayedLabel(for value: String) -> String {
-        guard appearance.keepsLetterKeycapsLowercase,
-              spec.style == .letter,
-              value.count == 1,
-              value.first?.isLetter == true else {
-            return value
-        }
-        return value.lowercased()
     }
 
     private func configureAccessibility() {

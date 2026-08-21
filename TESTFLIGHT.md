@@ -26,7 +26,7 @@ In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/re
 | App ID | `app.access.keyboard.6M3Z27M69P.extension` |
 | App Group | `group.6M3Z27M69P.app.access.keyboard` |
 
-On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.keyboard`. The keyboard extension will not see Beth mode without that group.
+On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.keyboard`. The keyboard extension will not see colour settings without that group.
 
 ## 2. App Store Connect record
 
@@ -55,7 +55,7 @@ Use these only; they match the privacy manifests and the Fix proxy.
 | Purpose | App Functionality |
 | When | Only if the tester taps **Fix** |
 | Third party? | Yes. The Release proxy at `https://access-keyboard.vercel.app/api/fix` forwards that field to OpenAI with `store` disabled. The proxy does not keep the text. Ordinary keystrokes stay on the iPad. |
-| Beth mode / predictions | On-device only (App Group + UserDefaults) |
+| Colour settings / predictions | On-device only (App Group + UserDefaults) |
 
 Internal TestFlight does not need a public privacy-policy URL. External testers / App Review will. After you deploy `proxy/public/privacy.html`, the URL is `https://access-keyboard.vercel.app/privacy.html`.
 
@@ -99,13 +99,13 @@ Paste this into the TestFlight group:
 ```
 iPad + iPadOS 18 only. iPhone will not install this build.
 
-1. Open access: keyboard. Type on the Type screen. Confirm the layout matches a normal iPad keyboard, including the globe key.
-2. Settings → turn on Beth mode. Letters should take Beth Moulam’s colours. Type a few misspellings and tap Fix on the suggestion bar. Undo should restore the original. Password fields must not send text.
+1. Open access: keyboard. Type on the Type screen. Confirm the layout matches a normal iPad keyboard, including the globe key. Keys should be larger than a stock iPad board, and letters should use the literacy font.
+2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. Undo should restore the original. Password fields must not send text.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
-4. In Notes or Safari, switch to access: keyboard with the globe key. Beth mode and Fix should now work there too.
+4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too.
 5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on).
 
-Full Access is required for Beth mode and Fix outside this app. Keystrokes stay on the iPad. Fix sends only the current field to https://access-keyboard.vercel.app/api/fix.
+Full Access is required for colour settings and Fix outside this app. Keystrokes stay on the iPad. Fix sends only the current field to https://access-keyboard.vercel.app/api/fix.
 ```
 
 ## Beta review notes
@@ -120,12 +120,12 @@ Settings → General → Keyboard → Keyboards → Add New Keyboard… → acce
 Then open that keyboard and enable Allow Full Access.
 
 Full Access is required for two things only:
-1. Share the Beth-mode colour toggle with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
+1. Share colour settings with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
 2. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
 
 Keystrokes are not sent off the device. Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI with store disabled and does not keep the text. Password fields are skipped.
 
-The in-app Type screen uses the same keyboard without Full Access, so you can test layout, Beth mode, and Fix before enabling the system keyboard.
+The in-app Type screen uses the same keyboard without Full Access, so you can test layout, colours, and Fix before enabling the system keyboard.
 ```
 
 ## 4b. Upload from this repo

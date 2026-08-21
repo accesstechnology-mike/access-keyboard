@@ -105,14 +105,10 @@ public final class KeyboardView: UIView {
     }
 
     private func updateAppearance() {
-        if KeyboardPreferences.literacyFontEnabled {
-            LiteracyFont.registerIfNeeded()
-        }
+        LiteracyFont.registerIfNeeded()
+        KeyboardPreferences.persistMigratedColourOptionIfNeeded()
         appearance = KeyboardAppearance.resolved(
-            contrast: KeyboardPreferences.contrastTheme,
-            colouring: KeyboardPreferences.keyColouring,
-            handedness: KeyboardPreferences.handedness,
-            usesLiteracyFont: KeyboardPreferences.literacyFontEnabled,
+            colour: KeyboardPreferences.colourOption,
             style: traitCollection.userInterfaceStyle
         )
         backgroundColor = appearance.backgroundColor

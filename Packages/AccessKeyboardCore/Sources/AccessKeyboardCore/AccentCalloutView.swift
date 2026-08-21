@@ -40,7 +40,8 @@ final class AccentCalloutView: UIView {
         buttons = options.enumerated().map { index, value in
             let button = UIButton(type: .system)
             button.setTitle(value, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 22, weight: .regular)
+            button.titleLabel?.font = LiteracyFont.uiFont(ofSize: 22)
+                ?? .systemFont(ofSize: 22, weight: .regular)
             button.setTitleColor(text, for: .normal)
             button.tag = index
             button.addTarget(self, action: #selector(selectOption(_:)), for: .touchUpInside)

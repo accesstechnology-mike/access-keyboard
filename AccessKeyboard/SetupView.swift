@@ -12,7 +12,7 @@ struct SetupView: View {
 
                 step(1, title: "Open Settings", detail: "Settings → General → Keyboard → Keyboards.")
                 step(2, title: "Add the keyboard", detail: "Tap Add New Keyboard…, then choose access: keyboard.")
-                step(3, title: "Allow Full Access", detail: "Open access: keyboard in that list and turn on Allow Full Access. Beth mode needs it to share the colour toggle. Fix needs it to reach the correction service. Typing keys stay on this device; tapping Fix sends the current field to the proxy.")
+                step(3, title: "Allow Full Access", detail: "Open access: keyboard in that list and turn on Allow Full Access. Colour settings need it so the extension sees the same choice. Fix needs it to reach the correction service. Typing keys stay on this device; tapping Fix sends the current field to the proxy.")
                 step(4, title: "Switch to it", detail: "In any text field, tap the globe key until you see access: keyboard.")
 
                 Text("iPadOS does not let an app open the keyboard list for you. You have to add it in Settings yourself — that’s an Apple restriction, not a missing feature.")

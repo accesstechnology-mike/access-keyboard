@@ -71,8 +71,8 @@ final class PredictionBarView: UIView {
                     ? "Use as typed, \(item.insertion)"
                     : "Predicted word, \(item.insertion)"
                 button.accessibilityTraits = .button
-                let weight: UIFont.Weight = item.isVerbatim ? .regular : .medium
-                button.titleLabel?.font = .systemFont(ofSize: fontSize, weight: weight)
+                button.titleLabel?.font = LiteracyFont.uiFont(ofSize: fontSize)
+                    ?? .systemFont(ofSize: fontSize, weight: item.isVerbatim ? .regular : .medium)
                 button.setTitleColor(appearance.textColor, for: .normal)
                 button.alpha = running ? 0.45 : 1
             } else {
