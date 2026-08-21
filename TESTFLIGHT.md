@@ -142,7 +142,7 @@ That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFligh
 gh workflow run testflight.yml --ref <branch>
 ```
 
-Pushing a `testflight-*` tag also starts the same job. The upload script asks App Store Connect for the next build number, so you do not have to bump `CURRENT_PROJECT_VERSION` by hand before CI.
+Pushing a `testflight-*` tag also starts the same job. The job runs on `macos-26` (Xcode 26 / iOS 26 SDK); App Store Connect rejects archives from Xcode 16. The upload script asks App Store Connect for the next build number, so you do not have to bump `CURRENT_PROJECT_VERSION` by hand before CI.
 
 ## After the first build
 
