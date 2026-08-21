@@ -136,10 +136,19 @@ The App Store Connect `.p8` is not in git. Locally it lives in `secrets/` (see `
 sh scripts/upload-testflight.sh
 ```
 
-That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. From any machine with `gh`:
+That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. App Store Connect currently requires the iOS 26 SDK, so CI runs on `macos-26`.
+
+From any machine with `gh`:
 
 ```sh
-gh workflow dispatch testflight.yml
+gh workflow run testflight.yml --ref main
+```
+
+Or push a tag. That is what this repo uses when `workflow_dispatch` is not available:
+
+```sh
+git tag testflight-<short-reason>
+git push origin testflight-<short-reason>
 ```
 
 ## After the first build

@@ -2,10 +2,13 @@ name: TestFlight
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "testflight-*"
 
 jobs:
   upload:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
