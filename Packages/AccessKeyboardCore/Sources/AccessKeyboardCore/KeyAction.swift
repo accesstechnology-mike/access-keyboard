@@ -23,6 +23,11 @@ public enum KeyStyle: Equatable {
     case space
 }
 
+public enum KeyRepeatPhase: Equatable {
+    case character
+    case word
+}
+
 public enum KeyWidth: Equatable {
     case unit(CGFloat)
     case flexible

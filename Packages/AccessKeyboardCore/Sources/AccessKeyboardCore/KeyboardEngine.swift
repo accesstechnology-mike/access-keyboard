@@ -26,6 +26,7 @@ public final class KeyboardEngine {
     }
 
     public var onChange: (() -> Void)?
+    public var onPredictionsChange: (() -> Void)?
     public var fixClient: (any FixClient)?
     public var networkAllowed: Bool = false
     public private(set) var fixStatus: FixStatus = .idle
@@ -63,7 +64,7 @@ public final class KeyboardEngine {
             applyAutocapitalization()
         case .space:
             learnCurrentWord()
-            insert(" ")
+            insertSpaceOrPeriod()
             consumeOneShotShift()
             applyAutocapitalization()
         case .tab:
@@ -98,6 +99,36 @@ public final class KeyboardEngine {
 
     public func handleCharacter(_ text: String) {
         handle(.character(text))
+    }
+
+    public func continueBackspace(byWord: Bool) {
+        if byWord {
+            deleteBackwardWord()
+        } else {
+            deleteBackward()
+        }
+        applyAutocapitalization()
+        notify()
+    }
+
+    public func moveCursor(horizontal: Int, vertical: Int) {
+        let before = document?.documentContextBeforeInput ?? ""
+        let after = document?.documentContextAfterInput ?? ""
+        let offset = EditingShortcuts.cursorOffset(
+            before: before,
+            after: after,
+            horizontal: horizontal,
+            vertical: vertical
+        )
+        guard offset != 0 else { return }
+        document?.adjustTextPosition(byCharacterOffset: offset)
+        let previousShift = shift
+        applyAutocapitalization()
+        if previousShift != shift {
+            notify()
+        } else {
+            onPredictionsChange?()
+        }
     }
 
     public func predictions() -> [Prediction] {
@@ -184,6 +215,19 @@ public final class KeyboardEngine {
         redoStack.removeAll()
     }
 
+    private func insertSpaceOrPeriod() {
+        let before = document?.documentContextBeforeInput ?? ""
+        guard EditingShortcuts.shouldConvertDoubleSpace(before) else {
+            insert(" ")
+            return
+        }
+        document?.deleteBackward()
+        if case .insert(" ") = undoStack.last {
+            undoStack.removeLast()
+        }
+        insert(". ")
+    }
+
     private func deleteBackward() {
         let deleted = document?.documentContextBeforeInput?.last.map(String.init) ?? ""
         document?.deleteBackward()
@@ -191,6 +235,18 @@ public final class KeyboardEngine {
             undoStack.append(.delete(deleted))
             redoStack.removeAll()
         }
+    }
+
+    private func deleteBackwardWord() {
+        let before = document?.documentContextBeforeInput ?? ""
+        let count = EditingShortcuts.wordDeleteLength(in: before)
+        guard count > 0 else { return }
+        let deleted = String(before.suffix(count))
+        for _ in deleted {
+            document?.deleteBackward()
+        }
+        undoStack.append(.delete(deleted))
+        redoStack.removeAll()
     }
 
     private func consumeOneShotShift() {

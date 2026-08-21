@@ -7,6 +7,7 @@ public final class KeyboardView: UIView {
     public var extraBottomInset: CGFloat = 0
 
     private var keyButtons: [KeyButton] = []
+    private var spaceButton: KeyButton?
     private var currentLayout: KeyboardLayout?
     private var currentMetrics: LayoutMetrics?
     private var appearance = KeyboardAppearance.system(for: .light)
@@ -14,6 +15,8 @@ public final class KeyboardView: UIView {
     private var preferenceObservation: KeyboardPreferenceObservation?
     private let predictionBar = PredictionBarView()
     private let haptics = UIImpactFeedbackGenerator(style: .light)
+    private var spaceTrackpad: UIPanGestureRecognizer?
+    private var trackpadRemainder = CGPoint.zero
 
     public convenience init() {
         self.init(engine: KeyboardEngine())
@@ -32,10 +35,20 @@ public final class KeyboardView: UIView {
     }
 
     private func commonInit() {
-        isMultipleTouchEnabled = false
+        isMultipleTouchEnabled = true
         engine.onChange = { [weak self] in
             self?.reloadKeys()
         }
+        engine.onPredictionsChange = { [weak self] in
+            self?.refreshPredictions()
+        }
+        let trackpad = UIPanGestureRecognizer(target: self, action: #selector(handleSpaceTrackpad(_:)))
+        trackpad.minimumNumberOfTouches = 2
+        trackpad.maximumNumberOfTouches = 2
+        trackpad.cancelsTouchesInView = true
+        trackpad.delegate = self
+        addGestureRecognizer(trackpad)
+        spaceTrackpad = trackpad
         predictionBar.onSelect = { [weak self] prediction in
             UIDevice.current.playInputClick()
             self?.haptics.impactOccurred(intensity: 0.55)
@@ -120,8 +133,17 @@ public final class KeyboardView: UIView {
         invalidateIntrinsicContentSize()
     }
 
+    private func refreshPredictions() {
+        guard let metrics = currentMetrics else {
+            reloadKeys()
+            return
+        }
+        layoutPredictionBar(metrics: metrics)
+    }
+
     private func rebuildKeys(layout: KeyboardLayout, metrics: LayoutMetrics) {
         keyButtons.forEach { $0.removeFromSuperview() }
+        spaceButton = nil
         keyButtons = layout.rows.flatMap { row in
             row.keys.map { spec in
                 let button = KeyButton(
@@ -140,8 +162,8 @@ public final class KeyboardView: UIView {
                 button.onLongPress = { [weak self] spec in
                     self?.handleLongPress(spec, from: button)
                 }
-                button.onRepeat = { [weak self] spec in
-                    self?.handleRepeat(spec)
+                button.onRepeat = { [weak self] spec, phase in
+                    self?.handleRepeat(spec, phase: phase)
                 }
                 button.onDrag = { [weak self] _, point in
                     self?.callout?.updateSelection(at: point)
@@ -150,6 +172,9 @@ public final class KeyboardView: UIView {
                     self?.finishLongPress(spec)
                 }
                 addSubview(button)
+                if spec.action == .space {
+                    self.spaceButton = button
+                }
                 return button
             }
         }
@@ -298,9 +323,37 @@ public final class KeyboardView: UIView {
         }
     }
 
-    private func handleRepeat(_ spec: KeySpec) {
+    private func handleRepeat(_ spec: KeySpec, phase: KeyRepeatPhase) {
         if spec.action == .backspace {
-            engine.handle(.backspace)
+            engine.continueBackspace(byWord: phase == .word)
+        }
+    }
+
+    @objc private func handleSpaceTrackpad(_ gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            trackpadRemainder = .zero
+        case .changed:
+            let translation = gesture.translation(in: self)
+            gesture.setTranslation(.zero, in: self)
+            trackpadRemainder.x += translation.x
+            trackpadRemainder.y += translation.y
+            guard let keyHeight = currentMetrics?.keyHeight else { return }
+            let characterStep = max(1, (keyHeight / 8).rounded())
+            let lineStep = max(1, (keyHeight / 4).rounded())
+            let horizontal = Int((trackpadRemainder.x / characterStep).rounded(.towardZero))
+            let vertical = Int((trackpadRemainder.y / lineStep).rounded(.towardZero))
+            if horizontal != 0 {
+                trackpadRemainder.x -= CGFloat(horizontal) * characterStep
+            }
+            if vertical != 0 {
+                trackpadRemainder.y -= CGFloat(vertical) * lineStep
+            }
+            if horizontal != 0 || vertical != 0 {
+                engine.moveCursor(horizontal: horizontal, vertical: vertical)
+            }
+        default:
+            trackpadRemainder = .zero
         }
     }
 
@@ -354,4 +407,15 @@ public final class KeyboardView: UIView {
 
 extension KeyboardView: UIInputViewAudioFeedback {
     public var enableInputClicksWhenVisible: Bool { true }
+}
+
+extension KeyboardView: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        guard gestureRecognizer === spaceTrackpad else { return true }
+        guard let spaceButton else { return false }
+        return spaceButton.bounds.contains(touch.location(in: spaceButton))
+    }
 }

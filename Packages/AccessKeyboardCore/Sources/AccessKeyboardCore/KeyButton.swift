@@ -10,7 +10,7 @@ final class KeyButton: UIControl {
     var onPress: ((KeySpec) -> Void)?
     var onRelease: ((KeySpec) -> Void)?
     var onLongPress: ((KeySpec) -> Void)?
-    var onRepeat: ((KeySpec) -> Void)?
+    var onRepeat: ((KeySpec, KeyRepeatPhase) -> Void)?
     var onDrag: ((KeySpec, CGPoint) -> Void)?
     var onFinishLongPress: ((KeySpec) -> Void)?
 
@@ -20,6 +20,8 @@ final class KeyButton: UIControl {
     private var longPressTimer: Timer?
     private var repeatTimer: Timer?
     private var didLongPress = false
+    private var backspaceLetterRepeats = 0
+    private var backspacePhase: KeyRepeatPhase = .character
 
     init(
         spec: KeySpec,
@@ -34,7 +36,7 @@ final class KeyButton: UIControl {
         self.shift = shift
         self.isModifierHighlighted = isModifierHighlighted
         super.init(frame: .zero)
-        isExclusiveTouch = true
+        isExclusiveTouch = spec.action != .space
         layer.cornerRadius = metrics.cornerRadius
         layer.shadowOffset = CGSize(width: 0, height: 1)
         layer.shadowRadius = 0
@@ -97,9 +99,10 @@ final class KeyButton: UIControl {
         isHighlighted = true
         didLongPress = false
         onPress?(spec)
-        scheduleLongPress()
         if spec.action == .backspace {
             scheduleRepeat()
+        } else {
+            scheduleLongPress()
         }
         return true
     }
@@ -141,17 +144,36 @@ final class KeyButton: UIControl {
     }
 
     private func scheduleRepeat() {
+        backspaceLetterRepeats = 0
+        backspacePhase = .character
         repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.07, repeats: true) { [weak self] _ in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.onRepeat?(self.spec)
-                    }
-                }
+                self.startRepeating(phase: .character, interval: 0.08)
             }
         }
+    }
+
+    private func startRepeating(phase: KeyRepeatPhase, interval: TimeInterval) {
+        backspacePhase = phase
+        repeatTimer?.invalidate()
+        fireRepeat()
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.fireRepeat()
+            }
+        }
+    }
+
+    private func fireRepeat() {
+        if backspacePhase == .character, backspaceLetterRepeats >= 8 {
+            startRepeating(phase: .word, interval: 0.14)
+            return
+        }
+        if backspacePhase == .character {
+            backspaceLetterRepeats += 1
+        }
+        onRepeat?(spec, backspacePhase)
     }
 
     private func cancelTimers() {

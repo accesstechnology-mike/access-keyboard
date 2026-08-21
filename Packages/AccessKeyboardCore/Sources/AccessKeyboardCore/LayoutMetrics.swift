@@ -38,12 +38,12 @@ public struct LayoutMetrics: Equatable {
                 bottomInset: max(4, safeBottom > 0 ? 4 : 6),
                 keySpacing: 7,
                 rowSpacing: 12,
-                keyHeight: 56,
-                predictionBarHeight: 48,
+                keyHeight: 52,
+                predictionBarHeight: 46,
                 cornerRadius: 6,
-                letterFontSize: 26,
-                modifierFontSize: 18,
-                symbolPointSize: 20,
+                letterFontSize: 24,
+                modifierFontSize: 17,
+                symbolPointSize: 19,
                 rowCount: 4
             )
         case .iPad:
@@ -54,12 +54,12 @@ public struct LayoutMetrics: Equatable {
                 bottomInset: 10,
                 keySpacing: 9,
                 rowSpacing: 10,
-                keyHeight: landscape ? 80 : 88,
-                predictionBarHeight: 56,
-                cornerRadius: 10,
-                letterFontSize: 30,
-                modifierFontSize: 18,
-                symbolPointSize: 22,
+                keyHeight: landscape ? 72 : 80,
+                predictionBarHeight: 52,
+                cornerRadius: 9,
+                letterFontSize: 28,
+                modifierFontSize: 17,
+                symbolPointSize: 21,
                 rowCount: 4
             )
         case .iPadPro:
@@ -70,18 +70,18 @@ public struct LayoutMetrics: Equatable {
                 bottomInset: 10,
                 keySpacing: 9,
                 rowSpacing: 10,
-                keyHeight: landscape ? 80 : 86,
-                predictionBarHeight: 58,
-                cornerRadius: 10,
-                letterFontSize: 32,
-                modifierFontSize: 18,
-                symbolPointSize: 22,
+                keyHeight: landscape ? 72 : 78,
+                predictionBarHeight: 54,
+                cornerRadius: 9,
+                letterFontSize: 30,
+                modifierFontSize: 17,
+                symbolPointSize: 21,
                 rowCount: 5
             )
         }
         if let rowCount, rowCount != metrics.rowCount {
             let scale = CGFloat(metrics.rowCount) / CGFloat(max(rowCount, 1))
-            metrics.keyHeight = max(56, (metrics.keyHeight * min(1, scale * 1.08)).rounded())
+            metrics.keyHeight = max(50, (metrics.keyHeight * min(1, scale * 1.08)).rounded())
             metrics.rowSpacing = max(8, (metrics.rowSpacing * min(1, scale)).rounded())
             metrics.rowCount = rowCount
         }

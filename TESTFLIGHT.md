@@ -99,7 +99,7 @@ Paste this into the TestFlight group:
 ```
 iPad + iPadOS 18 only. iPhone will not install this build.
 
-1. Open access: keyboard. Type on the Type screen. Confirm the layout matches a normal iPad keyboard, including the globe key. Keys should be larger than a stock iPad board, and letters should use the literacy font.
+1. Open access: keyboard. Type on the Type screen. Confirm the layout matches a normal iPad keyboard, including the globe key. Keys should be larger than a stock iPad board, and letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the space bar should move the cursor.
 2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. Undo should restore the original. Password fields must not send text.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
 4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too.
