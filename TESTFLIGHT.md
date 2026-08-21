@@ -139,8 +139,10 @@ sh scripts/upload-testflight.sh
 That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. From any machine with `gh`:
 
 ```sh
-gh workflow dispatch testflight.yml
+gh workflow run testflight.yml --ref <branch>
 ```
+
+Pushing a `testflight-*` tag also starts the same job. The upload script asks App Store Connect for the next build number, so you do not have to bump `CURRENT_PROJECT_VERSION` by hand before CI.
 
 ## After the first build
 
