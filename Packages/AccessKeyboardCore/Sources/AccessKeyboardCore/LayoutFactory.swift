@@ -6,15 +6,38 @@ public enum LayoutFactory {
         shift: ShiftState,
         layoutClass: LayoutClass,
         needsInputModeSwitchKey: Bool,
-        returnKeyType: UIReturnKeyType
+        returnKeyType: UIReturnKeyType,
+        letterLayout: LetterLayout = .qwerty,
+        handedness: Handedness = .standard
     ) -> KeyboardLayout {
         switch layoutClass {
         case .compact:
-            return compactLayout(mode: mode, shift: shift, needsGlobe: needsInputModeSwitchKey, returnKeyType: returnKeyType)
+            return compactLayout(
+                mode: mode,
+                shift: shift,
+                needsGlobe: needsInputModeSwitchKey,
+                returnKeyType: returnKeyType,
+                letterLayout: letterLayout,
+                handedness: handedness
+            )
         case .iPad:
-            return iPadLayout(mode: mode, shift: shift, needsGlobe: needsInputModeSwitchKey, returnKeyType: returnKeyType)
+            return iPadLayout(
+                mode: mode,
+                shift: shift,
+                needsGlobe: needsInputModeSwitchKey,
+                returnKeyType: returnKeyType,
+                letterLayout: letterLayout,
+                handedness: handedness
+            )
         case .iPadPro:
-            return iPadProLayout(mode: mode, shift: shift, needsGlobe: needsInputModeSwitchKey, returnKeyType: returnKeyType)
+            return iPadProLayout(
+                mode: mode,
+                shift: shift,
+                needsGlobe: needsInputModeSwitchKey,
+                returnKeyType: returnKeyType,
+                letterLayout: letterLayout,
+                handedness: handedness
+            )
         }
     }
 
@@ -24,17 +47,29 @@ public enum LayoutFactory {
         mode: KeyboardMode,
         shift: ShiftState,
         needsGlobe: Bool,
-        returnKeyType: UIReturnKeyType
+        returnKeyType: UIReturnKeyType,
+        letterLayout: LetterLayout,
+        handedness: Handedness
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
         case .alphabetic:
-            rows = [
-                KeyboardRow(keys: letters("qwertyuiop", shift: shift)),
-                KeyboardRow(keys: letters("asdfghjkl", shift: shift)),
-                KeyboardRow(keys: compactBottomLetterRow(shift: shift)),
-                KeyboardRow(keys: compactToolbar(mode: .alphabetic, needsGlobe: needsGlobe, returnKeyType: returnKeyType))
-            ]
+            if letterLayout == .frequency {
+                rows = compactFrequencyRows(
+                    shift: shift,
+                    needsGlobe: needsGlobe,
+                    returnKeyType: returnKeyType,
+                    handedness: handedness
+                )
+            } else {
+                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                rows = [
+                    KeyboardRow(keys: letters(map.top, shift: shift)),
+                    KeyboardRow(keys: letters(map.home, shift: shift)),
+                    KeyboardRow(keys: compactBottomLetterRow(map.bottom, shift: shift)),
+                    KeyboardRow(keys: compactToolbar(mode: .alphabetic, needsGlobe: needsGlobe, returnKeyType: returnKeyType))
+                ]
+            }
         case .numeric:
             rows = [
                 KeyboardRow(keys: chars("1234567890")),
@@ -53,10 +88,27 @@ public enum LayoutFactory {
         return KeyboardLayout(rows: rows, layoutClass: .compact)
     }
 
-    private static func compactBottomLetterRow(shift: ShiftState) -> [KeySpec] {
+    private static func compactBottomLetterRow(_ lettersString: String, shift: ShiftState) -> [KeySpec] {
         [shiftKey(compact: true, shift: shift)]
-            + letters("zxcvbnm", shift: shift)
+            + letters(lettersString, shift: shift)
             + [backspace(compact: true)]
+    }
+
+    private static func compactFrequencyRows(
+        shift: ShiftState,
+        needsGlobe: Bool,
+        returnKeyType: UIReturnKeyType,
+        handedness: Handedness
+    ) -> [KeyboardRow] {
+        let freq = LetterMaps.frequencyRows(handedness: handedness)
+        var rows = freq.dropLast().map { KeyboardRow(keys: letters($0, shift: shift)) }
+        if let last = freq.last {
+            rows.append(
+                KeyboardRow(keys: [shiftKey(compact: true, shift: shift)] + letters(last, shift: shift) + [backspace(compact: true)])
+            )
+        }
+        rows.append(KeyboardRow(keys: compactToolbar(mode: .alphabetic, needsGlobe: needsGlobe, returnKeyType: returnKeyType)))
+        return rows
     }
 
     private static func compactToolbar(mode: KeyboardMode, needsGlobe: Bool, returnKeyType: UIReturnKeyType) -> [KeySpec] {
@@ -80,29 +132,42 @@ public enum LayoutFactory {
         mode: KeyboardMode,
         shift: ShiftState,
         needsGlobe: Bool,
-        returnKeyType: UIReturnKeyType
+        returnKeyType: UIReturnKeyType,
+        letterLayout: LetterLayout,
+        handedness: Handedness
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
         case .alphabetic:
-            rows = [
-                KeyboardRow(keys: letters("qwertyuiop", shift: shift) + [backspace(compact: false, width: .unit(1.5))]),
-                KeyboardRow(keys: letters("asdfghjkl", shift: shift) + [
-                    punctuation(";", shifted: ":"),
-                    punctuation("'", shifted: "\""),
-                    returnKey(returnKeyType, compact: false, width: .unit(1.6))
-                ]),
-                KeyboardRow(keys: [
-                    shiftKey(compact: false, shift: shift, width: .unit(1.4)),
-                    punctuation("`", shifted: "~")
-                ] + letters("zxcvbnm", shift: shift) + [
-                    punctuation(",", shifted: "<"),
-                    punctuation(".", shifted: ">"),
-                    punctuation("/", shifted: "?"),
-                    shiftKey(compact: false, shift: shift, width: .unit(1.4))
-                ]),
-                KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: false))
-            ]
+            if letterLayout == .frequency {
+                rows = iPadFrequencyRows(
+                    shift: shift,
+                    needsGlobe: needsGlobe,
+                    returnKeyType: returnKeyType,
+                    handedness: handedness,
+                    pro: false
+                )
+            } else {
+                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                rows = [
+                    KeyboardRow(keys: letters(map.top, shift: shift) + [backspace(compact: false, width: .unit(1.5))]),
+                    KeyboardRow(keys: letters(map.home, shift: shift) + [
+                        punctuation(";", shifted: ":"),
+                        punctuation("'", shifted: "\""),
+                        returnKey(returnKeyType, compact: false, width: .unit(1.6))
+                    ]),
+                    KeyboardRow(keys: [
+                        shiftKey(compact: false, shift: shift, width: .unit(1.4)),
+                        punctuation("`", shifted: "~")
+                    ] + letters(map.bottom, shift: shift) + [
+                        punctuation(",", shifted: "<"),
+                        punctuation(".", shifted: ">"),
+                        punctuation("/", shifted: "?"),
+                        shiftKey(compact: false, shift: shift, width: .unit(1.4))
+                    ]),
+                    KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: false))
+                ]
+            }
         case .numeric:
             rows = [
                 KeyboardRow(keys: chars("1234567890") + [backspace(compact: false, width: .unit(1.5))]),
@@ -135,38 +200,51 @@ public enum LayoutFactory {
         mode: KeyboardMode,
         shift: ShiftState,
         needsGlobe: Bool,
-        returnKeyType: UIReturnKeyType
+        returnKeyType: UIReturnKeyType,
+        letterLayout: LetterLayout,
+        handedness: Handedness
     ) -> KeyboardLayout {
         let rows: [KeyboardRow]
         switch mode {
         case .alphabetic:
-            rows = [
-                KeyboardRow(keys: numberRow(shift: shift) + [backspace(compact: false, width: .unit(1.8))]),
-                KeyboardRow(keys: [
-                    tabKey()
-                ] + letters("qwertyuiop", shift: shift) + [
-                    punctuation("[", shifted: "{"),
-                    punctuation("]", shifted: "}"),
-                    punctuation("\\", shifted: "|")
-                ]),
-                KeyboardRow(keys: [
-                    capsLockKey(shift: shift)
-                ] + letters("asdfghjkl", shift: shift) + [
-                    punctuation(";", shifted: ":"),
-                    punctuation("'", shifted: "\""),
-                    returnKey(returnKeyType, compact: false, width: .unit(1.7))
-                ]),
-                KeyboardRow(keys: [
-                    shiftKey(compact: false, shift: shift, width: .unit(1.5)),
-                    punctuation("`", shifted: "~")
-                ] + letters("zxcvbnm", shift: shift) + [
-                    punctuation(",", shifted: "<"),
-                    punctuation(".", shifted: ">"),
-                    punctuation("/", shifted: "?"),
-                    shiftKey(compact: false, shift: shift, width: .unit(1.8))
-                ]),
-                KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: true))
-            ]
+            if letterLayout == .frequency {
+                rows = iPadFrequencyRows(
+                    shift: shift,
+                    needsGlobe: needsGlobe,
+                    returnKeyType: returnKeyType,
+                    handedness: handedness,
+                    pro: true
+                )
+            } else {
+                let map = LetterMaps.frameRows(for: letterLayout, handedness: handedness)
+                rows = [
+                    KeyboardRow(keys: numberRow(shift: shift) + [backspace(compact: false, width: .unit(1.8))]),
+                    KeyboardRow(keys: [
+                        tabKey()
+                    ] + letters(map.top, shift: shift) + [
+                        punctuation("[", shifted: "{"),
+                        punctuation("]", shifted: "}"),
+                        punctuation("\\", shifted: "|")
+                    ]),
+                    KeyboardRow(keys: [
+                        capsLockKey(shift: shift)
+                    ] + letters(map.home, shift: shift) + [
+                        punctuation(";", shifted: ":"),
+                        punctuation("'", shifted: "\""),
+                        returnKey(returnKeyType, compact: false, width: .unit(1.7))
+                    ]),
+                    KeyboardRow(keys: [
+                        shiftKey(compact: false, shift: shift, width: .unit(1.5)),
+                        punctuation("`", shifted: "~")
+                    ] + letters(map.bottom, shift: shift) + [
+                        punctuation(",", shifted: "<"),
+                        punctuation(".", shifted: ">"),
+                        punctuation("/", shifted: "?"),
+                        shiftKey(compact: false, shift: shift, width: .unit(1.8))
+                    ]),
+                    KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: true))
+                ]
+            }
         case .numeric:
             rows = [
                 KeyboardRow(keys: chars("1234567890-=") + [backspace(compact: false, width: .unit(1.8))]),
@@ -211,6 +289,33 @@ public enum LayoutFactory {
             ]
         }
         return KeyboardLayout(rows: rows, layoutClass: .iPadPro)
+    }
+
+    private static func iPadFrequencyRows(
+        shift: ShiftState,
+        needsGlobe: Bool,
+        returnKeyType: UIReturnKeyType,
+        handedness: Handedness,
+        pro: Bool
+    ) -> [KeyboardRow] {
+        let freq = LetterMaps.frequencyRows(handedness: handedness)
+        var rows: [KeyboardRow] = []
+        if pro {
+            rows.append(KeyboardRow(keys: [tabKey()] + letters(freq[0], shift: shift) + [backspace(compact: false, width: .unit(1.8))]))
+        } else {
+            rows.append(KeyboardRow(keys: letters(freq[0], shift: shift) + [backspace(compact: false, width: .unit(1.5))]))
+        }
+        rows.append(KeyboardRow(keys: letters(freq[1], shift: shift) + [returnKey(returnKeyType, compact: false, width: .unit(pro ? 1.7 : 1.6))]))
+        if pro {
+            rows.append(KeyboardRow(keys: [capsLockKey(shift: shift)] + letters(freq[2], shift: shift)))
+            rows.append(KeyboardRow(keys: [shiftKey(compact: false, shift: shift, width: .unit(1.5))] + letters(freq[3], shift: shift)))
+        } else {
+            rows.append(KeyboardRow(keys: [shiftKey(compact: false, shift: shift, width: .unit(1.4))] + letters(freq[2], shift: shift)))
+            rows.append(KeyboardRow(keys: letters(freq[3], shift: shift)))
+        }
+        rows.append(KeyboardRow(keys: letters(freq[4], shift: shift)))
+        rows.append(KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: pro)))
+        return rows
     }
 
     private static func iPadToolbar(mode: KeyboardMode, needsGlobe: Bool, pro: Bool) -> [KeySpec] {

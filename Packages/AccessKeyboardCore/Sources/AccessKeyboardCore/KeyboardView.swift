@@ -68,7 +68,8 @@ public final class KeyboardView: UIView {
         let metrics = LayoutMetrics.metrics(
             for: layout.layoutClass,
             bounds: bounds.size,
-            safeBottom: extraBottomInset
+            safeBottom: extraBottomInset,
+            rowCount: layout.rows.count
         )
         if layout != currentLayout || metrics != currentMetrics {
             currentLayout = layout
@@ -80,8 +81,14 @@ public final class KeyboardView: UIView {
     }
 
     public var preferredHeight: CGFloat {
-        let layoutClass = LayoutClassResolver.resolve(size: bounds.size.width > 0 ? bounds.size : CGSize(width: 1024, height: 300), idiom: idiom)
-        let metrics = LayoutMetrics.metrics(for: layoutClass, bounds: bounds.size, safeBottom: extraBottomInset)
+        let size = bounds.size.width > 0 ? bounds.size : CGSize(width: 1024, height: 300)
+        let layout = engine.layout(for: size, idiom: idiom)
+        let metrics = LayoutMetrics.metrics(
+            for: layout.layoutClass,
+            bounds: size,
+            safeBottom: extraBottomInset,
+            rowCount: layout.rows.count
+        )
         if engine.showsPredictions {
             return metrics.preferredHeight
         }
@@ -98,8 +105,16 @@ public final class KeyboardView: UIView {
     }
 
     private func updateAppearance() {
-        appearance = KeyboardAppearance.system(for: traitCollection.userInterfaceStyle)
-        appearance.usesBethLetterColors = KeyboardPreferences.bethModeEnabled
+        if KeyboardPreferences.literacyFontEnabled {
+            LiteracyFont.registerIfNeeded()
+        }
+        appearance = KeyboardAppearance.resolved(
+            contrast: KeyboardPreferences.contrastTheme,
+            colouring: KeyboardPreferences.keyColouring,
+            handedness: KeyboardPreferences.handedness,
+            usesLiteracyFont: KeyboardPreferences.literacyFontEnabled,
+            style: traitCollection.userInterfaceStyle
+        )
         backgroundColor = appearance.backgroundColor
     }
 

@@ -111,6 +111,13 @@ public struct KeyboardLayout: Equatable {
         self.rows = rows
         self.layoutClass = layoutClass
     }
+
+    public func letterString(inRow index: Int) -> String {
+        rows[index].keys.compactMap { spec -> String? in
+            guard spec.style == .letter, case .character(let text) = spec.action else { return nil }
+            return text.lowercased()
+        }.joined()
+    }
 }
 
 public enum LayoutClass: Equatable {
