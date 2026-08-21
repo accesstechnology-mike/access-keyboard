@@ -14,6 +14,10 @@ public struct KeyboardAppearance {
     public var shadowColor: UIColor
     public var calloutFill: UIColor
     public var usesBethLetterColors: Bool
+    public var keyColouring: KeyColouring
+    public var handedness: Handedness
+    public var usesLiteracyFont: Bool
+    public var keepsLetterKeycapsLowercase: Bool
 
     public init(
         backgroundColor: UIColor,
@@ -28,7 +32,11 @@ public struct KeyboardAppearance {
         secondaryTextColor: UIColor,
         shadowColor: UIColor,
         calloutFill: UIColor,
-        usesBethLetterColors: Bool = false
+        usesBethLetterColors: Bool = false,
+        keyColouring: KeyColouring = .none,
+        handedness: Handedness = .standard,
+        usesLiteracyFont: Bool = false,
+        keepsLetterKeycapsLowercase: Bool = false
     ) {
         self.backgroundColor = backgroundColor
         self.letterFill = letterFill
@@ -43,6 +51,67 @@ public struct KeyboardAppearance {
         self.shadowColor = shadowColor
         self.calloutFill = calloutFill
         self.usesBethLetterColors = usesBethLetterColors
+        self.keyColouring = keyColouring
+        self.handedness = handedness
+        self.usesLiteracyFont = usesLiteracyFont
+        self.keepsLetterKeycapsLowercase = keepsLetterKeycapsLowercase
+    }
+
+    public static func resolved(
+        contrast: ContrastTheme,
+        colouring: KeyColouring,
+        handedness: Handedness,
+        usesLiteracyFont: Bool,
+        style: UIUserInterfaceStyle
+    ) -> KeyboardAppearance {
+        let effectiveColouring = contrast.overridesColouring ? KeyColouring.none : colouring
+        var appearance: KeyboardAppearance
+        switch contrast {
+        case .system:
+            appearance = system(for: style)
+        case .blackOnWhite:
+            appearance = highContrast(
+                background: .white,
+                keyFill: .white,
+                modifierFill: UIColor(white: 0.9, alpha: 1),
+                text: .black,
+                primaryFill: .black,
+                primaryText: .white
+            )
+        case .whiteOnBlack:
+            appearance = highContrast(
+                background: .black,
+                keyFill: UIColor(white: 0.12, alpha: 1),
+                modifierFill: .black,
+                text: .white,
+                primaryFill: .white,
+                primaryText: .black
+            )
+        case .yellowOnBlack:
+            appearance = highContrast(
+                background: .black,
+                keyFill: UIColor(white: 0.08, alpha: 1),
+                modifierFill: .black,
+                text: AccessColouring.highContrastYellow,
+                primaryFill: AccessColouring.highContrastYellow,
+                primaryText: .black
+            )
+        case .blackOnYellow:
+            appearance = highContrast(
+                background: AccessColouring.highContrastYellow,
+                keyFill: AccessColouring.highContrastYellow,
+                modifierFill: UIColor(red: 0.95, green: 0.82, blue: 0, alpha: 1),
+                text: .black,
+                primaryFill: .black,
+                primaryText: AccessColouring.highContrastYellow
+            )
+        }
+        appearance.keyColouring = effectiveColouring
+        appearance.handedness = handedness
+        appearance.usesBethLetterColors = effectiveColouring == .beth
+        appearance.usesLiteracyFont = usesLiteracyFont
+        appearance.keepsLetterKeycapsLowercase = usesLiteracyFont || effectiveColouring == .beth
+        return appearance
     }
 
     public static func system(for style: UIUserInterfaceStyle) -> KeyboardAppearance {
@@ -94,8 +163,8 @@ public struct KeyboardAppearance {
                 return letterFill
             }
         }
-        if let bethFill = bethFill(for: style, character: character) {
-            return pressed ? BethColorMap.pressedFill(for: bethFill) : bethFill
+        if let overlay = decorativeFill(for: style, character: character) {
+            return pressed ? BethColorMap.pressedFill(for: overlay) : overlay
         }
         switch style {
         case .letter, .space:
@@ -108,8 +177,8 @@ public struct KeyboardAppearance {
     }
 
     public func foreground(for style: KeyStyle, character: String? = nil) -> UIColor {
-        if let bethFill = bethFill(for: style, character: character) {
-            return BethColorMap.foreground(for: bethFill)
+        if let overlay = decorativeFill(for: style, character: character) {
+            return AccessColouring.foreground(for: overlay, colouring: keyColouring)
         }
         switch style {
         case .letter, .space: return textColor
@@ -118,8 +187,39 @@ public struct KeyboardAppearance {
         }
     }
 
-    private func bethFill(for style: KeyStyle, character: String?) -> UIColor? {
-        guard usesBethLetterColors, style == .letter, let character else { return nil }
-        return BethColorMap.fill(for: character)
+    private func decorativeFill(for style: KeyStyle, character: String?) -> UIColor? {
+        guard style == .letter, let character else { return nil }
+        if usesBethLetterColors {
+            return BethColorMap.fill(for: character)
+        }
+        return AccessColouring.fill(
+            colouring: keyColouring,
+            character: character,
+            handedness: handedness
+        )
+    }
+
+    private static func highContrast(
+        background: UIColor,
+        keyFill: UIColor,
+        modifierFill: UIColor,
+        text: UIColor,
+        primaryFill: UIColor,
+        primaryText: UIColor
+    ) -> KeyboardAppearance {
+        KeyboardAppearance(
+            backgroundColor: background,
+            letterFill: keyFill,
+            modifierFill: modifierFill,
+            primaryFill: primaryFill,
+            letterPressedFill: modifierFill,
+            modifierPressedFill: keyFill,
+            textColor: text,
+            modifierTextColor: text,
+            primaryTextColor: primaryText,
+            secondaryTextColor: text.withAlphaComponent(0.75),
+            shadowColor: UIColor.black.withAlphaComponent(0.45),
+            calloutFill: keyFill
+        )
     }
 }

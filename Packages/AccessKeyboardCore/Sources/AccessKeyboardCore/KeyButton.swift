@@ -190,12 +190,18 @@ final class KeyButton: UIControl {
             symbolView.isHidden = true
             label.text = displayedLabel(for: value)
             let isModifier = spec.style != .letter
-            label.font = .systemFont(
-                ofSize: isModifier ? metrics.modifierFontSize : metrics.letterFontSize,
-                weight: isModifier ? .regular : .regular
-            )
-            if spec.style == .letter, value.count == 1 {
-                label.font = .systemFont(ofSize: metrics.letterFontSize, weight: .light)
+            if spec.style == .letter,
+               appearance.usesLiteracyFont,
+               let literacy = LiteracyFont.uiFont(ofSize: metrics.letterFontSize) {
+                label.font = literacy
+            } else {
+                label.font = .systemFont(
+                    ofSize: isModifier ? metrics.modifierFontSize : metrics.letterFontSize,
+                    weight: .regular
+                )
+                if spec.style == .letter, value.count == 1 {
+                    label.font = .systemFont(ofSize: metrics.letterFontSize, weight: .light)
+                }
             }
         case .symbol(let name):
             label.isHidden = true
@@ -222,7 +228,7 @@ final class KeyButton: UIControl {
     }
 
     private func displayedLabel(for value: String) -> String {
-        guard appearance.usesBethLetterColors,
+        guard appearance.keepsLetterKeycapsLowercase,
               spec.style == .letter,
               value.count == 1,
               value.first?.isLetter == true else {
