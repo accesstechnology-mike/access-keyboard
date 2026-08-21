@@ -7,6 +7,11 @@ public extension Notification.Name {
 public enum KeyboardPreferences {
     public static let appGroupID = "group.6M3Z27M69P.app.access.keyboard"
     public static let bethModeEnabledKey = "bethModeEnabled"
+    public static let letterLayoutKey = "letterLayout"
+    public static let handednessKey = "handedness"
+    public static let keyColouringKey = "keyColouring"
+    public static let contrastThemeKey = "contrastTheme"
+    public static let literacyFontEnabledKey = "literacyFontEnabled"
     public static let extensionHasFullAccessKey = "extensionHasFullAccess"
 
     private static let darwinName = CFNotificationName("app.access.keyboard.preferencesDidChange" as CFString)
@@ -15,11 +20,49 @@ public enum KeyboardPreferences {
         UserDefaults(suiteName: appGroupID) ?? .standard
     }
 
-    public static var bethModeEnabled: Bool {
-        get { suite.bool(forKey: bethModeEnabledKey) }
+    public static var letterLayout: LetterLayout {
+        get { value(LetterLayout.self, key: letterLayoutKey, default: .qwerty) }
+        set { set(newValue.rawValue, forKey: letterLayoutKey) }
+    }
+
+    public static var handedness: Handedness {
+        get { value(Handedness.self, key: handednessKey, default: .standard) }
+        set { set(newValue.rawValue, forKey: handednessKey) }
+    }
+
+    public static var keyColouring: KeyColouring {
+        get {
+            if let stored = suite.string(forKey: keyColouringKey),
+               let value = KeyColouring(rawValue: stored) {
+                return value
+            }
+            return suite.bool(forKey: bethModeEnabledKey) ? .beth : .none
+        }
         set {
-            suite.set(newValue, forKey: bethModeEnabledKey)
+            suite.set(newValue.rawValue, forKey: keyColouringKey)
+            suite.set(newValue == .beth, forKey: bethModeEnabledKey)
             notify()
+        }
+    }
+
+    public static var contrastTheme: ContrastTheme {
+        get { value(ContrastTheme.self, key: contrastThemeKey, default: .system) }
+        set { set(newValue.rawValue, forKey: contrastThemeKey) }
+    }
+
+    public static var literacyFontEnabled: Bool {
+        get { suite.bool(forKey: literacyFontEnabledKey) }
+        set { set(newValue, forKey: literacyFontEnabledKey) }
+    }
+
+    public static var bethModeEnabled: Bool {
+        get { keyColouring == .beth }
+        set {
+            if newValue {
+                keyColouring = .beth
+            } else if keyColouring == .beth {
+                keyColouring = .none
+            }
         }
     }
 
@@ -41,6 +84,22 @@ public enum KeyboardPreferences {
 
     public static func observe(_ handler: @escaping () -> Void) -> KeyboardPreferenceObservation {
         KeyboardPreferenceObservation(handler: handler)
+    }
+
+    private static func value<T: RawRepresentable>(
+        _ type: T.Type,
+        key: String,
+        default defaultValue: T
+    ) -> T where T.RawValue == String {
+        guard let raw = suite.string(forKey: key), let value = T(rawValue: raw) else {
+            return defaultValue
+        }
+        return value
+    }
+
+    private static func set(_ value: Any, forKey key: String) {
+        suite.set(value, forKey: key)
+        notify()
     }
 }
 
