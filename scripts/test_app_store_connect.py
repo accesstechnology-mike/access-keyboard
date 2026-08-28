@@ -155,16 +155,19 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertFalse(asc.internal_group_rejects_assign(external))
         self.assertFalse(asc.ignore_already_exists(alpha))
 
-    def test_valid_is_not_enough_for_testflight_install(self) -> None:
+    def test_valid_without_beta_detail_is_installable(self) -> None:
         processing = build(7)
         processing["internal_build_state"] = "PROCESSING"
         ready = build(7, identifier="ready")
         ready["internal_build_state"] = "READY_FOR_BETA_TESTING"
+        missing = build(9, identifier="missing")
+        missing["internal_build_state"] = None
         self.assertFalse(asc.is_installable(processing))
         self.assertTrue(asc.is_installable(ready))
+        self.assertTrue(asc.is_installable(missing))
         self.assertEqual(
-            asc.latest_installable_build([processing, ready])["id"],
-            "ready",
+            asc.latest_installable_build([processing, ready, missing])["id"],
+            "missing",
         )
 
     def test_asc_token_must_refresh_before_apple_20_minute_cap(self) -> None:
