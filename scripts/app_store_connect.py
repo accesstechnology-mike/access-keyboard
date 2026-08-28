@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PBXPROJ = ROOT / "AccessKeyboard.xcodeproj/project.pbxproj"
 ENV_FILE = ROOT / "secrets/AppStoreConnect.env"
 ASC_BASE = "https://api.appstoreconnect.apple.com"
+TOKEN_LIFETIME_S = 20 * 60
+TOKEN_REFRESH_MARGIN_S = 5 * 60
 
 
 def load_dotenv(path: Path) -> None:
@@ -102,7 +104,7 @@ def make_token(key_id: str, issuer: str, key_path: Path) -> str:
             {
                 "iss": issuer,
                 "iat": now,
-                "exp": now + 20 * 60,
+                "exp": now + TOKEN_LIFETIME_S,
                 "aud": "appstoreconnect-v1",
             },
             separators=(",", ":"),
@@ -114,6 +116,15 @@ def make_token(key_id: str, issuer: str, key_path: Path) -> str:
         input=signing_input,
     )
     return f"{header}.{payload}.{b64url(der_ecdsa_to_jose(der))}"
+
+
+def token_needs_refresh(now: int, expires_at: int) -> bool:
+    return now + TOKEN_REFRESH_MARGIN_S >= expires_at
+
+
+def fresh_token() -> str:
+    key_id, issuer, key_path = credentials()
+    return make_token(key_id, issuer, key_path)
 
 
 class ASCHTTPError(RuntimeError):
@@ -560,7 +571,13 @@ def wait_for_installable_build(
 ) -> dict:
     deadline = time.time() + timeout_s
     seen = "missing"
+    expires_at = int(time.time()) + TOKEN_LIFETIME_S
     while True:
+        now = int(time.time())
+        if token_needs_refresh(now, expires_at):
+            print("refreshing App Store Connect token")
+            token = fresh_token()
+            expires_at = now + TOKEN_LIFETIME_S
         builds = list_app_builds(token, identifier)
         match = next((item for item in builds if item["number"] == number), None)
         if match:
@@ -793,8 +810,9 @@ def cmd_status() -> int:
 def cmd_latest_only(wait_for: int | None) -> int:
     token, bundle, identifier = _app_context()
     if wait_for is not None:
-        print(f"waiting for build {wait_for} on {bundle}")
+        print(f"waiting for build {wait_for} on {bundle}", flush=True)
         wait_for_installable_build(token, identifier, wait_for)
+        token = fresh_token()
     latest = latest_installable_build(list_app_builds(token, identifier))
     if latest is None:
         latest = latest_valid_build(list_app_builds(token, identifier))
