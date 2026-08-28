@@ -277,12 +277,23 @@ def latest_valid_build(builds: list[dict]) -> dict | None:
 INSTALLABLE_INTERNAL_STATES = frozenset(
     {"READY_FOR_BETA_TESTING", "IN_BETA_TESTING"}
 )
+BLOCKED_INTERNAL_STATES = frozenset(
+    {
+        "PROCESSING",
+        "MISSING_EXPORT_COMPLIANCE",
+        "IN_EXPORT_COMPLIANCE_REVIEW",
+        "EXPIRED",
+    }
+)
 
 
 def is_installable(build: dict) -> bool:
     if build["expired"] or build["processing_state"] != "VALID":
         return False
-    return build.get("internal_build_state") in INSTALLABLE_INTERNAL_STATES
+    state = build.get("internal_build_state")
+    if state in BLOCKED_INTERNAL_STATES:
+        return False
+    return state in INSTALLABLE_INTERNAL_STATES or state in {None, ""}
 
 
 def latest_installable_build(builds: list[dict]) -> dict | None:
@@ -347,7 +358,7 @@ def list_app_builds(token: str, identifier: str) -> list[dict]:
         {
             "filter[app]": identifier,
             "include": "buildBetaDetail",
-            "fields[builds]": "version,expired,processingState,usesNonExemptEncryption",
+            "fields[builds]": "version,expired,processingState,usesNonExemptEncryption,buildBetaDetail",
             "fields[buildBetaDetails]": "internalBuildState,externalBuildState",
             "limit": "200",
         },
