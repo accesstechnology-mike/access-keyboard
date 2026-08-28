@@ -82,14 +82,7 @@ Internal testers skip Beta App Review. They must be Users in App Store Connect (
 
 Each person installs **TestFlight** from the App Store on an **iPad running iPadOS 18**, accepts the invite, and installs `access: keyboard`. An iPhone will not be offered the build.
 
-If two Apple IDs disagree about the version — the usual case is the App Store Connect / developer account still on an old internal-group build, while a personal iCloud tester is on the external-group build — run latest-only. That is the same command CI runs after every upload:
-
-```sh
-python3 scripts/app_store_connect.py status
-python3 scripts/app_store_connect.py latest-only
-```
-
-Or **Actions → TestFlight → Run workflow** and tick **Give every tester the latest TestFlight build only**. The test/dev Apple ID will then be offered the same build as everyone else. Open TestFlight on that iPad and tap Update; Apple cannot replace an already-installed binary by itself.
+Every upload assigns the latest build to every group and expires the rest. There is no opt-in. **Actions → TestFlight → Run workflow** does the same for the build already in App Store Connect, without cutting a new archive. Testers who still have an old install must open TestFlight and tap Update; Apple cannot replace an already-installed binary by itself.
 
 ## 6. External testers (needs Beta Review)
 
@@ -146,13 +139,7 @@ sh scripts/upload-testflight.sh
 
 That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, uploads, waits until Apple marks the build VALID, assigns it to every TestFlight group, and expires every older build. App Store Connect currently requires the iOS 26 SDK, so CI runs on `macos-26`.
 
-From any machine with `gh`:
-
-```sh
-gh workflow run testflight.yml --ref main
-```
-
-Or push a tag. That is what this repo uses when `workflow_dispatch` is not available:
+**Actions → TestFlight → Run workflow** always gives every tester the latest existing build. It does not ask. Push a tag when you want a new archive:
 
 ```sh
 git tag testflight-<short-reason>
