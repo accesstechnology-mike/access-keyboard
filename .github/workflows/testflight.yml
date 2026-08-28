@@ -2,16 +2,50 @@ name: TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      latest_only:
+        description: "Give every tester the latest TestFlight build only. Skips archive."
+        type: boolean
+        default: false
   push:
     tags:
       - "testflight-*"
 
 jobs:
-  upload:
-    runs-on: macos-26
-    timeout-minutes: 45
+  latest-only:
+    if: github.event_name == 'workflow_dispatch' && inputs.latest_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check latest-only selection
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Latest TestFlight build only
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+        run: python3 scripts/app_store_connect.py latest-only
+
+  upload:
+    if: github.event_name != 'workflow_dispatch' || inputs.latest_only != true
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check latest-only selection
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Write local secrets
         env:

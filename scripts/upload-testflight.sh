@@ -73,3 +73,5 @@ xcodebuild \
   DEVELOPMENT_TEAM="$TEAM"
 
 echo "Uploaded build $BUILD to App Store Connect / TestFlight."
+echo "Waiting for processing, then making build $BUILD the only build testers can install."
+python3 "$ROOT/scripts/app_store_connect.py" latest-only --wait-for "$BUILD"
