@@ -135,9 +135,15 @@ class LatestOnlyTests(unittest.TestCase):
             "/v1/betaGroups/1/relationships/builds",
             '{"errors":[{"detail":"The build is not available for external testing."}]}',
         )
+        cannot_assign = asc.ASCHTTPError(
+            409,
+            "/v1/betaTesters",
+            '{"errors":[{"detail":"Tester(s) cannot be assigned"}]}',
+        )
         self.assertTrue(asc.ignore_already_exists(already))
         self.assertTrue(asc.ignore_already_exists(other_409))
         self.assertFalse(asc.ignore_already_exists(real_error))
+        self.assertFalse(asc.ignore_already_exists(cannot_assign))
 
     def test_internal_auto_distribute_group_cannot_be_assigned_a_build(self) -> None:
         alpha = asc.ASCHTTPError(
@@ -204,6 +210,26 @@ class LatestOnlyTests(unittest.TestCase):
             "tester@example.com",
         )
         self.assertEqual(asc.parse_user_email({"attributes": {}}), "")
+
+    def test_create_response_keeps_apple_state(self) -> None:
+        parsed = asc.parse_created_tester(
+            {
+                "data": {
+                    "id": "abc",
+                    "attributes": {
+                        "email": "gone@example.com",
+                        "inviteType": "EMAIL",
+                        "state": "NOT_INVITED",
+                        "firstName": "Ada",
+                        "lastName": "Lovelace",
+                    },
+                }
+            },
+            "gone@example.com",
+        )
+        self.assertEqual(parsed["state"], "NOT_INVITED")
+        self.assertEqual(parsed["first_name"], "Ada")
+        self.assertTrue(asc.tester_needs_reinvite(parsed))
 
     def test_missing_tester_and_cannot_assign_are_detected(self) -> None:
         missing = asc.ASCHTTPError(
