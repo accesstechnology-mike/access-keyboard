@@ -182,9 +182,19 @@ class LatestOnlyTests(unittest.TestCase):
             {"id": "1", "email": "ok@example.com", "state": "INSTALLED"},
             {"id": "2", "email": "gone@example.com", "state": "REVOKED"},
             {"id": "3", "email": "", "state": "REVOKED"},
+            {"id": "4", "email": "pending@example.com", "state": "NOT_INVITED"},
+            {"id": "5", "email": "invited@example.com", "state": "INVITED"},
+            {"id": "6", "email": "accepted@example.com", "state": "ACCEPTED"},
         ]
-        revoked = asc.revoked_testers(testers)
-        self.assertEqual([item["email"] for item in revoked], ["gone@example.com"])
+        blocked = asc.testers_needing_reinvite(testers)
+        self.assertEqual(
+            [item["email"] for item in blocked],
+            ["gone@example.com", "pending@example.com"],
+        )
+        self.assertEqual(
+            [item["email"] for item in asc.revoked_testers(testers)],
+            ["gone@example.com", "pending@example.com"],
+        )
 
     def test_expired_first_invite_is_not_installable(self) -> None:
         first = build(1, expired=True)
