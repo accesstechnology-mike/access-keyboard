@@ -205,6 +205,23 @@ class LatestOnlyTests(unittest.TestCase):
         )
         self.assertEqual(asc.parse_user_email({"attributes": {}}), "")
 
+    def test_missing_tester_and_cannot_assign_are_detected(self) -> None:
+        missing = asc.ASCHTTPError(
+            404,
+            "/v1/betaTesters/ghost",
+            '{"errors":[{"detail":"There is no resource of type \'betaTesters\'"}]}',
+        )
+        blocked = asc.ASCHTTPError(
+            409,
+            "/v1/betaTesters",
+            '{"errors":[{"detail":"Tester(s) cannot be assigned"}]}',
+        )
+        other = asc.ASCHTTPError(409, "/v1/betaTesters", '{"errors":[{"detail":"Nope."}]}')
+        self.assertTrue(asc.tester_is_missing(missing))
+        self.assertTrue(asc.tester_cannot_be_assigned(blocked))
+        self.assertFalse(asc.tester_cannot_be_assigned(other))
+        self.assertFalse(asc.tester_is_missing(blocked))
+
     def test_create_tester_sends_only_groups_or_only_builds(self) -> None:
         groups = asc.tester_create_relationships(["alpha", "beta"], "build-11")
         self.assertEqual(list(groups), ["betaGroups"])
