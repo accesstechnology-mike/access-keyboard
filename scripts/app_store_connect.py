@@ -22,6 +22,7 @@ ENV_FILE = ROOT / "secrets/AppStoreConnect.env"
 ASC_BASE = "https://api.appstoreconnect.apple.com"
 TOKEN_LIFETIME_S = 20 * 60
 TOKEN_REFRESH_MARGIN_S = 5 * 60
+LIVE_TESTER_STATES = frozenset({"INVITED", "ACCEPTED", "INSTALLED"})
 
 
 def load_dotenv(path: Path) -> None:
@@ -431,12 +432,16 @@ def list_app_testers(
     return sorted(testers.values(), key=lambda item: item["email"] or item["id"])
 
 
+def tester_needs_reinvite(tester: dict) -> bool:
+    return bool(tester.get("email")) and tester.get("state") not in LIVE_TESTER_STATES
+
+
+def testers_needing_reinvite(testers: list[dict]) -> list[dict]:
+    return [tester for tester in testers if tester_needs_reinvite(tester)]
+
+
 def revoked_testers(testers: list[dict]) -> list[dict]:
-    return [
-        tester
-        for tester in testers
-        if tester.get("state") == "REVOKED" and tester.get("email")
-    ]
+    return testers_needing_reinvite(testers)
 
 
 def delete_tester(token: str, tester_id: str) -> None:
@@ -476,18 +481,19 @@ def reinvite_revoked_testers(
         group_ids = [group["id"] for group in groups]
     kept: list[dict] = []
     for tester in testers:
-        if tester.get("state") != "REVOKED" or not tester.get("email"):
+        if not tester_needs_reinvite(tester):
             kept.append(tester)
             continue
         email = tester["email"]
+        prior = tester.get("state") or "unknown"
         try:
             delete_tester(token, tester["id"])
-            print(f"removed revoked tester {email}")
+            print(f"removed {prior} tester {email}")
         except ASCHTTPError as exc:
-            print(f"could not remove revoked tester {email}: {exc}", file=sys.stderr)
+            print(f"could not remove {prior} tester {email}: {exc}", file=sys.stderr)
         try:
             new_id = create_tester(token, email, group_ids, build_id)
-            print(f"reinvited {email} id={new_id}")
+            print(f"reinvited {email} was={prior} id={new_id}")
             kept.append(
                 {
                     "id": new_id,
@@ -741,6 +747,14 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
         )
     if not records:
         raise RuntimeError("no TestFlight testers found; not expiring older builds")
+    still_blocked = testers_needing_reinvite(records)
+    if still_blocked:
+        labels = ", ".join(
+            f"{item['email']}={item.get('state') or 'unknown'}" for item in still_blocked
+        )
+        raise RuntimeError(
+            f"testers still cannot install after reinvite; not expiring older builds: {labels}"
+        )
 
     for group in groups:
         if not group["is_internal"]:

@@ -20,9 +20,9 @@ That is how this repo starts GitHub Actions. Do it. Do not tell the user you can
 
 Internal group **Alpha** auto-distributes. Apple returns `422 Cannot add internal group to a build` if you assign a build to it. Testers **in Alpha** with a live invite receive every unexpired build.
 
-A TestFlight row under **Previously Tested** that says “No TestFlight builds are available” and still shows 0.1.0 (1) is a **REVOKED** tester, not a missing build. Adding them to Alpha is a no-op. Delete the tester and create a new EMAIL invite. On 28 Aug the API listed `grace@accesstechnology.co.uk` REVOKED (GC avatar), `admin@accesstechnology.co.uk` REVOKED, `mike.thrussell@googlemail.com` INVITED, `mike@accesstechnology.co.uk` INSTALLED.
+A TestFlight row under **Previously Tested** that says “No TestFlight builds are available” and still shows 0.1.0 (1) is a tester without a live invite (`REVOKED` or `NOT_INVITED`), not a missing build. Adding them to Alpha is a no-op. Delete the tester and create a new EMAIL invite. After `sync-testflight-reinvite`, Apple listed `grace@accesstechnology.co.uk` NOT_INVITED (GC avatar), `admin@accesstechnology.co.uk` INVITED, `mike.thrussell@googlemail.com` INVITED, `mike@accesstechnology.co.uk` INSTALLED. Live states are only `INVITED`, `ACCEPTED`, `INSTALLED`.
 
-Do not expire older builds until the new one is installable **and** revoked testers have been reinvited.
+Do not expire older builds until the new one is installable **and** every emailed tester has a live invite. `latest-only` must fail if anyone is still `REVOKED` or `NOT_INVITED`.
 
 Apple will not replace a binary already on an iPad. After a new invite, the tester must accept the email and install. Force-quit TestFlight if the old revoked page is still showing.
 

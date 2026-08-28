@@ -156,4 +156,5 @@ git push origin sync-testflight-<short-reason>
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
 - Keep `MARKETING_VERSION` at `0.1.0` until you intend a user-visible version change.
 - Testers only ever get the latest build. Uploads and **Run workflow** expire every older one.
+- A tester who still sees an old build and “No TestFlight builds are available” is `REVOKED` or `NOT_INVITED`. Delete them and send a new EMAIL invite. Do not expire older builds until every emailed tester is `INVITED`, `ACCEPTED`, or `INSTALLED`.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.
