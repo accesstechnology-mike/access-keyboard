@@ -167,6 +167,13 @@ class LatestOnlyTests(unittest.TestCase):
             "ready",
         )
 
+    def test_asc_token_must_refresh_before_apple_20_minute_cap(self) -> None:
+        issued = 1_000_000
+        expires = issued + asc.TOKEN_LIFETIME_S
+        self.assertFalse(asc.token_needs_refresh(issued + 10 * 60, expires))
+        self.assertTrue(asc.token_needs_refresh(issued + 16 * 60, expires))
+        self.assertTrue(asc.token_needs_refresh(expires, expires))
+
     def test_expired_first_invite_is_not_installable(self) -> None:
         first = build(1, expired=True)
         first["internal_build_state"] = "EXPIRED"
