@@ -150,5 +150,5 @@ git push origin testflight-<short-reason>
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
 - Keep `MARKETING_VERSION` at `0.1.0` until you intend a user-visible version change.
-- Testers must only have the latest build. Do not leave older builds assigned to a group. `latest-only` expires them.
+- Testers only ever get the latest build. Uploads and **Run workflow** expire every older one.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.
