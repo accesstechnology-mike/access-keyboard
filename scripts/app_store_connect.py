@@ -193,11 +193,21 @@ def collect_resources(
 
 
 def ignore_already_exists(exc: ASCHTTPError) -> bool:
+    if tester_cannot_be_assigned(exc):
+        return False
     if exc.code == 409:
         return True
     return exc.code == 422 and (
         "already" in exc.body.lower() or "duplicate" in exc.body.lower()
     )
+
+
+def tester_cannot_be_assigned(exc: ASCHTTPError) -> bool:
+    return exc.code == 409 and "cannot be assigned" in exc.body.lower()
+
+
+def tester_is_missing(exc: ASCHTTPError) -> bool:
+    return exc.code == 404
 
 
 def internal_group_rejects_assign(exc: ASCHTTPError) -> bool:
@@ -453,14 +463,6 @@ def revoked_testers(testers: list[dict]) -> list[dict]:
     return testers_needing_reinvite(testers)
 
 
-def tester_is_missing(exc: ASCHTTPError) -> bool:
-    return exc.code == 404
-
-
-def tester_cannot_be_assigned(exc: ASCHTTPError) -> bool:
-    return exc.code == 409 and "cannot be assigned" in exc.body.lower()
-
-
 def delete_tester(token: str, tester_id: str) -> str:
     try:
         asc_request(token, f"/v1/betaTesters/{tester_id}", method="DELETE")
@@ -486,9 +488,19 @@ def tester_create_relationships(group_ids: list[str], build_id: str) -> dict:
     raise RuntimeError("creating a tester needs a group or a build")
 
 
+def parse_created_tester(payload: dict, email: str) -> dict:
+    data = payload.get("data") or {}
+    parsed = parse_tester({"id": data.get("id") or "", "attributes": data.get("attributes") or {}})
+    if not parsed["id"]:
+        raise RuntimeError(f"creating tester {email} returned no id")
+    if not parsed["email"]:
+        parsed["email"] = email
+    return parsed
+
+
 def post_tester(
     token: str, email: str, group_ids: list[str], build_id: str
-) -> str:
+) -> dict:
     relationships = tester_create_relationships(group_ids, build_id)
     payload = asc_request(
         token,
@@ -502,13 +514,10 @@ def post_tester(
             }
         },
     )
-    created = (payload.get("data") or {}).get("id")
-    if not created:
-        raise RuntimeError(f"creating tester {email} returned no id")
-    return str(created)
+    return parse_created_tester(payload, email)
 
 
-def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> str:
+def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> dict:
     attempts: list[tuple[list[str], str]] = []
     if group_ids:
         attempts.append((group_ids, ""))
@@ -520,9 +529,12 @@ def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -
     for groups, identifier in attempts:
         via = "groups" if groups else "build"
         try:
-            new_id = post_tester(token, email, groups, identifier)
-            print(f"created tester {email} via {via} id={new_id}")
-            return new_id
+            created = post_tester(token, email, groups, identifier)
+            print(
+                f"created tester {email} via {via} id={created['id']} "
+                f"state={created['state'] or 'unknown'}"
+            )
+            return created
         except ASCHTTPError as exc:
             last = exc
             if tester_cannot_be_assigned(exc):
@@ -532,12 +544,79 @@ def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -
     raise last or RuntimeError(f"creating tester {email} failed")
 
 
+def list_user_invitations(token: str) -> list[dict]:
+    items, _ = collect_resources(
+        token,
+        "/v1/userInvitations",
+        {"fields[userInvitations]": "email,firstName,lastName", "limit": "200"},
+    )
+    invitations: list[dict] = []
+    for item in items:
+        attrs = item.get("attributes") or {}
+        email = str(attrs.get("email") or "")
+        if not email:
+            continue
+        invitations.append(
+            {
+                "id": item["id"],
+                "email": email,
+                "first_name": str(attrs.get("firstName") or ""),
+                "last_name": str(attrs.get("lastName") or ""),
+            }
+        )
+    return invitations
+
+
+def invite_app_store_connect_user(
+    token: str, email: str, first_name: str, last_name: str, app_id: str
+) -> str:
+    # Marketing is the least privileged App Store Connect role Apple documents
+    # as enough for internal TestFlight testers.
+    payload = asc_request(
+        token,
+        "/v1/userInvitations",
+        method="POST",
+        body={
+            "data": {
+                "type": "userInvitations",
+                "attributes": {
+                    "email": email,
+                    "firstName": first_name,
+                    "lastName": last_name,
+                    "roles": ["MARKETING"],
+                    "allAppsVisible": False,
+                    "provisioningAllowed": False,
+                },
+                "relationships": {
+                    "visibleApps": {
+                        "data": [{"type": "apps", "id": app_id}]
+                    }
+                },
+            }
+        },
+    )
+    created = (payload.get("data") or {}).get("id")
+    if not created:
+        raise RuntimeError(f"inviting App Store Connect user {email} returned no id")
+    return str(created)
+
+
 def reinvite_revoked_testers(
-    token: str, testers: list[dict], groups: list[dict], build_id: str
+    token: str,
+    testers: list[dict],
+    groups: list[dict],
+    build_id: str,
+    app_id: str,
+    team_emails: set[str],
 ) -> list[dict]:
     group_ids = [group["id"] for group in groups if group["is_internal"]]
     if not group_ids:
         group_ids = [group["id"] for group in groups]
+    try:
+        pending = {item["email"].lower(): item for item in list_user_invitations(token)}
+    except ASCHTTPError as exc:
+        print(f"user invitations: {exc}", file=sys.stderr)
+        pending = {}
     kept: list[dict] = []
     for tester in testers:
         if not tester_needs_reinvite(tester):
@@ -550,22 +629,49 @@ def reinvite_revoked_testers(
             print(f"{result} {prior} tester {email}")
         except ASCHTTPError as exc:
             print(f"could not remove {prior} tester {email}: {exc}", file=sys.stderr)
+        created = None
         try:
-            new_id = create_tester(token, email, group_ids, build_id)
-            print(f"reinvited {email} was={prior} id={new_id}")
-            kept.append(
-                {
-                    "id": new_id,
-                    "email": email,
-                    "invite_type": "EMAIL",
-                    "state": "INVITED",
-                    "first_name": tester.get("first_name") or "",
-                    "last_name": tester.get("last_name") or "",
-                }
+            created = create_tester(token, email, group_ids, build_id)
+            print(
+                f"reinvited {email} was={prior} id={created['id']} "
+                f"state={created['state'] or 'unknown'}"
             )
         except ASCHTTPError as exc:
             print(f"could not reinvite {email}: {exc}", file=sys.stderr)
-            kept.append(tester)
+            created = tester
+        if tester_needs_reinvite(created) and email.lower() not in team_emails:
+            first = created.get("first_name") or tester.get("first_name") or ""
+            last = created.get("last_name") or tester.get("last_name") or ""
+            if email.lower() in pending:
+                print(
+                    f"waiting for {email} to accept App Store Connect user invite",
+                    file=sys.stderr,
+                )
+            elif not first or not last:
+                print(
+                    f"cannot invite {email} as App Store Connect user; "
+                    f"Apple did not return a name",
+                    file=sys.stderr,
+                )
+            else:
+                try:
+                    invite_id = invite_app_store_connect_user(
+                        token, email, first, last, app_id
+                    )
+                    print(
+                        f"invited {email} to App Store Connect as MARKETING "
+                        f"id={invite_id}; they must accept that email before "
+                        f"internal TestFlight works"
+                    )
+                except ASCHTTPError as exc:
+                    if ignore_already_exists(exc):
+                        print(f"App Store Connect invite already exists for {email}")
+                    else:
+                        print(
+                            f"could not invite {email} to App Store Connect: {exc}",
+                            file=sys.stderr,
+                        )
+        kept.append(created)
     return kept
 
 
@@ -608,16 +714,12 @@ def invite_missing_team_users(
         if email.lower() in known:
             continue
         try:
-            new_id = create_tester(token, email, group_ids, build_id)
-            print(f"invited team user {email} id={new_id}")
-            extra.append(
-                {
-                    "id": new_id,
-                    "email": email,
-                    "invite_type": "EMAIL",
-                    "state": "INVITED",
-                }
+            created = create_tester(token, email, group_ids, build_id)
+            print(
+                f"invited team user {email} id={created['id']} "
+                f"state={created['state'] or 'unknown'}"
             )
+            extra.append(created)
             known.add(email.lower())
         except ASCHTTPError as exc:
             print(f"could not invite team user {email}: {exc}", file=sys.stderr)
@@ -853,14 +955,27 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
             print(f"individual testers on build {build['number']}: {exc}", file=sys.stderr)
 
     records = sorted(testers.values(), key=lambda item: item["email"] or item["id"])
+    try:
+        team_emails = {email.lower() for email in list_team_user_emails(token)}
+    except ASCHTTPError as exc:
+        print(f"team users: {exc}", file=sys.stderr)
+        team_emails = set()
     records = invite_missing_team_users(token, records, groups, latest["id"])
-    records = reinvite_revoked_testers(token, records, groups, latest["id"])
+    records = reinvite_revoked_testers(
+        token, records, groups, latest["id"], identifier, team_emails
+    )
     print(f"app testers={len(records)}")
     for tester in records:
         label = tester["email"] or tester["id"]
+        name = " ".join(
+            part
+            for part in (tester.get("first_name"), tester.get("last_name"))
+            if part
+        )
         print(
             f"tester {label} invite={tester['invite_type'] or 'unknown'} "
             f"state={tester['state'] or 'unknown'}"
+            + (f" name={name}" if name else "")
         )
     if not records:
         raise RuntimeError("no TestFlight testers found; not expiring older builds")
