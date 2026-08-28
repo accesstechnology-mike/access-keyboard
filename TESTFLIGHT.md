@@ -76,9 +76,9 @@ If signing fails on the extension, the App Group is missing from one of the App 
 
 Internal testers skip Beta App Review. They must be Users in App Store Connect (Admin / App Manager / Developer / Marketing / Sales).
 
-1. TestFlight → **Internal Testing** → create a group, e.g. `Access Technology`.
-2. Add testers. Turn on **Automatically Distribute Builds** so App Store Connect users are not pinned to the first build they were given.
-3. Do not add a specific old build. `scripts/upload-testflight.sh` assigns the latest processed build to every group and expires every older build. Testers must only ever see the current build.
+1. TestFlight → **Internal Testing** → create a group, e.g. `Access Technology` / **Alpha**.
+2. Add **every** App Store Connect user who should test, including the developer/test Apple ID. Being an Admin does not put that Apple ID in the group. A first-build email invite is a per-build invite; it will not follow later uploads.
+3. Turn on **Automatically Distribute Builds**. Do not add a specific old build. Uploads wait until the new build is installable, put every existing tester in the internal groups and on that build, then expire older builds.
 
 Each person installs **TestFlight** from the App Store on an **iPad running iPadOS 18**, accepts the invite, and installs `access: keyboard`. An iPhone will not be offered the build.
 
