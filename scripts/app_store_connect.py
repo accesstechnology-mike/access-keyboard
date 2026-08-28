@@ -175,7 +175,9 @@ def collect_resources(
 
 
 def ignore_already_exists(exc: ASCHTTPError) -> bool:
-    return exc.code in {409, 422} and (
+    if exc.code == 409:
+        return True
+    return exc.code == 422 and (
         "already" in exc.body.lower() or "duplicate" in exc.body.lower()
     )
 

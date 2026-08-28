@@ -122,15 +122,21 @@ class LatestOnlyTests(unittest.TestCase):
             )
         )
 
-    def test_conflict_is_ignored_only_when_apple_says_already_exists(self) -> None:
+    def test_conflict_is_ignored_for_existing_relationships(self) -> None:
         already = asc.ASCHTTPError(
             409,
             "/v1/betaGroups/1/relationships/builds",
             '{"errors":[{"detail":"The specified resource already exists."}]}',
         )
-        other = asc.ASCHTTPError(409, "/v1/builds/1", '{"errors":[{"detail":"Nope."}]}')
+        other_409 = asc.ASCHTTPError(409, "/v1/builds/1", '{"errors":[{"detail":"Nope."}]}')
+        real_error = asc.ASCHTTPError(
+            422,
+            "/v1/betaGroups/1/relationships/builds",
+            '{"errors":[{"detail":"The build is not available for external testing."}]}',
+        )
         self.assertTrue(asc.ignore_already_exists(already))
-        self.assertFalse(asc.ignore_already_exists(other))
+        self.assertTrue(asc.ignore_already_exists(other_409))
+        self.assertFalse(asc.ignore_already_exists(real_error))
 
 
 if __name__ == "__main__":
