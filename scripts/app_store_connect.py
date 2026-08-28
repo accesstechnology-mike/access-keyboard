@@ -142,16 +142,22 @@ def asc_request(
     if body is not None:
         raw_body = json.dumps(body).encode()
         headers["content-type"] = "application/json"
-    request = urllib.request.Request(url, data=raw_body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = response.read().decode()
-            if not payload:
-                return {}
-            return json.loads(payload)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode()[:400]
-        raise ASCHTTPError(exc.code, path, detail) from exc
+    last_error: ASCHTTPError | None = None
+    for attempt in range(3):
+        request = urllib.request.Request(url, data=raw_body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = response.read().decode()
+                if not payload:
+                    return {}
+                return json.loads(payload)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode()[:400]
+            last_error = ASCHTTPError(exc.code, path, detail)
+            if exc.code != 500 or attempt == 2:
+                raise last_error from exc
+            time.sleep(2**attempt)
+    raise last_error or RuntimeError(f"App Store Connect request failed for {path}")
 
 
 def collect_resources(
@@ -179,6 +185,14 @@ def ignore_already_exists(exc: ASCHTTPError) -> bool:
         return True
     return exc.code == 422 and (
         "already" in exc.body.lower() or "duplicate" in exc.body.lower()
+    )
+
+
+def internal_group_rejects_assign(exc: ASCHTTPError) -> bool:
+    body = exc.body.lower()
+    return exc.code == 422 and (
+        "cannot add internal group" in body
+        or "cannot be assigned to this internal group" in body
     )
 
 
@@ -345,6 +359,8 @@ def assign_build_to_group(token: str, group_id: str, build_id: str) -> str:
     except ASCHTTPError as exc:
         if ignore_already_exists(exc):
             return "already"
+        if internal_group_rejects_assign(exc):
+            return "automatic"
         raise
 
 
@@ -486,6 +502,17 @@ def wait_for_valid_build(
         time.sleep(sleep_s)
 
 
+def move_individual_testers(token: str, latest: dict, old: list[dict]) -> None:
+    tester_ids: list[str] = []
+    for build in old:
+        tester_ids.extend(individual_testers(token, build["id"]))
+    unique_testers = list(dict.fromkeys(tester_ids))
+    if not unique_testers:
+        return
+    added = assign_individual_testers(token, latest["id"], unique_testers)
+    print(f"moved {added} individual tester assignment(s) to build {latest['number']}")
+
+
 def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
     groups = list_beta_groups(token, identifier)
     if not groups:
@@ -498,24 +525,34 @@ def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
             access = enable_group_all_builds(token, group)
             if access == "enabled":
                 print(f"{kind} group {group['name']}: testers now get every new build")
+            if group["is_internal"] and (
+                group.get("has_access_to_all_builds") is True or access == "enabled"
+            ):
+                print(f"{kind} group {group['name']}: already receives every build")
+                continue
             if not group["is_internal"]:
                 review = submit_beta_review(token, latest["id"])
                 if review == "submitted":
-                    print(f"{kind} group {group['name']}: submitted build {latest['number']} for Beta Review")
+                    print(
+                        f"{kind} group {group['name']}: submitted build {latest['number']} for Beta Review"
+                    )
             assigned = assign_build_to_group(token, group["id"], latest["id"])
-            print(f"{kind} group {group['name']}: {assigned} build {latest['number']}")
+            if assigned == "automatic":
+                print(f"{kind} group {group['name']}: already receives every build")
+            else:
+                print(f"{kind} group {group['name']}: {assigned} build {latest['number']}")
         except ASCHTTPError as exc:
+            if group["is_internal"] and internal_group_rejects_assign(exc):
+                print(f"{kind} group {group['name']}: already receives every build")
+                continue
             failures.append(f"{kind} group {group['name']}: {exc}")
             print(f"{kind} group {group['name']}: FAILED {exc}", file=sys.stderr)
 
     old = builds_to_expire(list_app_builds(token, identifier), latest)
-    tester_ids: list[str] = []
-    for build in old:
-        tester_ids.extend(individual_testers(token, build["id"]))
-    unique_testers = list(dict.fromkeys(tester_ids))
-    if unique_testers:
-        added = assign_individual_testers(token, latest["id"], unique_testers)
-        print(f"moved {added} individual tester assignment(s) to build {latest['number']}")
+    try:
+        move_individual_testers(token, latest, old)
+    except ASCHTTPError as exc:
+        print(f"skipping individual testers: {exc}", file=sys.stderr)
 
     if failures:
         raise RuntimeError(

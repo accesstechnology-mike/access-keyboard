@@ -138,6 +138,22 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertTrue(asc.ignore_already_exists(other_409))
         self.assertFalse(asc.ignore_already_exists(real_error))
 
+    def test_internal_auto_distribute_group_cannot_be_assigned_a_build(self) -> None:
+        alpha = asc.ASCHTTPError(
+            422,
+            "/v1/betaGroups/1d669790-f55d-4154-804b-239ee314f1de/relationships/builds",
+            '{"errors":[{"title":"Builds cannot be assigned to this internal group.",'
+            '"detail":"Cannot add internal group to a build."}]}',
+        )
+        external = asc.ASCHTTPError(
+            422,
+            "/v1/betaGroups/ext/relationships/builds",
+            '{"errors":[{"detail":"The build is not available for external testing."}]}',
+        )
+        self.assertTrue(asc.internal_group_rejects_assign(alpha))
+        self.assertFalse(asc.internal_group_rejects_assign(external))
+        self.assertFalse(asc.ignore_already_exists(alpha))
+
 
 if __name__ == "__main__":
     unittest.main()
