@@ -5,10 +5,11 @@ on:
   push:
     tags:
       - "testflight-*"
+      - "sync-testflight-*"
 
 jobs:
   latest-only:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref_name, 'sync-testflight-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +34,7 @@ jobs:
         run: python3 scripts/app_store_connect.py latest-only
 
   upload:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'testflight-')
     runs-on: macos-26
     timeout-minutes: 90
     steps:
