@@ -372,25 +372,63 @@ def list_app_builds(token: str, identifier: str) -> list[dict]:
     return builds
 
 
-def list_app_testers(token: str, identifier: str) -> list[dict]:
-    items, _ = collect_resources(
-        token,
-        f"/v1/apps/{identifier}/betaTesters",
-        {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
-    )
-    testers = []
+def parse_tester(item: dict) -> dict:
+    attrs = item.get("attributes") or {}
+    return {
+        "id": item["id"],
+        "email": str(attrs.get("email") or ""),
+        "invite_type": str(attrs.get("inviteType") or ""),
+        "state": str(attrs.get("state") or ""),
+    }
+
+
+def _merge_testers(dest: dict[str, dict], items: list[dict]) -> None:
     for item in items:
-        attrs = item.get("attributes") or {}
-        testers.append(
+        parsed = parse_tester(item)
+        dest[parsed["id"]] = parsed
+
+
+def list_testers_from_path(
+    token: str, path: str, params: dict[str, str]
+) -> list[dict]:
+    items, _ = collect_resources(token, path, params)
+    return items
+
+
+def list_app_testers(
+    token: str, identifier: str, groups: list[dict] | None = None
+) -> list[dict]:
+    testers: dict[str, dict] = {}
+    queries = [
+        (
+            "/v1/betaTesters",
             {
-                "id": item["id"],
-                "email": str(attrs.get("email") or ""),
-                "invite_type": str(attrs.get("inviteType") or ""),
-                "state": str(attrs.get("state") or ""),
-            }
+                "filter[apps]": identifier,
+                "fields[betaTesters]": "email,inviteType,state",
+                "limit": "200",
+            },
+        ),
+        (
+            f"/v1/apps/{identifier}/betaTesters",
+            {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+        ),
+    ]
+    for group in groups or []:
+        queries.append(
+            (
+                f"/v1/betaGroups/{group['id']}/betaTesters",
+                {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+            )
         )
-    testers.sort(key=lambda item: item["email"])
-    return testers
+    errors: list[str] = []
+    for path, params in queries:
+        try:
+            _merge_testers(testers, list_testers_from_path(token, path, params))
+        except ASCHTTPError as exc:
+            errors.append(f"{path}: {exc}")
+    if not testers and errors:
+        raise RuntimeError("could not list TestFlight testers: " + " ".join(errors))
+    return sorted(testers.values(), key=lambda item: item["email"] or item["id"])
 
 
 def add_tester_to_group(token: str, group_id: str, tester_id: str) -> str:
@@ -609,19 +647,33 @@ def wait_for_installable_build(
 
 
 def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list[dict]) -> None:
-    testers = list_app_testers(token, identifier)
-    print(f"app testers={len(testers)}")
-    for tester in testers:
+    testers = {item["id"]: item for item in list_app_testers(token, identifier, groups)}
+    for build in list_app_builds(token, identifier):
+        try:
+            items, _ = collect_resources(
+                token,
+                f"/v1/builds/{build['id']}/individualTesters",
+                {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+            )
+            _merge_testers(testers, items)
+        except ASCHTTPError as exc:
+            print(f"individual testers on build {build['number']}: {exc}", file=sys.stderr)
+
+    records = sorted(testers.values(), key=lambda item: item["email"] or item["id"])
+    print(f"app testers={len(records)}")
+    for tester in records:
         label = tester["email"] or tester["id"]
         print(
             f"tester {label} invite={tester['invite_type'] or 'unknown'} "
             f"state={tester['state'] or 'unknown'}"
         )
+    if not records:
+        raise RuntimeError("no TestFlight testers found; not expiring older builds")
 
     for group in groups:
         if not group["is_internal"]:
             continue
-        for tester in testers:
+        for tester in records:
             try:
                 result = add_tester_to_group(token, group["id"], tester["id"])
                 label = tester["email"] or tester["id"]
@@ -633,15 +685,10 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
                     file=sys.stderr,
                 )
 
-    tester_ids = [tester["id"] for tester in testers]
-    for build in list_app_builds(token, identifier):
-        if build["id"] == latest["id"]:
-            continue
-        tester_ids.extend(individual_testers(token, build["id"]))
-    unique_ids = list(dict.fromkeys(tester_ids))
-    if unique_ids:
-        added = assign_individual_testers(token, latest["id"], unique_ids)
-        print(f"entitled {added} tester(s) to build {latest['number']}")
+    added = assign_individual_testers(
+        token, latest["id"], [tester["id"] for tester in records]
+    )
+    print(f"entitled {added} tester(s) to build {latest['number']}")
 
 
 def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
@@ -679,10 +726,7 @@ def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
             failures.append(f"{kind} group {group['name']}: {exc}")
             print(f"{kind} group {group['name']}: FAILED {exc}", file=sys.stderr)
 
-    try:
-        entitle_every_tester(token, identifier, latest, groups)
-    except ASCHTTPError as exc:
-        print(f"skipping tester entitlement: {exc}", file=sys.stderr)
+    entitle_every_tester(token, identifier, latest, groups)
 
     if failures:
         raise RuntimeError(
@@ -798,7 +842,7 @@ def cmd_status() -> int:
         if is_installable(build):
             flags.append("installable")
         print(f"build {build['number']} {' '.join(flags)}")
-    testers = list_app_testers(token, identifier)
+    testers = list_app_testers(token, identifier, list_beta_groups(token, identifier))
     print(f"app testers={len(testers)}")
     for tester in testers:
         print(
