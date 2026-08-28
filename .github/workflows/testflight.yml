@@ -2,18 +2,13 @@ name: TestFlight
 
 on:
   workflow_dispatch:
-    inputs:
-      latest_only:
-        description: "Give every tester the latest TestFlight build only. Skips archive."
-        type: boolean
-        default: false
   push:
     tags:
       - "testflight-*"
 
 jobs:
   latest-only:
-    if: github.event_name == 'workflow_dispatch' && inputs.latest_only
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -30,7 +25,7 @@ jobs:
           mkdir -p secrets
           printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
 
-      - name: Latest TestFlight build only
+      - name: Give testers the latest build only
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -38,7 +33,7 @@ jobs:
         run: python3 scripts/app_store_connect.py latest-only
 
   upload:
-    if: github.event_name != 'workflow_dispatch' || inputs.latest_only != true
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 60
     steps:
