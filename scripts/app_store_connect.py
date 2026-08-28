@@ -373,6 +373,9 @@ def list_app_builds(token: str, identifier: str) -> list[dict]:
     return builds
 
 
+TESTER_FIELDS = "email,inviteType,state,firstName,lastName"
+
+
 def parse_tester(item: dict) -> dict:
     attrs = item.get("attributes") or {}
     return {
@@ -380,6 +383,8 @@ def parse_tester(item: dict) -> dict:
         "email": str(attrs.get("email") or ""),
         "invite_type": str(attrs.get("inviteType") or ""),
         "state": str(attrs.get("state") or ""),
+        "first_name": str(attrs.get("firstName") or ""),
+        "last_name": str(attrs.get("lastName") or ""),
     }
 
 
@@ -405,24 +410,24 @@ def list_app_testers(
             "/v1/betaTesters",
             {
                 "filter[apps]": identifier,
-                "fields[betaTesters]": "email,inviteType,state",
+                "fields[betaTesters]": TESTER_FIELDS,
                 "limit": "200",
             },
         ),
         (
             "/v1/betaTesters",
-            {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+            {"fields[betaTesters]": TESTER_FIELDS, "limit": "200"},
         ),
         (
             f"/v1/apps/{identifier}/betaTesters",
-            {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+            {"fields[betaTesters]": TESTER_FIELDS, "limit": "200"},
         ),
     ]
     for group in groups or []:
         queries.append(
             (
                 f"/v1/betaGroups/{group['id']}/betaTesters",
-                {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+                {"fields[betaTesters]": TESTER_FIELDS, "limit": "200"},
             )
         )
     errors: list[str] = []
@@ -448,8 +453,22 @@ def revoked_testers(testers: list[dict]) -> list[dict]:
     return testers_needing_reinvite(testers)
 
 
-def delete_tester(token: str, tester_id: str) -> None:
-    asc_request(token, f"/v1/betaTesters/{tester_id}", method="DELETE")
+def tester_is_missing(exc: ASCHTTPError) -> bool:
+    return exc.code == 404
+
+
+def tester_cannot_be_assigned(exc: ASCHTTPError) -> bool:
+    return exc.code == 409 and "cannot be assigned" in exc.body.lower()
+
+
+def delete_tester(token: str, tester_id: str) -> str:
+    try:
+        asc_request(token, f"/v1/betaTesters/{tester_id}", method="DELETE")
+        return "removed"
+    except ASCHTTPError as exc:
+        if tester_is_missing(exc):
+            return "already"
+        raise
 
 
 def tester_create_relationships(group_ids: list[str], build_id: str) -> dict:
@@ -467,7 +486,9 @@ def tester_create_relationships(group_ids: list[str], build_id: str) -> dict:
     raise RuntimeError("creating a tester needs a group or a build")
 
 
-def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> str:
+def post_tester(
+    token: str, email: str, group_ids: list[str], build_id: str
+) -> str:
     relationships = tester_create_relationships(group_ids, build_id)
     payload = asc_request(
         token,
@@ -487,6 +508,30 @@ def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -
     return str(created)
 
 
+def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> str:
+    attempts: list[tuple[list[str], str]] = []
+    if group_ids:
+        attempts.append((group_ids, ""))
+    if build_id:
+        attempts.append(([], build_id))
+    if not attempts:
+        raise RuntimeError("creating a tester needs a group or a build")
+    last: ASCHTTPError | None = None
+    for groups, identifier in attempts:
+        via = "groups" if groups else "build"
+        try:
+            new_id = post_tester(token, email, groups, identifier)
+            print(f"created tester {email} via {via} id={new_id}")
+            return new_id
+        except ASCHTTPError as exc:
+            last = exc
+            if tester_cannot_be_assigned(exc):
+                print(f"create {email} via {via}: {exc}", file=sys.stderr)
+                continue
+            raise
+    raise last or RuntimeError(f"creating tester {email} failed")
+
+
 def reinvite_revoked_testers(
     token: str, testers: list[dict], groups: list[dict], build_id: str
 ) -> list[dict]:
@@ -501,8 +546,8 @@ def reinvite_revoked_testers(
         email = tester["email"]
         prior = tester.get("state") or "unknown"
         try:
-            delete_tester(token, tester["id"])
-            print(f"removed {prior} tester {email}")
+            result = delete_tester(token, tester["id"])
+            print(f"{result} {prior} tester {email}")
         except ASCHTTPError as exc:
             print(f"could not remove {prior} tester {email}: {exc}", file=sys.stderr)
         try:
@@ -514,6 +559,8 @@ def reinvite_revoked_testers(
                     "email": email,
                     "invite_type": "EMAIL",
                     "state": "INVITED",
+                    "first_name": tester.get("first_name") or "",
+                    "last_name": tester.get("last_name") or "",
                 }
             )
         except ASCHTTPError as exc:
@@ -553,6 +600,9 @@ def invite_missing_team_users(
     except ASCHTTPError as exc:
         print(f"team users: {exc}", file=sys.stderr)
         return testers
+    print(f"team users={len(emails)}")
+    for email in emails:
+        print(f"team user {email}")
     extra = list(testers)
     for email in emails:
         if email.lower() in known:
@@ -796,7 +846,7 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
             items, _ = collect_resources(
                 token,
                 f"/v1/builds/{build['id']}/individualTesters",
-                {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+                {"fields[betaTesters]": TESTER_FIELDS, "limit": "200"},
             )
             _merge_testers(testers, items)
         except ASCHTTPError as exc:
