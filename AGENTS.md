@@ -17,11 +17,13 @@ That is how this repo starts GitHub Actions. Do it. Do not tell the user you can
 - **Actions → TestFlight → Run workflow** → `latest-only` only (no new archive, no checkbox).
 - `latest-only` waits until the build is **installable**, puts **every** app tester into every internal group and onto that build, then expires older builds. Do not expire if tester listing fails. `GET /v1/apps/{id}/betaTesters` can 403 this API key; also query `/v1/betaTesters?filter[apps]=`, each group's testers, and each build's individual testers. Installable means `VALID` and not expired. If Apple sends `internalBuildState`, treat `PROCESSING` / export-compliance states as not ready; if that field is missing (`VALID/no-internal-state`), `VALID` is enough. Do not wait 45 minutes for a field Apple never returns. App Store Connect JWTs expire after 20 minutes; refresh them during that wait. A 401 `NOT_AUTHORIZED` mid-wait is an expired token, not a revoked key.
 
-Internal group **Alpha** auto-distributes. Apple returns `422 Cannot add internal group to a build` if you assign a build to it. That means testers **in Alpha** receive every unexpired build. An App Store Connect / “internal tester” Apple ID is **not** automatically in Alpha. The first invite (19 Aug, 0.1.0(1)) was a per-build invite. Later uploads never added that Apple ID. A personal iCloud tester who was added later got 6. After we expired 1–6, the first invitee sees “No TestFlight builds are available” with Version 0.1.0 Build 1 still shown as the last known build. Put that tester in Alpha and on the latest build before expiring anything.
+Internal group **Alpha** auto-distributes. Apple returns `422 Cannot add internal group to a build` if you assign a build to it. Testers **in Alpha** with a live invite receive every unexpired build.
 
-Do not expire older builds until the new one is installable **and** every existing tester is entitled to it.
+A TestFlight row under **Previously Tested** that says “No TestFlight builds are available” and still shows 0.1.0 (1) is a **REVOKED** tester, not a missing build. Adding them to Alpha is a no-op. Delete the tester and create a new EMAIL invite. On 28 Aug the API listed `grace@accesstechnology.co.uk` REVOKED (GC avatar), `admin@accesstechnology.co.uk` REVOKED, `mike.thrussell@googlemail.com` INVITED, `mike@accesstechnology.co.uk` INSTALLED.
 
-Apple will not replace a binary already on an iPad. After latest-only succeeds, the tester still has to open TestFlight and tap Update. If TestFlight says no builds are available, this Apple ID is not entitled to the live build.
+Do not expire older builds until the new one is installable **and** revoked testers have been reinvited.
+
+Apple will not replace a binary already on an iPad. After a new invite, the tester must accept the email and install. Force-quit TestFlight if the old revoked page is still showing.
 
 GitHub’s TestFlight workflow **#5** is the 21 August upload of `e64d5ef` (typing gestures). Slack/GitHub “TestFlight #5 / e64d5ef / cursor bot” is that old run, not a new one. Check `gh run list --workflow=testflight.yml` for the live run number and SHA.
 
