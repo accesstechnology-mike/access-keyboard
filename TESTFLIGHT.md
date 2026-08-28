@@ -139,6 +139,8 @@ sh scripts/upload-testflight.sh
 
 That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, uploads, waits until Apple marks the build VALID, assigns it to every TestFlight group, and expires every older build. App Store Connect currently requires the iOS 26 SDK, so CI runs on `macos-26`.
 
+Agents start a new archive by pushing a `testflight-*` tag (see `AGENTS.md`). Do not claim GitHub Actions cannot be started from this environment.
+
 **Actions → TestFlight → Run workflow** always gives every tester the latest existing build. It does not ask. Push a tag when you want a new archive:
 
 ```sh
