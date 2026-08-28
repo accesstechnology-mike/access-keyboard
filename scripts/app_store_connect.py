@@ -410,6 +410,10 @@ def list_app_testers(
             },
         ),
         (
+            "/v1/betaTesters",
+            {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+        ),
+        (
             f"/v1/apps/{identifier}/betaTesters",
             {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
         ),
@@ -448,13 +452,23 @@ def delete_tester(token: str, tester_id: str) -> None:
     asc_request(token, f"/v1/betaTesters/{tester_id}", method="DELETE")
 
 
+def tester_create_relationships(group_ids: list[str], build_id: str) -> dict:
+    # Apple returns 409 "Only one relationship should be included when creating betaTesters".
+    if group_ids:
+        return {
+            "betaGroups": {
+                "data": [
+                    {"type": "betaGroups", "id": group_id} for group_id in group_ids
+                ]
+            }
+        }
+    if build_id:
+        return {"builds": {"data": [{"type": "builds", "id": build_id}]}}
+    raise RuntimeError("creating a tester needs a group or a build")
+
+
 def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> str:
-    relationships: dict = {
-        "betaGroups": {
-            "data": [{"type": "betaGroups", "id": group_id} for group_id in group_ids]
-        },
-        "builds": {"data": [{"type": "builds", "id": build_id}]},
-    }
+    relationships = tester_create_relationships(group_ids, build_id)
     payload = asc_request(
         token,
         "/v1/betaTesters",
@@ -506,6 +520,58 @@ def reinvite_revoked_testers(
             print(f"could not reinvite {email}: {exc}", file=sys.stderr)
             kept.append(tester)
     return kept
+
+
+def parse_user_email(item: dict) -> str:
+    attrs = item.get("attributes") or {}
+    return str(attrs.get("username") or attrs.get("email") or "")
+
+
+def list_team_user_emails(token: str) -> list[str]:
+    items, _ = collect_resources(
+        token,
+        "/v1/users",
+        {"fields[users]": "username", "limit": "200"},
+    )
+    emails: list[str] = []
+    for item in items:
+        email = parse_user_email(item)
+        if "@" in email:
+            emails.append(email)
+    return emails
+
+
+def invite_missing_team_users(
+    token: str, testers: list[dict], groups: list[dict], build_id: str
+) -> list[dict]:
+    known = {item["email"].lower() for item in testers if item.get("email")}
+    group_ids = [group["id"] for group in groups if group["is_internal"]]
+    if not group_ids:
+        group_ids = [group["id"] for group in groups]
+    try:
+        emails = list_team_user_emails(token)
+    except ASCHTTPError as exc:
+        print(f"team users: {exc}", file=sys.stderr)
+        return testers
+    extra = list(testers)
+    for email in emails:
+        if email.lower() in known:
+            continue
+        try:
+            new_id = create_tester(token, email, group_ids, build_id)
+            print(f"invited team user {email} id={new_id}")
+            extra.append(
+                {
+                    "id": new_id,
+                    "email": email,
+                    "invite_type": "EMAIL",
+                    "state": "INVITED",
+                }
+            )
+            known.add(email.lower())
+        except ASCHTTPError as exc:
+            print(f"could not invite team user {email}: {exc}", file=sys.stderr)
+    return extra
 
 
 def add_tester_to_group(token: str, group_id: str, tester_id: str) -> str:
@@ -737,6 +803,7 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
             print(f"individual testers on build {build['number']}: {exc}", file=sys.stderr)
 
     records = sorted(testers.values(), key=lambda item: item["email"] or item["id"])
+    records = invite_missing_team_users(token, records, groups, latest["id"])
     records = reinvite_revoked_testers(token, records, groups, latest["id"])
     print(f"app testers={len(records)}")
     for tester in records:

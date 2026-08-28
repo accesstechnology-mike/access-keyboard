@@ -196,6 +196,34 @@ class LatestOnlyTests(unittest.TestCase):
             ["gone@example.com", "pending@example.com"],
         )
 
+    def test_team_user_email_comes_from_username(self) -> None:
+        self.assertEqual(
+            asc.parse_user_email(
+                {"attributes": {"username": "tester@example.com", "roles": ["ADMIN"]}}
+            ),
+            "tester@example.com",
+        )
+        self.assertEqual(asc.parse_user_email({"attributes": {}}), "")
+
+    def test_create_tester_sends_only_groups_or_only_builds(self) -> None:
+        groups = asc.tester_create_relationships(["alpha", "beta"], "build-11")
+        self.assertEqual(list(groups), ["betaGroups"])
+        self.assertEqual(
+            groups["betaGroups"]["data"],
+            [
+                {"type": "betaGroups", "id": "alpha"},
+                {"type": "betaGroups", "id": "beta"},
+            ],
+        )
+        builds = asc.tester_create_relationships([], "build-11")
+        self.assertEqual(list(builds), ["builds"])
+        self.assertEqual(
+            builds["builds"]["data"],
+            [{"type": "builds", "id": "build-11"}],
+        )
+        with self.assertRaises(RuntimeError):
+            asc.tester_create_relationships([], "")
+
     def test_expired_first_invite_is_not_installable(self) -> None:
         first = build(1, expired=True)
         first["internal_build_state"] = "EXPIRED"
