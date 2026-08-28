@@ -238,6 +238,7 @@ def parse_build(item: dict) -> dict | None:
         "expired": bool(attrs.get("expired")),
         "processing_state": str(attrs.get("processingState") or ""),
         "uses_non_exempt_encryption": attrs.get("usesNonExemptEncryption"),
+        "internal_build_state": None,
     }
 
 
@@ -257,6 +258,24 @@ def latest_valid_build(builds: list[dict]) -> dict | None:
         for item in builds
         if item["processing_state"] == "VALID" and not item["expired"]
     ]
+    if not ready:
+        return None
+    return max(ready, key=lambda item: item["number"])
+
+
+INSTALLABLE_INTERNAL_STATES = frozenset(
+    {"READY_FOR_BETA_TESTING", "IN_BETA_TESTING"}
+)
+
+
+def is_installable(build: dict) -> bool:
+    if build["expired"] or build["processing_state"] != "VALID":
+        return False
+    return build.get("internal_build_state") in INSTALLABLE_INTERNAL_STATES
+
+
+def latest_installable_build(builds: list[dict]) -> dict | None:
+    ready = [item for item in builds if is_installable(item)]
     if not ready:
         return None
     return max(ready, key=lambda item: item["number"])
@@ -296,19 +315,75 @@ def next_build_number(token: str, bundle_id: str) -> int:
     return highest + 1
 
 
+def attach_beta_detail(item: dict, parsed: dict, included: list[dict]) -> dict:
+    details = {
+        resource["id"]: resource
+        for resource in included
+        if resource.get("type") == "buildBetaDetails"
+    }
+    rel = ((item.get("relationships") or {}).get("buildBetaDetail") or {}).get("data") or {}
+    detail = details.get(rel.get("id") or "", {})
+    parsed["internal_build_state"] = (detail.get("attributes") or {}).get(
+        "internalBuildState"
+    )
+    return parsed
+
+
 def list_app_builds(token: str, identifier: str) -> list[dict]:
-    items, _ = collect_resources(
+    items, included = collect_resources(
         token,
         "/v1/builds",
         {
             "filter[app]": identifier,
+            "include": "buildBetaDetail",
             "fields[builds]": "version,expired,processingState,usesNonExemptEncryption",
+            "fields[buildBetaDetails]": "internalBuildState,externalBuildState",
             "limit": "200",
         },
     )
-    builds = [parsed for item in items if (parsed := parse_build(item))]
+    builds = [
+        attach_beta_detail(item, parsed, included)
+        for item in items
+        if (parsed := parse_build(item))
+    ]
     builds.sort(key=lambda item: item["number"], reverse=True)
     return builds
+
+
+def list_app_testers(token: str, identifier: str) -> list[dict]:
+    items, _ = collect_resources(
+        token,
+        f"/v1/apps/{identifier}/betaTesters",
+        {"fields[betaTesters]": "email,inviteType,state", "limit": "200"},
+    )
+    testers = []
+    for item in items:
+        attrs = item.get("attributes") or {}
+        testers.append(
+            {
+                "id": item["id"],
+                "email": str(attrs.get("email") or ""),
+                "invite_type": str(attrs.get("inviteType") or ""),
+                "state": str(attrs.get("state") or ""),
+            }
+        )
+    testers.sort(key=lambda item: item["email"])
+    return testers
+
+
+def add_tester_to_group(token: str, group_id: str, tester_id: str) -> str:
+    try:
+        asc_request(
+            token,
+            f"/v1/betaGroups/{group_id}/relationships/betaTesters",
+            method="POST",
+            body={"data": [{"type": "betaTesters", "id": tester_id}]},
+        )
+        return "added"
+    except ASCHTTPError as exc:
+        if ignore_already_exists(exc):
+            return "already"
+        raise
 
 
 def list_beta_groups(token: str, identifier: str) -> list[dict]:
@@ -476,11 +551,11 @@ def assign_individual_testers(token: str, build_id: str, tester_ids: list[str]) 
     return added
 
 
-def wait_for_valid_build(
+def wait_for_installable_build(
     token: str,
     identifier: str,
     number: int,
-    timeout_s: int = 35 * 60,
+    timeout_s: int = 45 * 60,
     sleep_s: int = 30,
 ) -> dict:
     deadline = time.time() + timeout_s
@@ -490,27 +565,55 @@ def wait_for_valid_build(
         match = next((item for item in builds if item["number"] == number), None)
         if match:
             clear_export_compliance(token, match)
-            seen = match["processing_state"] or "unknown"
-            if match["processing_state"] == "VALID":
+            seen = (
+                f"{match['processing_state'] or 'unknown'}"
+                f"/{match.get('internal_build_state') or 'no-internal-state'}"
+            )
+            if is_installable(match):
                 return match
             if match["processing_state"] in {"FAILED", "INVALID"}:
                 raise RuntimeError(f"build {number} is {match['processing_state']}")
         if time.time() >= deadline:
             raise RuntimeError(
-                f"timed out waiting for build {number} to be VALID (state={seen})"
+                f"timed out waiting for build {number} to be installable (state={seen})"
             )
         time.sleep(sleep_s)
 
 
-def move_individual_testers(token: str, latest: dict, old: list[dict]) -> None:
-    tester_ids: list[str] = []
-    for build in old:
+def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list[dict]) -> None:
+    testers = list_app_testers(token, identifier)
+    print(f"app testers={len(testers)}")
+    for tester in testers:
+        label = tester["email"] or tester["id"]
+        print(
+            f"tester {label} invite={tester['invite_type'] or 'unknown'} "
+            f"state={tester['state'] or 'unknown'}"
+        )
+
+    for group in groups:
+        if not group["is_internal"]:
+            continue
+        for tester in testers:
+            try:
+                result = add_tester_to_group(token, group["id"], tester["id"])
+                label = tester["email"] or tester["id"]
+                print(f"internal group {group['name']}: {result} {label}")
+            except ASCHTTPError as exc:
+                label = tester["email"] or tester["id"]
+                print(
+                    f"internal group {group['name']}: could not add {label}: {exc}",
+                    file=sys.stderr,
+                )
+
+    tester_ids = [tester["id"] for tester in testers]
+    for build in list_app_builds(token, identifier):
+        if build["id"] == latest["id"]:
+            continue
         tester_ids.extend(individual_testers(token, build["id"]))
-    unique_testers = list(dict.fromkeys(tester_ids))
-    if not unique_testers:
-        return
-    added = assign_individual_testers(token, latest["id"], unique_testers)
-    print(f"moved {added} individual tester assignment(s) to build {latest['number']}")
+    unique_ids = list(dict.fromkeys(tester_ids))
+    if unique_ids:
+        added = assign_individual_testers(token, latest["id"], unique_ids)
+        print(f"entitled {added} tester(s) to build {latest['number']}")
 
 
 def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
@@ -548,18 +651,23 @@ def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
             failures.append(f"{kind} group {group['name']}: {exc}")
             print(f"{kind} group {group['name']}: FAILED {exc}", file=sys.stderr)
 
-    old = builds_to_expire(list_app_builds(token, identifier), latest)
     try:
-        move_individual_testers(token, latest, old)
+        entitle_every_tester(token, identifier, latest, groups)
     except ASCHTTPError as exc:
-        print(f"skipping individual testers: {exc}", file=sys.stderr)
+        print(f"skipping tester entitlement: {exc}", file=sys.stderr)
 
     if failures:
         raise RuntimeError(
             "not every TestFlight group has the latest build; older builds were left in place. "
             + " ".join(failures)
         )
+    if not is_installable(latest):
+        raise RuntimeError(
+            f"build {latest['number']} is not installable yet "
+            f"(internal={latest.get('internal_build_state')}); not expiring older builds"
+        )
 
+    old = builds_to_expire(list_app_builds(token, identifier), latest)
     for build in old:
         result = expire_build(token, build)
         print(f"{result} build {build['number']}")
@@ -657,7 +765,19 @@ def cmd_status() -> int:
             flags.append("expired")
         if latest and build["id"] == latest["id"]:
             flags.append("latest")
+        if build.get("internal_build_state"):
+            flags.append(str(build["internal_build_state"]))
+        if is_installable(build):
+            flags.append("installable")
         print(f"build {build['number']} {' '.join(flags)}")
+    testers = list_app_testers(token, identifier)
+    print(f"app testers={len(testers)}")
+    for tester in testers:
+        print(
+            f"tester {tester['email'] or tester['id']} "
+            f"invite={tester['invite_type'] or 'unknown'} "
+            f"state={tester['state'] or 'unknown'}"
+        )
     for group in list_beta_groups(token, identifier):
         kind = "internal" if group["is_internal"] else "external"
         all_builds = group.get("has_access_to_all_builds")
@@ -674,11 +794,17 @@ def cmd_latest_only(wait_for: int | None) -> int:
     token, bundle, identifier = _app_context()
     if wait_for is not None:
         print(f"waiting for build {wait_for} on {bundle}")
-        wait_for_valid_build(token, identifier, wait_for)
-    latest = latest_valid_build(list_app_builds(token, identifier))
+        wait_for_installable_build(token, identifier, wait_for)
+    latest = latest_installable_build(list_app_builds(token, identifier))
     if latest is None:
-        raise RuntimeError("no VALID unexpired TestFlight build")
-    print(f"latest {latest['number']}")
+        latest = latest_valid_build(list_app_builds(token, identifier))
+        if latest is None:
+            raise RuntimeError("no VALID unexpired TestFlight build")
+        raise RuntimeError(
+            f"build {latest['number']} is VALID but not installable yet "
+            f"(internal={latest.get('internal_build_state')})"
+        )
+    print(f"latest {latest['number']} {latest.get('internal_build_state')}")
     enforce_latest_only(token, identifier, latest)
     return 0
 

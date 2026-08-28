@@ -45,6 +45,7 @@ class LatestOnlyTests(unittest.TestCase):
                 "expired": False,
                 "processing_state": "VALID",
                 "uses_non_exempt_encryption": False,
+                "internal_build_state": None,
             },
         )
 
@@ -153,6 +154,23 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertTrue(asc.internal_group_rejects_assign(alpha))
         self.assertFalse(asc.internal_group_rejects_assign(external))
         self.assertFalse(asc.ignore_already_exists(alpha))
+
+    def test_valid_is_not_enough_for_testflight_install(self) -> None:
+        processing = build(7)
+        processing["internal_build_state"] = "PROCESSING"
+        ready = build(7, identifier="ready")
+        ready["internal_build_state"] = "READY_FOR_BETA_TESTING"
+        self.assertFalse(asc.is_installable(processing))
+        self.assertTrue(asc.is_installable(ready))
+        self.assertEqual(
+            asc.latest_installable_build([processing, ready])["id"],
+            "ready",
+        )
+
+    def test_expired_first_invite_is_not_installable(self) -> None:
+        first = build(1, expired=True)
+        first["internal_build_state"] = "EXPIRED"
+        self.assertFalse(asc.is_installable(first))
 
 
 if __name__ == "__main__":
