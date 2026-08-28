@@ -12,7 +12,7 @@ On this repo:
 python3 scripts/check-testflight.py
 ```
 
-That checks the 1024 icon has no alpha, both targets share version `0.1.0` / build `1`, privacy manifests declare UserDefaults (`CA92.1`), and the live Fix endpoint answers.
+That checks the 1024 icon has no alpha, both targets share one marketing version and one build number, privacy manifests declare UserDefaults (`CA92.1`), and the live Fix endpoint answers.
 
 If you change the app after a TestFlight upload, bump `CURRENT_PROJECT_VERSION` on **both** the app and the extension (Debug and Release). Apple rejects a reuse of the same build number.
 
@@ -77,11 +77,19 @@ If signing fails on the extension, the App Group is missing from one of the App 
 Internal testers skip Beta App Review. They must be Users in App Store Connect (Admin / App Manager / Developer / Marketing / Sales).
 
 1. TestFlight → **Internal Testing** → create a group, e.g. `Access Technology`.
-2. Add testers.
-3. Add build **0.1.0 (1)**.
-4. Paste the “What to Test” block below.
+2. Add testers. Turn on **Automatically Distribute Builds** so App Store Connect users are not pinned to the first build they were given.
+3. Do not add a specific old build. `scripts/upload-testflight.sh` assigns the latest processed build to every group and expires every older build. Testers must only ever see the current build.
 
 Each person installs **TestFlight** from the App Store on an **iPad running iPadOS 18**, accepts the invite, and installs `access: keyboard`. An iPhone will not be offered the build.
+
+If two Apple IDs disagree about the version — the usual case is the App Store Connect / developer account still on an old internal-group build, while a personal iCloud tester is on the external-group build — run latest-only. That is the same command CI runs after every upload:
+
+```sh
+python3 scripts/app_store_connect.py status
+python3 scripts/app_store_connect.py latest-only
+```
+
+Or **Actions → TestFlight → Run workflow** and tick **Give every tester the latest TestFlight build only**. The test/dev Apple ID will then be offered the same build as everyone else. Open TestFlight on that iPad and tap Update; Apple cannot replace an already-installed binary by itself.
 
 ## 6. External testers (needs Beta Review)
 
@@ -136,7 +144,7 @@ The App Store Connect `.p8` is not in git. Locally it lives in `secrets/` (see `
 sh scripts/upload-testflight.sh
 ```
 
-That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, and uploads. App Store Connect currently requires the iOS 26 SDK, so CI runs on `macos-26`.
+That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFlight build, uploads, waits until Apple marks the build VALID, assigns it to every TestFlight group, and expires every older build. App Store Connect currently requires the iOS 26 SDK, so CI runs on `macos-26`.
 
 From any machine with `gh`:
 
@@ -155,4 +163,5 @@ git push origin testflight-<short-reason>
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
 - Keep `MARKETING_VERSION` at `0.1.0` until you intend a user-visible version change.
+- Testers must only have the latest build. Do not leave older builds assigned to a group. `latest-only` expires them.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.
