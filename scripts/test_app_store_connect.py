@@ -177,6 +177,15 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertTrue(asc.token_needs_refresh(issued + 16 * 60, expires))
         self.assertTrue(asc.token_needs_refresh(expires, expires))
 
+    def test_revoked_testers_are_the_ones_who_see_no_builds(self) -> None:
+        testers = [
+            {"id": "1", "email": "ok@example.com", "state": "INSTALLED"},
+            {"id": "2", "email": "gone@example.com", "state": "REVOKED"},
+            {"id": "3", "email": "", "state": "REVOKED"},
+        ]
+        revoked = asc.revoked_testers(testers)
+        self.assertEqual([item["email"] for item in revoked], ["gone@example.com"])
+
     def test_expired_first_invite_is_not_installable(self) -> None:
         first = build(1, expired=True)
         first["internal_build_state"] = "EXPIRED"

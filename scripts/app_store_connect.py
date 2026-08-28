@@ -431,6 +431,77 @@ def list_app_testers(
     return sorted(testers.values(), key=lambda item: item["email"] or item["id"])
 
 
+def revoked_testers(testers: list[dict]) -> list[dict]:
+    return [
+        tester
+        for tester in testers
+        if tester.get("state") == "REVOKED" and tester.get("email")
+    ]
+
+
+def delete_tester(token: str, tester_id: str) -> None:
+    asc_request(token, f"/v1/betaTesters/{tester_id}", method="DELETE")
+
+
+def create_tester(token: str, email: str, group_ids: list[str], build_id: str) -> str:
+    relationships: dict = {
+        "betaGroups": {
+            "data": [{"type": "betaGroups", "id": group_id} for group_id in group_ids]
+        },
+        "builds": {"data": [{"type": "builds", "id": build_id}]},
+    }
+    payload = asc_request(
+        token,
+        "/v1/betaTesters",
+        method="POST",
+        body={
+            "data": {
+                "type": "betaTesters",
+                "attributes": {"email": email},
+                "relationships": relationships,
+            }
+        },
+    )
+    created = (payload.get("data") or {}).get("id")
+    if not created:
+        raise RuntimeError(f"creating tester {email} returned no id")
+    return str(created)
+
+
+def reinvite_revoked_testers(
+    token: str, testers: list[dict], groups: list[dict], build_id: str
+) -> list[dict]:
+    group_ids = [group["id"] for group in groups if group["is_internal"]]
+    if not group_ids:
+        group_ids = [group["id"] for group in groups]
+    kept: list[dict] = []
+    for tester in testers:
+        if tester.get("state") != "REVOKED" or not tester.get("email"):
+            kept.append(tester)
+            continue
+        email = tester["email"]
+        try:
+            delete_tester(token, tester["id"])
+            print(f"removed revoked tester {email}")
+        except ASCHTTPError as exc:
+            print(f"could not remove revoked tester {email}: {exc}", file=sys.stderr)
+        try:
+            new_id = create_tester(token, email, group_ids, build_id)
+            print(f"reinvited {email} id={new_id}")
+            kept.append(
+                {
+                    "id": new_id,
+                    "email": email,
+                    "invite_type": "EMAIL",
+                    "state": "INVITED",
+                }
+            )
+        except ASCHTTPError as exc:
+            print(f"could not reinvite {email}: {exc}", file=sys.stderr)
+            kept.append(tester)
+    return kept
+
+
 def add_tester_to_group(token: str, group_id: str, tester_id: str) -> str:
     try:
         asc_request(
@@ -660,6 +731,7 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
             print(f"individual testers on build {build['number']}: {exc}", file=sys.stderr)
 
     records = sorted(testers.values(), key=lambda item: item["email"] or item["id"])
+    records = reinvite_revoked_testers(token, records, groups, latest["id"])
     print(f"app testers={len(records)}")
     for tester in records:
         label = tester["email"] or tester["id"]
