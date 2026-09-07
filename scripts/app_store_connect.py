@@ -1097,6 +1097,80 @@ def write_export_options(path: Path, team_id: str) -> None:
     )
 
 
+CERTIFICATE_FIELDS = (
+    "certificateType,displayName,name,serialNumber,expirationDate,platform"
+)
+# Development certificate types that consume the Apple Development cert cap and
+# therefore block Automatic signing once the account is full. This is an
+# iPad-only app, so the iOS/Apple Development types are what matter; Mac
+# development certs are included because they share the same development pool.
+DEVELOPMENT_CERT_TYPES = frozenset(
+    {"DEVELOPMENT", "IOS_DEVELOPMENT", "MAC_APP_DEVELOPMENT"}
+)
+
+
+def parse_certificate(item: dict) -> dict:
+    attrs = item.get("attributes") or {}
+    return {
+        "id": str(item.get("id") or ""),
+        "type": str(attrs.get("certificateType") or ""),
+        "name": str(attrs.get("name") or ""),
+        "display_name": str(attrs.get("displayName") or ""),
+        "serial": str(attrs.get("serialNumber") or ""),
+        "expiration": str(attrs.get("expirationDate") or ""),
+        "platform": str(attrs.get("platform") or ""),
+    }
+
+
+def list_certificates(token: str) -> list[dict]:
+    items, _ = collect_resources(
+        token,
+        "/v1/certificates",
+        {"fields[certificates]": CERTIFICATE_FIELDS, "limit": "200"},
+    )
+    return [parse_certificate(item) for item in items]
+
+
+def development_certificates(
+    certs: list[dict], types: frozenset[str] = DEVELOPMENT_CERT_TYPES
+) -> list[dict]:
+    return [cert for cert in certs if cert["type"] in types]
+
+
+def certificate_age_key(cert: dict) -> tuple[str, str]:
+    # A cert lives one year from creation, so the one expiring soonest is the
+    # oldest. Sorting by expiration ascending puts the oldest certs first; the
+    # serial breaks ties deterministically.
+    return (cert["expiration"] or "", cert["serial"] or cert["id"])
+
+
+def spare_certificates_to_revoke(certs: list[dict], keep: int) -> list[dict]:
+    ordered = sorted(certs, key=certificate_age_key)
+    if keep <= 0:
+        return ordered
+    if len(ordered) <= keep:
+        return []
+    return ordered[:-keep]
+
+
+def revoke_certificate(token: str, cert_id: str) -> str:
+    try:
+        asc_request(token, f"/v1/certificates/{cert_id}", method="DELETE")
+        return "revoked"
+    except ASCHTTPError as exc:
+        if exc.code == 404:
+            return "already"
+        raise
+
+
+def describe_certificate(cert: dict) -> str:
+    return (
+        f"id={cert['id']} type={cert['type'] or '?'} "
+        f"name={cert['name'] or '?'} display={cert['display_name'] or '?'} "
+        f"expires={cert['expiration'] or '?'} serial={cert['serial'] or '?'}"
+    )
+
+
 def cmd_ping() -> int:
     key_id, issuer, key_path = credentials()
     token = make_token(key_id, issuer, key_path)
@@ -1180,6 +1254,41 @@ def cmd_status() -> int:
     return 0
 
 
+def cmd_revoke_spare_development_certs(keep: int, execute: bool) -> int:
+    if keep < 0:
+        raise RuntimeError("--keep must be zero or greater")
+    token = fresh_token()
+    certs = list_certificates(token)
+    dev = development_certificates(certs)
+    print(f"development certificates={len(dev)} (of {len(certs)} total)")
+    for cert in sorted(dev, key=certificate_age_key):
+        print(f"cert {describe_certificate(cert)}")
+    to_revoke = spare_certificates_to_revoke(dev, keep)
+    if not to_revoke:
+        print(f"nothing to revoke; keeping newest {keep} development cert(s)")
+        return 0
+    print(
+        f"keeping newest {keep}; {len(to_revoke)} spare development cert(s) "
+        f"{'to revoke' if execute else 'would be revoked'}"
+    )
+    if not execute:
+        for cert in to_revoke:
+            print(f"would revoke {describe_certificate(cert)}")
+        print("dry run; pass --execute to revoke")
+        return 0
+    failures: list[str] = []
+    for cert in to_revoke:
+        try:
+            result = revoke_certificate(token, cert["id"])
+            print(f"{result} {describe_certificate(cert)}")
+        except ASCHTTPError as exc:
+            failures.append(f"{cert['id']}: {exc}")
+            print(f"could not revoke {describe_certificate(cert)}: {exc}", file=sys.stderr)
+    if failures:
+        raise RuntimeError("some development certs could not be revoked: " + " ".join(failures))
+    return 0
+
+
 def cmd_latest_only(wait_for: int | None) -> int:
     token, bundle, identifier = _app_context()
     if wait_for is not None:
@@ -1218,6 +1327,18 @@ def main() -> int:
         default=None,
         help="wait until this build number is VALID, then make it the only tester build",
     )
+    revoke_p = sub.add_parser("revoke-spare-development-certs")
+    revoke_p.add_argument(
+        "--keep",
+        type=int,
+        default=1,
+        help="how many newest Development certificates to keep (default 1)",
+    )
+    revoke_p.add_argument(
+        "--execute",
+        action="store_true",
+        help="actually revoke; without this the command only lists (dry run)",
+    )
     args = parser.parse_args()
     if args.cmd == "ping":
         return cmd_ping()
@@ -1233,6 +1354,8 @@ def main() -> int:
         return cmd_status()
     if args.cmd == "latest-only":
         return cmd_latest_only(args.wait_for)
+    if args.cmd == "revoke-spare-development-certs":
+        return cmd_revoke_spare_development_certs(args.keep, args.execute)
     return 1
 
 

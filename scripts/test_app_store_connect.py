@@ -273,5 +273,94 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertFalse(asc.is_installable(first))
 
 
+def cert(
+    identifier: str,
+    *,
+    cert_type: str = "DEVELOPMENT",
+    expiration: str = "",
+    serial: str = "",
+) -> dict:
+    return {
+        "id": identifier,
+        "type": cert_type,
+        "name": "Apple Development: dev@example.com",
+        "display_name": "Apple Development",
+        "serial": serial or identifier.upper(),
+        "expiration": expiration,
+        "platform": "IOS",
+    }
+
+
+class DevelopmentCertificateTests(unittest.TestCase):
+    def test_parse_certificate_reads_apple_attributes(self) -> None:
+        parsed = asc.parse_certificate(
+            {
+                "id": "abc",
+                "attributes": {
+                    "certificateType": "DEVELOPMENT",
+                    "displayName": "Apple Development",
+                    "name": "Apple Development: dev@example.com",
+                    "serialNumber": "1A2B3C",
+                    "expirationDate": "2026-09-01T00:00:00.000+0000",
+                    "platform": "IOS",
+                },
+            }
+        )
+        self.assertEqual(
+            parsed,
+            {
+                "id": "abc",
+                "type": "DEVELOPMENT",
+                "name": "Apple Development: dev@example.com",
+                "display_name": "Apple Development",
+                "serial": "1A2B3C",
+                "expiration": "2026-09-01T00:00:00.000+0000",
+                "platform": "IOS",
+            },
+        )
+
+    def test_development_certificates_keeps_only_development_types(self) -> None:
+        certs = [
+            cert("a", cert_type="DEVELOPMENT"),
+            cert("b", cert_type="IOS_DEVELOPMENT"),
+            cert("c", cert_type="MAC_APP_DEVELOPMENT"),
+            cert("d", cert_type="DISTRIBUTION"),
+            cert("e", cert_type="IOS_DISTRIBUTION"),
+        ]
+        dev = asc.development_certificates(certs)
+        self.assertEqual([item["id"] for item in dev], ["a", "b", "c"])
+
+    def test_spare_certificates_revokes_oldest_and_keeps_newest(self) -> None:
+        certs = [
+            cert("new", expiration="2027-01-01T00:00:00.000+0000"),
+            cert("old", expiration="2025-01-01T00:00:00.000+0000"),
+            cert("mid", expiration="2026-01-01T00:00:00.000+0000"),
+        ]
+        to_revoke = asc.spare_certificates_to_revoke(certs, keep=1)
+        self.assertEqual([item["id"] for item in to_revoke], ["old", "mid"])
+
+    def test_spare_certificates_keeps_two_newest(self) -> None:
+        certs = [
+            cert("new", expiration="2027-01-01T00:00:00.000+0000"),
+            cert("old", expiration="2025-01-01T00:00:00.000+0000"),
+            cert("mid", expiration="2026-01-01T00:00:00.000+0000"),
+        ]
+        to_revoke = asc.spare_certificates_to_revoke(certs, keep=2)
+        self.assertEqual([item["id"] for item in to_revoke], ["old"])
+
+    def test_spare_certificates_nothing_to_revoke_when_at_or_below_keep(self) -> None:
+        certs = [cert("only", expiration="2027-01-01T00:00:00.000+0000")]
+        self.assertEqual(asc.spare_certificates_to_revoke(certs, keep=1), [])
+        self.assertEqual(asc.spare_certificates_to_revoke([], keep=1), [])
+
+    def test_spare_certificates_keep_zero_revokes_all(self) -> None:
+        certs = [
+            cert("new", expiration="2027-01-01T00:00:00.000+0000"),
+            cert("old", expiration="2025-01-01T00:00:00.000+0000"),
+        ]
+        to_revoke = asc.spare_certificates_to_revoke(certs, keep=0)
+        self.assertEqual([item["id"] for item in to_revoke], ["old", "new"])
+
+
 if __name__ == "__main__":
     unittest.main()
