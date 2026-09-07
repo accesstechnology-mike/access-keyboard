@@ -380,7 +380,7 @@ public final class KeyboardView: UIView {
     }
 
     private func displayedCharacter(for spec: KeySpec) -> String? {
-        if engine.shift.isUppercase, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
+        if engine.shift.affectsSymbolKeys, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
             return value
         }
         if case .text(let value) = spec.display {

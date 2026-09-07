@@ -200,7 +200,7 @@ public final class KeyboardEngine {
     }
 
     public func displayedText(for spec: KeySpec) -> String? {
-        if shift.isUppercase, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
+        if shift.affectsSymbolKeys, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
             return value
         }
         if case .text(let value) = spec.display {
@@ -266,7 +266,7 @@ public final class KeyboardEngine {
         switch shift {
         case .off:
             shift = .shifted
-        case .shifted, .capsLock:
+        case .shifted, .autoShifted, .capsLock:
             shift = .off
         }
     }
@@ -365,9 +365,9 @@ public final class KeyboardEngine {
         case .allCharacters:
             shift = .capsLock
         case .words:
-            shift = shouldCapitalizeWord(document?.documentContextBeforeInput) ? .shifted : .off
+            shift = shouldCapitalizeWord(document?.documentContextBeforeInput) ? .autoShifted : .off
         default:
-            shift = shouldCapitalizeSentence(document?.documentContextBeforeInput) ? .shifted : .off
+            shift = shouldCapitalizeSentence(document?.documentContextBeforeInput) ? .autoShifted : .off
         }
     }
 
