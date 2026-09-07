@@ -72,6 +72,8 @@ Internal TestFlight does not need a public privacy-policy URL. External testers 
 
 If signing fails on the extension, the App Group is missing from one of the App IDs. Fix that in the Developer portal, then archive again.
 
+If an archive fails with `Choose a certificate to revoke. Your account has reached the maximum number of certificates.`, free a Development cert slot with **Actions → Revoke spare Development certs → Run workflow** (or `gh workflow run revoke-dev-certs.yml -f keep=1 -f execute=true`); it runs `python3 scripts/app_store_connect.py revoke-spare-development-certs --keep 1 --execute` to revoke the oldest Apple Development / `IOS_DEVELOPMENT` certs while keeping the newest. Automatic signing recreates provisioning profiles on the next archive.
+
 ## 5. Internal testers (do this first)
 
 Internal testers skip Beta App Review. They must be Users in App Store Connect (Admin / App Manager / Developer / Marketing / Sales).
