@@ -9,10 +9,28 @@ public enum KeyboardMode: Equatable {
 public enum ShiftState: Equatable {
     case off
     case shifted
+    /// Capitalization produced by autocapitalization (sentence/word start). It
+    /// uppercases letters like `.shifted`, but must NOT flip symbol/number keys
+    /// to their shifted alternates — otherwise starting a sentence would swap
+    /// the whole number row and punctuation to symbols and back after one key.
+    case autoShifted
     case capsLock
 
+    /// Whether letter keys should render/insert their uppercase form.
     public var isUppercase: Bool {
         self != .off
+    }
+
+    /// Whether symbol and number-row keys should show/insert their shifted
+    /// alternate (`1`→`!`, `;`→`:`). Only true for user-driven shift, never for
+    /// autocapitalization, so the case of the first letter never reflows symbols.
+    public var affectsSymbolKeys: Bool {
+        switch self {
+        case .shifted, .capsLock:
+            return true
+        case .off, .autoShifted:
+            return false
+        }
     }
 }
 

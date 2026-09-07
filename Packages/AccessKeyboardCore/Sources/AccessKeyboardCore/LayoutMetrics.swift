@@ -35,7 +35,9 @@ public struct LayoutMetrics: Equatable {
             metrics = LayoutMetrics(
                 sideInset: 3,
                 topInset: 8,
-                bottomInset: max(4, safeBottom > 0 ? 4 : 6),
+                // Reserve the home-indicator safe area so the bottom toolbar row
+                // never sits under it; falls back to a small pad when absent.
+                bottomInset: max(6, safeBottom),
                 keySpacing: 7,
                 rowSpacing: 12,
                 keyHeight: 52,
@@ -51,7 +53,7 @@ public struct LayoutMetrics: Equatable {
             metrics = LayoutMetrics(
                 sideInset: 8,
                 topInset: 10,
-                bottomInset: 10,
+                bottomInset: max(10, safeBottom),
                 keySpacing: 9,
                 rowSpacing: 10,
                 keyHeight: landscape ? 72 : 80,
@@ -67,7 +69,7 @@ public struct LayoutMetrics: Equatable {
             metrics = LayoutMetrics(
                 sideInset: 6,
                 topInset: 10,
-                bottomInset: 10,
+                bottomInset: max(10, safeBottom),
                 keySpacing: 9,
                 rowSpacing: 10,
                 keyHeight: landscape ? 72 : 78,

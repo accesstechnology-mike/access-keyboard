@@ -42,6 +42,8 @@ final class AccentCalloutView: UIView {
             button.setTitle(value, for: .normal)
             button.titleLabel?.font = LiteracyFont.uiFont(ofSize: 22)
                 ?? .systemFont(ofSize: 22, weight: .regular)
+            button.titleLabel?.adjustsFontSizeToFitWidth = true
+            button.titleLabel?.minimumScaleFactor = 0.6
             button.setTitleColor(text, for: .normal)
             button.tag = index
             button.addTarget(self, action: #selector(selectOption(_:)), for: .touchUpInside)
@@ -51,7 +53,9 @@ final class AccentCalloutView: UIView {
         selectedIndex = 0
         highlightSelection()
 
-        let width = CGFloat(options.count) * 44
+        let optionWidth: CGFloat = 44
+        let maxWidth = max(optionWidth, parent.bounds.width - 16)
+        let width = min(CGFloat(options.count) * optionWidth, maxWidth)
         let height: CGFloat = 52
         var x = keyFrame.midX - width / 2
         x = max(8, min(x, parent.bounds.width - width - 8))

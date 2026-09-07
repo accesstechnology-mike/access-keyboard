@@ -84,8 +84,15 @@ final class KeyButton: UIControl {
         super.layoutSubviews()
         let inset: CGFloat = 2
         if spec.secondary != nil {
-            secondaryLabel.frame = CGRect(x: inset, y: 3, width: bounds.width - inset * 2, height: 12)
-            label.frame = CGRect(x: inset, y: 10, width: bounds.width - inset * 2, height: bounds.height - 12)
+            let secondaryHeight: CGFloat = 13
+            secondaryLabel.frame = CGRect(x: inset, y: 2, width: bounds.width - inset * 2, height: secondaryHeight)
+            let labelTop = secondaryLabel.frame.maxY
+            label.frame = CGRect(
+                x: inset,
+                y: labelTop,
+                width: bounds.width - inset * 2,
+                height: max(0, bounds.height - labelTop - 2)
+            )
         } else {
             secondaryLabel.frame = .zero
             label.frame = bounds.insetBy(dx: 4, dy: 2)
@@ -235,7 +242,7 @@ final class KeyButton: UIControl {
     }
 
     private var display: KeyDisplay {
-        if shift.isUppercase, let shifted = spec.shiftedDisplay {
+        if shift.affectsSymbolKeys, let shifted = spec.shiftedDisplay {
             return shifted
         }
         return spec.display
@@ -257,14 +264,14 @@ final class KeyButton: UIControl {
     private var accessibilityTitle: String {
         switch spec.action {
         case .character(let text):
-            if shift.isUppercase, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
+            if shift.affectsSymbolKeys, let shifted = spec.shiftedDisplay, case .text(let value) = shifted {
                 return value
             }
             return text
         case .shift:
             switch shift {
             case .off: return "Shift"
-            case .shifted: return "Shifted"
+            case .shifted, .autoShifted: return "Shifted"
             case .capsLock: return "Caps Lock"
             }
         case .capsLock: return "Caps Lock"

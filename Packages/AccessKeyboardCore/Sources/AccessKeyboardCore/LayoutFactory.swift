@@ -355,25 +355,35 @@ public enum LayoutFactory {
             ("-", "_"), ("=", "+")
         ]
         return pairs.map { number, symbol in
-            let shown = shift.isUppercase ? symbol : number
+            let showSymbol = shift.affectsSymbolKeys
+            let shown = showSymbol ? symbol : number
             return KeySpec(
                 action: .character(shown),
                 display: .text(shown),
                 style: .letter,
-                secondary: shift.isUppercase ? number : symbol
+                secondary: showSymbol ? number : symbol
             )
         }
     }
 
     private static func shiftKey(compact: Bool, shift: ShiftState, width: KeyWidth = .unit(1.4)) -> KeySpec {
-        let symbol = shift == .capsLock ? "capslock.fill" : (shift == .shifted ? "shift.fill" : "shift")
+        let symbol: String
+        switch shift {
+        case .capsLock:
+            symbol = "capslock.fill"
+        case .shifted, .autoShifted:
+            symbol = "shift.fill"
+        case .off:
+            symbol = "shift"
+        }
         let display: KeyDisplay = compact ? .symbol(symbol) : .text("shift")
         return KeySpec(action: .shift, display: display, width: width, style: .modifier)
     }
 
     private static func capsLockKey(shift: ShiftState) -> KeySpec {
-        let display: KeyDisplay = shift == .capsLock ? .text("caps lock") : .text("caps lock")
-        return KeySpec(action: .capsLock, display: display, width: .unit(1.5), style: .modifier)
+        // Active state is conveyed by the highlighted fill (see KeyboardView
+        // isHighlightedModifier); the label stays constant.
+        return KeySpec(action: .capsLock, display: .text("caps lock"), width: .unit(1.5), style: .modifier)
     }
 
     private static func backspace(compact: Bool, width: KeyWidth = .unit(1.4)) -> KeySpec {

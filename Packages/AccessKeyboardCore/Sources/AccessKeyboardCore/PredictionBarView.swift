@@ -65,6 +65,7 @@ final class PredictionBarView: UIView {
         for (index, button) in buttons.enumerated() {
             if predictions.indices.contains(index) {
                 let item = predictions[index]
+                button.isHidden = false
                 button.setTitle(item.displayText, for: .normal)
                 button.isEnabled = !running
                 button.accessibilityLabel = item.isVerbatim
@@ -76,14 +77,21 @@ final class PredictionBarView: UIView {
                 button.setTitleColor(appearance.textColor, for: .normal)
                 button.alpha = running ? 0.45 : 1
             } else {
+                // No suggestion for this slot (e.g. numeric/symbol modes): hide it
+                // entirely rather than showing an empty, divided, tappable slot.
+                button.isHidden = true
                 button.setTitle("", for: .normal)
                 button.isEnabled = false
-                button.accessibilityLabel = "No prediction"
-                button.alpha = 0.35
+                button.accessibilityLabel = nil
             }
         }
+        let count = min(predictions.count, buttons.count)
         let line = appearance.secondaryTextColor.withAlphaComponent(0.45)
-        separators.forEach { $0.backgroundColor = line }
+        for (index, separator) in separators.enumerated() {
+            // separators[0] divides Fix from the first slot; [1]/[2] sit between slots.
+            separator.backgroundColor = line
+            separator.isHidden = count <= index
+        }
         setNeedsLayout()
     }
 
