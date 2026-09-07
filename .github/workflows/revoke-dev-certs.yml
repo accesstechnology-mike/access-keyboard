@@ -1,0 +1,45 @@
+name: Revoke spare Development certs
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "How many newest Development certificates to keep"
+        required: false
+        default: "1"
+      execute:
+        description: "Set to true to actually revoke; otherwise only lists (dry run)"
+        required: false
+        default: "true"
+
+jobs:
+  revoke-spare-development-certs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Revoke spare Development certificates
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+          KEEP: ${{ github.event.inputs.keep || '1' }}
+          EXECUTE: ${{ github.event.inputs.execute || 'true' }}
+        run: |
+          if [ "$EXECUTE" = "true" ]; then
+            python3 scripts/app_store_connect.py revoke-spare-development-certs --keep "$KEEP" --execute
+          else
+            python3 scripts/app_store_connect.py revoke-spare-development-certs --keep "$KEEP"
+          fi
