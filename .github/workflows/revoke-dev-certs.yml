@@ -11,6 +11,12 @@ on:
         description: "Set to true to actually revoke; otherwise only lists (dry run)"
         required: false
         default: "true"
+  # A tag push is the repo's way to start Actions when the API token is
+  # read-only (see AGENTS.md). Pushing a revoke-dev-certs-* tag runs the
+  # revoke with --keep 1 --execute.
+  push:
+    tags:
+      - "revoke-dev-certs-*"
 
 jobs:
   revoke-spare-development-certs:
