@@ -71,6 +71,41 @@ final class KeyButton: UIControl {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Re-purposes an existing button for a new spec without recreating the view.
+    /// Reusing buttons instead of tearing the whole board down on every keystroke
+    /// avoids the allocation churn (and the mid-touch teardown of the backspace
+    /// key) that destabilised long typing sessions in the memory-limited keyboard
+    /// extension. In-flight repeat/long-press timers are preserved when the key's
+    /// action is unchanged (e.g. a case flip), so held keys keep working.
+    func update(
+        spec: KeySpec,
+        appearance: KeyboardAppearance,
+        metrics: LayoutMetrics,
+        shift: ShiftState,
+        isModifierHighlighted: Bool
+    ) {
+        let actionChanged = spec.action != self.spec.action
+        let contentChanged = spec != self.spec || shift != self.shift
+        self.spec = spec
+        self.appearance = appearance
+        self.metrics = metrics
+        self.shift = shift
+        self.isModifierHighlighted = isModifierHighlighted
+        if actionChanged {
+            // The physical key now does something different; cancel any timers
+            // and touch state left over from the previous action.
+            cancelTimers()
+            didLongPress = false
+            isExclusiveTouch = spec.action != .space
+        }
+        if contentChanged {
+            applyContent()
+            configureAccessibility()
+        }
+        applyChrome()
+        setNeedsLayout()
+    }
+
     deinit {
         longPressTimer?.invalidate()
         repeatTimer?.invalidate()
@@ -100,6 +135,23 @@ final class KeyButton: UIControl {
         symbolView.frame = bounds.insetBy(dx: 8, dy: 8)
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: metrics.cornerRadius).cgPath
         layer.shadowColor = appearance.shadowColor.cgColor
+    }
+
+    /// Expands the touchable area into the dead space between keys so imprecise
+    /// pointing and switch-scanning land on the intended key. Each key claims
+    /// half of the surrounding gap, so neighbouring hit areas meet exactly at
+    /// the midline without overlapping. The visible key does not move.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        bounds.inset(by: hitSlop).contains(point)
+    }
+
+    private var hitSlop: UIEdgeInsets {
+        UIEdgeInsets(
+            top: -metrics.rowSpacing / 2,
+            left: -metrics.keySpacing / 2,
+            bottom: -metrics.rowSpacing / 2,
+            right: -metrics.keySpacing / 2
+        )
     }
 
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {

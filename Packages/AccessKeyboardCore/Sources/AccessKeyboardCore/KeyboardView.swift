@@ -10,6 +10,7 @@ public final class KeyboardView: UIView {
     private var spaceButton: KeyButton?
     private var currentLayout: KeyboardLayout?
     private var currentMetrics: LayoutMetrics?
+    private var contentDirty = false
     private var appearance = KeyboardAppearance.system(for: .light)
     private var callout: AccentCalloutView?
     private var preferenceObservation: KeyboardPreferenceObservation?
@@ -84,11 +85,20 @@ public final class KeyboardView: UIView {
             safeBottom: extraBottomInset,
             rowCount: layout.rows.count
         )
-        if layout != currentLayout || metrics != currentMetrics {
-            currentLayout = layout
-            currentMetrics = metrics
+        // Rebuild the view hierarchy only when the board's shape changes (mode,
+        // rotation, size class). For ordinary keystrokes the structure is
+        // identical, so reuse the existing buttons and just refresh their
+        // content — this avoids destroying and recreating ~30-40 views on every
+        // press, which caused allocation churn and mid-touch teardown in the
+        // memory-limited keyboard extension.
+        if keyButtons.isEmpty || metrics != currentMetrics || !layout.hasSameStructure(as: currentLayout) {
             rebuildKeys(layout: layout, metrics: metrics)
+        } else if layout != currentLayout || contentDirty {
+            updateKeys(layout: layout, metrics: metrics)
         }
+        currentLayout = layout
+        currentMetrics = metrics
+        contentDirty = false
         layoutPredictionBar(metrics: metrics)
         layoutKeys(layout: layout, metrics: metrics)
     }
@@ -117,6 +127,15 @@ public final class KeyboardView: UIView {
         reloadKeys()
     }
 
+    /// Drops transient UI (the accent callout) so the keyboard extension can
+    /// shed memory when the system issues a memory warning. Keyboard extensions
+    /// run under a tight memory limit, so releasing anything non-essential
+    /// reduces the chance of a jetsam kill during long sessions.
+    public func releaseTransientResources() {
+        callout?.removeFromSuperview()
+        callout = nil
+    }
+
     private func updateAppearance() {
         LiteracyFont.registerIfNeeded()
         KeyboardPreferences.persistMigratedColourOptionIfNeeded()
@@ -128,7 +147,7 @@ public final class KeyboardView: UIView {
     }
 
     private func reloadKeys() {
-        currentLayout = nil
+        contentDirty = true
         setNeedsLayout()
         invalidateIntrinsicContentSize()
     }
@@ -176,6 +195,28 @@ public final class KeyboardView: UIView {
                     self.spaceButton = button
                 }
                 return button
+            }
+        }
+    }
+
+    private func updateKeys(layout: KeyboardLayout, metrics: LayoutMetrics) {
+        let specs = layout.rows.flatMap { $0.keys }
+        guard specs.count == keyButtons.count else {
+            rebuildKeys(layout: layout, metrics: metrics)
+            return
+        }
+        spaceButton = nil
+        for (index, spec) in specs.enumerated() {
+            let button = keyButtons[index]
+            button.update(
+                spec: spec,
+                appearance: appearance,
+                metrics: metrics,
+                shift: engine.shift,
+                isModifierHighlighted: isHighlightedModifier(spec)
+            )
+            if spec.action == .space {
+                spaceButton = button
             }
         }
     }

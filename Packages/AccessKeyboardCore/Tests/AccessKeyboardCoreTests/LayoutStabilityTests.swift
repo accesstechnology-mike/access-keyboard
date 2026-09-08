@@ -109,6 +109,58 @@ final class LayoutStabilityTests: XCTestCase {
         XCTAssertEqual(proSafe.bottomInset, 24)
     }
 
+    // MARK: - Forgiving hit targets (item 3)
+
+    @MainActor
+    func testKeyButtonHitAreaExtendsIntoSurroundingGap() {
+        let metrics = LayoutMetrics.metrics(
+            for: .compact,
+            bounds: CGSize(width: 390, height: 300),
+            safeBottom: 0
+        )
+        let button = KeyButton(
+            spec: .letter("e"),
+            appearance: .system(for: .light),
+            metrics: metrics,
+            shift: .off,
+            isModifierHighlighted: false
+        )
+        button.frame = CGRect(x: 0, y: 0, width: 40, height: metrics.keyHeight)
+
+        let midY = metrics.keyHeight / 2
+        // A touch in the dead space to the left of the key still lands on it,
+        // up to half the inter-key spacing.
+        XCTAssertTrue(button.point(inside: CGPoint(x: -metrics.keySpacing / 2 + 0.5, y: midY), with: nil))
+        // Beyond half the gap belongs to the neighbouring key, not this one.
+        XCTAssertFalse(button.point(inside: CGPoint(x: -metrics.keySpacing / 2 - 1, y: midY), with: nil))
+        // The vertical gap between rows is reclaimed the same way.
+        XCTAssertTrue(button.point(inside: CGPoint(x: 20, y: -metrics.rowSpacing / 2 + 0.5), with: nil))
+        XCTAssertFalse(button.point(inside: CGPoint(x: 20, y: -metrics.rowSpacing / 2 - 1), with: nil))
+    }
+
+    // MARK: - Board reuse keeps structure stable (item 2)
+
+    func testFrequencyAndAlphabeticShareNoStructureSoRebuildIsSafe() {
+        let alpha = LayoutFactory.layout(
+            mode: .alphabetic, shift: .off, layoutClass: .iPad,
+            needsInputModeSwitchKey: true, returnKeyType: .default, letterLayout: .qwerty
+        )
+        let numeric = LayoutFactory.layout(
+            mode: .numeric, shift: .off, layoutClass: .iPad,
+            needsInputModeSwitchKey: true, returnKeyType: .default, letterLayout: .qwerty
+        )
+        // A case flip must preserve structure (so buttons can be reused)...
+        let alphaShifted = LayoutFactory.layout(
+            mode: .alphabetic, shift: .shifted, layoutClass: .iPad,
+            needsInputModeSwitchKey: true, returnKeyType: .default, letterLayout: .qwerty
+        )
+        XCTAssertTrue(alpha.hasSameStructure(as: alphaShifted))
+        // ...but a mode change must not, so the board rebuilds instead of
+        // mismatching buttons to specs.
+        XCTAssertFalse(alpha.hasSameStructure(as: numeric))
+        XCTAssertFalse(alpha.hasSameStructure(as: nil))
+    }
+
     // MARK: - Helpers
 
     private func layout(
