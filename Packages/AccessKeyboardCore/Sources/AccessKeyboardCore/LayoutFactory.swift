@@ -50,10 +50,11 @@ public enum LayoutFactory {
         switch mode {
         case .alphabetic:
             if letterLayout == .frequency {
-                rows = compactFrequencyRows(
+                rows = frequencyRows(
                     shift: shift,
                     needsGlobe: needsGlobe,
-                    returnKeyType: returnKeyType
+                    returnKeyType: returnKeyType,
+                    layoutClass: .compact
                 )
             } else {
                 let map = LetterMaps.frameRows(for: letterLayout)
@@ -88,22 +89,6 @@ public enum LayoutFactory {
             + [backspace(compact: true)]
     }
 
-    private static func compactFrequencyRows(
-        shift: ShiftState,
-        needsGlobe: Bool,
-        returnKeyType: UIReturnKeyType
-    ) -> [KeyboardRow] {
-        let freq = LetterMaps.frequencyRows()
-        var rows = freq.dropLast().map { KeyboardRow(keys: letters($0, shift: shift)) }
-        if let last = freq.last {
-            rows.append(
-                KeyboardRow(keys: [shiftKey(compact: true, shift: shift)] + letters(last, shift: shift) + [backspace(compact: true)])
-            )
-        }
-        rows.append(KeyboardRow(keys: compactToolbar(mode: .alphabetic, needsGlobe: needsGlobe, returnKeyType: returnKeyType)))
-        return rows
-    }
-
     private static func compactToolbar(mode: KeyboardMode, needsGlobe: Bool, returnKeyType: UIReturnKeyType) -> [KeySpec] {
         var keys: [KeySpec] = []
         if mode == .alphabetic {
@@ -132,11 +117,11 @@ public enum LayoutFactory {
         switch mode {
         case .alphabetic:
             if letterLayout == .frequency {
-                rows = iPadFrequencyRows(
+                rows = frequencyRows(
                     shift: shift,
                     needsGlobe: needsGlobe,
                     returnKeyType: returnKeyType,
-                    pro: false
+                    layoutClass: .iPad
                 )
             } else {
                 let map = LetterMaps.frameRows(for: letterLayout)
@@ -198,11 +183,11 @@ public enum LayoutFactory {
         switch mode {
         case .alphabetic:
             if letterLayout == .frequency {
-                rows = iPadFrequencyRows(
+                rows = frequencyRows(
                     shift: shift,
                     needsGlobe: needsGlobe,
                     returnKeyType: returnKeyType,
-                    pro: true
+                    layoutClass: .iPadPro
                 )
             } else {
                 let map = LetterMaps.frameRows(for: letterLayout)
@@ -280,30 +265,82 @@ public enum LayoutFactory {
         return KeyboardLayout(rows: rows, layoutClass: .iPadPro)
     }
 
-    private static func iPadFrequencyRows(
+    // MARK: - Frequency (Keeble-style scanning grid)
+
+    /// Builds the frequency board as a neat rectangular grid shared by every
+    /// device class. The letters keep the ACE Centre EARDU frequency order but
+    /// are re-flowed into equal-width rows so the most-used letters cluster in
+    /// the top-left and the left-hand letter columns line up perfectly for
+    /// switch scanning. All system/modifier keys (tab, caps lock, shift, 123)
+    /// live in a single leading column of identical width, so they never push
+    /// the letter columns out of alignment. Because every row has the same
+    /// total width, the layout engine centres them identically and the columns
+    /// stay aligned. The period lives once in the grid (never duplicated in the
+    /// toolbar), and backspace / return move to the toolbar to keep the grid a
+    /// clean rectangle.
+    private static func frequencyRows(
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        pro: Bool
+        layoutClass: LayoutClass
     ) -> [KeyboardRow] {
-        let freq = LetterMaps.frequencyRows()
+        let compact = layoutClass == .compact
+        let letterRows = LetterMaps.frequencyLetterRows()
+
+        // One fixed-width leading key per row keeps the letter columns aligned.
+        let modWidth: KeyWidth
+        switch layoutClass {
+        case .compact: modWidth = .unit(1.3)
+        case .iPad: modWidth = .unit(1.4)
+        case .iPadPro: modWidth = .unit(1.5)
+        }
+        let leadingColumn: [KeySpec] = [
+            tabKey(width: modWidth),
+            capsLockKey(shift: shift, width: modWidth, compact: compact),
+            shiftKey(compact: compact, shift: shift, width: modWidth),
+            modeKey("123", .numeric, width: modWidth)
+        ]
+
         var rows: [KeyboardRow] = []
-        if pro {
-            rows.append(KeyboardRow(keys: [tabKey()] + letters(freq[0], shift: shift) + [backspace(compact: false, width: .unit(1.8))]))
-        } else {
-            rows.append(KeyboardRow(keys: letters(freq[0], shift: shift) + [backspace(compact: false, width: .unit(1.5))]))
+        let lastIndex = letterRows.count - 1
+        for (index, letterRow) in letterRows.enumerated() {
+            var keys: [KeySpec] = []
+            if index < leadingColumn.count {
+                keys.append(leadingColumn[index])
+            }
+            keys += letters(letterRow, shift: shift)
+            if index == lastIndex {
+                // Fill the short final row so the grid is a full rectangle. This
+                // is the board's only period, which removes the duplicate `.`
+                // that previously sat in both the grid and the toolbar.
+                keys.append(punctuation("."))
+                keys.append(punctuation(","))
+            }
+            rows.append(KeyboardRow(keys: keys))
         }
-        rows.append(KeyboardRow(keys: letters(freq[1], shift: shift) + [returnKey(returnKeyType, compact: false, width: .unit(pro ? 1.7 : 1.6))]))
-        if pro {
-            rows.append(KeyboardRow(keys: [capsLockKey(shift: shift)] + letters(freq[2], shift: shift)))
-            rows.append(KeyboardRow(keys: [shiftKey(compact: false, shift: shift, width: .unit(1.5))] + letters(freq[3], shift: shift)))
-        } else {
-            rows.append(KeyboardRow(keys: [shiftKey(compact: false, shift: shift, width: .unit(1.4))] + letters(freq[2], shift: shift)))
-            rows.append(KeyboardRow(keys: letters(freq[3], shift: shift)))
-        }
-        rows.append(KeyboardRow(keys: letters(freq[4], shift: shift)))
-        rows.append(KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: pro)))
+        rows.append(KeyboardRow(keys: frequencyToolbar(
+            needsGlobe: needsGlobe,
+            returnKeyType: returnKeyType,
+            compact: compact
+        )))
         return rows
+    }
+
+    private static func frequencyToolbar(
+        needsGlobe: Bool,
+        returnKeyType: UIReturnKeyType,
+        compact: Bool
+    ) -> [KeySpec] {
+        var keys: [KeySpec] = [backspace(compact: compact, width: .unit(compact ? 1.4 : 1.6))]
+        if needsGlobe {
+            keys.append(globe(width: .unit(1.1)))
+        }
+        keys.append(space(width: .flexible))
+        keys.append(returnKey(returnKeyType, compact: compact, width: .unit(compact ? 2.0 : 1.8)))
+        if !compact {
+            keys.append(dismissKey())
+        }
+        return keys
     }
 
     private static func iPadToolbar(mode: KeyboardMode, needsGlobe: Bool, pro: Bool) -> [KeySpec] {
@@ -380,10 +417,12 @@ public enum LayoutFactory {
         return KeySpec(action: .shift, display: display, width: width, style: .modifier)
     }
 
-    private static func capsLockKey(shift: ShiftState) -> KeySpec {
+    private static func capsLockKey(shift: ShiftState, width: KeyWidth = .unit(1.5), compact: Bool = false) -> KeySpec {
         // Active state is conveyed by the highlighted fill (see KeyboardView
-        // isHighlightedModifier); the label stays constant.
-        return KeySpec(action: .capsLock, display: .text("caps lock"), width: .unit(1.5), style: .modifier)
+        // isHighlightedModifier); the label stays constant. Narrow compact keys
+        // show the glyph instead of the "caps lock" wordmark so it never clips.
+        let display: KeyDisplay = compact ? .symbol("capslock") : .text("caps lock")
+        return KeySpec(action: .capsLock, display: display, width: width, style: .modifier)
     }
 
     private static func backspace(compact: Bool, width: KeyWidth = .unit(1.4)) -> KeySpec {
@@ -395,8 +434,8 @@ public enum LayoutFactory {
         )
     }
 
-    private static func tabKey() -> KeySpec {
-        KeySpec(action: .tab, display: .text("tab"), width: .unit(1.2), style: .modifier)
+    private static func tabKey(width: KeyWidth = .unit(1.2)) -> KeySpec {
+        KeySpec(action: .tab, display: .text("tab"), width: width, style: .modifier)
     }
 
     private static func globe(width: KeyWidth) -> KeySpec {

@@ -84,7 +84,13 @@ public enum LetterMaps {
         }
     }
 
-    public static func frequencyRows() -> [String] {
-        ["eardu", "toilgv", "nsfyx.", "hcpkj,", "mbwqz?"]
+    /// The ACE Centre EARDU switch-scanning frequency order, re-flowed into
+    /// even seven-column rows. The letter sequence is unchanged
+    /// (`eardutoilgvnsfyxhcpkjmbwqz`); only the row grouping changed so the grid
+    /// is a neat rectangle with aligned left columns and the most-used letters
+    /// in the top-left. The layout factory adds the leading modifier column and
+    /// fills the short final row with punctuation.
+    public static func frequencyLetterRows() -> [String] {
+        ["earduto", "ilgvnsf", "yxhcpkj", "mbwqz"]
     }
 }

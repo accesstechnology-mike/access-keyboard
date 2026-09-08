@@ -135,6 +135,19 @@ public struct KeyboardLayout: Equatable {
         self.layoutClass = layoutClass
     }
 
+    /// Whether two layouts have the same number of rows and keys per row. When
+    /// this holds, the keyboard can reuse its existing buttons and only refresh
+    /// their content instead of rebuilding the whole view hierarchy.
+    public func hasSameStructure(as other: KeyboardLayout?) -> Bool {
+        guard let other, layoutClass == other.layoutClass, rows.count == other.rows.count else {
+            return false
+        }
+        for (lhs, rhs) in zip(rows, other.rows) where lhs.keys.count != rhs.keys.count {
+            return false
+        }
+        return true
+    }
+
     public func letterString(inRow index: Int) -> String {
         rows[index].keys.compactMap { spec -> String? in
             guard spec.style == .letter, case .character(let text) = spec.action else { return nil }
