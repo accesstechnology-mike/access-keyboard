@@ -30,18 +30,75 @@ final class AccessOptionsTests: XCTestCase {
         XCTAssertEqual(layout.letterString(inRow: 2), "zxcvbnm")
     }
 
-    func testEARDUFrequencyOrder() {
+    func testEARDUFrequencyOrderIsPreservedButReflowed() {
+        // The letter sequence is the unchanged ACE Centre EARDU order; only the
+        // row grouping changed (now even 7-column rows for a neat grid).
         XCTAssertEqual(
-            LetterMaps.frequencyRows(),
-            ["eardu", "toilgv", "nsfyx.", "hcpkj,", "mbwqz?"]
+            LetterMaps.frequencyLetterRows(),
+            ["earduto", "ilgvnsf", "yxhcpkj", "mbwqz"]
+        )
+        XCTAssertEqual(
+            LetterMaps.frequencyLetterRows().joined(),
+            "eardutoilgvnsfyxhcpkjmbwqz",
+            "the EARDU frequency order must be preserved exactly"
         )
 
         let layout = compact(.frequency)
-        XCTAssertEqual(layout.letterString(inRow: 0), "eardu")
-        XCTAssertEqual(layout.letterString(inRow: 1), "toilgv")
-        XCTAssertEqual(layout.letterString(inRow: 2), "nsfyx.")
-        XCTAssertEqual(layout.letterString(inRow: 3), "hcpkj,")
-        XCTAssertEqual(layout.letterString(inRow: 4), "mbwqz?")
+        // Letter rows keep the frequency order; the leading modifier column is
+        // excluded from letterString because those keys are modifiers.
+        XCTAssertEqual(layout.letterString(inRow: 0), "earduto")
+        XCTAssertEqual(layout.letterString(inRow: 1), "ilgvnsf")
+        XCTAssertEqual(layout.letterString(inRow: 2), "yxhcpkj")
+        // Final row: the two least-frequent letters then the grid's punctuation.
+        XCTAssertEqual(layout.letterString(inRow: 3), "mbwqz.,")
+    }
+
+    func testFrequencyBoardHasExactlyOnePeriod() {
+        for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
+            let layout = LayoutFactory.layout(
+                mode: .alphabetic,
+                shift: .off,
+                layoutClass: layoutClass,
+                needsInputModeSwitchKey: true,
+                returnKeyType: .default,
+                letterLayout: .frequency
+            )
+            let periods = layout.rows
+                .flatMap { $0.keys }
+                .filter { $0.action == .character(".") }
+            XCTAssertEqual(
+                periods.count, 1,
+                "frequency board (\(layoutClass)) must have exactly one period key, not a duplicate"
+            )
+        }
+    }
+
+    func testFrequencyLetterColumnsAlignAcrossRows() {
+        // Every letter row shares one fixed-width leading modifier column, so the
+        // left-hand letter columns line up (equal total row weight → identical
+        // centring in the layout engine).
+        for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
+            let layout = LayoutFactory.layout(
+                mode: .alphabetic,
+                shift: .off,
+                layoutClass: layoutClass,
+                needsInputModeSwitchKey: true,
+                returnKeyType: .default,
+                letterLayout: .frequency
+            )
+            let letterRows = layout.rows.filter { row in
+                row.keys.contains { $0.style == .letter }
+            }
+            let weights = letterRows.map { row in
+                row.keys.reduce(CGFloat(0)) { $0 + self.weight(of: $1.width) }
+            }
+            let counts = letterRows.map { $0.keys.count }
+            XCTAssertEqual(Set(weights).count, 1, "letter rows must share one width so columns align (\(layoutClass))")
+            XCTAssertEqual(Set(counts).count, 1, "letter rows must have the same key count so columns align (\(layoutClass))")
+            for row in letterRows {
+                XCTAssertEqual(row.keys.first?.style, .modifier, "each letter row must start with the shared modifier column (\(layoutClass))")
+            }
+        }
     }
 
     func testShiftedLetterKeycapsAreUppercase() {
@@ -231,6 +288,13 @@ final class AccessOptionsTests: XCTestCase {
             returnKeyType: .default,
             letterLayout: letterLayout
         )
+    }
+
+    private func weight(of width: KeyWidth) -> CGFloat {
+        switch width {
+        case .unit(let value): return value
+        case .flexible: return 4.5
+        }
     }
 }
 
