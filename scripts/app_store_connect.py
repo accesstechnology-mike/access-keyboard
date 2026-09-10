@@ -154,11 +154,12 @@ def asc_request(
     if body is not None:
         raw_body = json.dumps(body).encode()
         headers["content-type"] = "application/json"
-    last_error: ASCHTTPError | None = None
-    for attempt in range(3):
+    last_error: Exception | None = None
+    attempts = 4
+    for attempt in range(attempts):
         request = urllib.request.Request(url, data=raw_body, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=60) as response:
                 payload = response.read().decode()
                 if not payload:
                     return {}
@@ -166,8 +167,17 @@ def asc_request(
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode()[:400]
             last_error = ASCHTTPError(exc.code, path, detail)
-            if exc.code != 500 or attempt == 2:
+            if exc.code != 500 or attempt == attempts - 1:
                 raise last_error from exc
+            time.sleep(2**attempt)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            # Transient network trouble on the runner (DNS, reset, read
+            # timeout). Retry with backoff before giving up.
+            last_error = exc
+            if attempt == attempts - 1:
+                raise RuntimeError(
+                    f"App Store Connect request failed for {path}: {exc}"
+                ) from exc
             time.sleep(2**attempt)
     raise last_error or RuntimeError(f"App Store Connect request failed for {path}")
 
