@@ -1479,18 +1479,22 @@ def _invite_email_tester(
     try:
         created = create_tester(token, email, [group["id"]], "")
     except ASCHTTPError as exc:
-        if not ignore_already_exists(exc):
+        # A tester that already exists comes back as 409 "already exists" or,
+        # when they are already on this group, 409 "Tester(s) cannot be
+        # assigned". External email testers do not need an App Store Connect
+        # seat, so both mean "already invited"; look the tester up instead of
+        # failing. Re-raise only when the tester genuinely is not there.
+        existing = find_tester_by_email(token, identifier, email, groups)
+        if existing is None:
             raise
-        print(f"INVITE tester {email} already exists; confirming state")
-        created = find_tester_by_email(token, identifier, email, groups) or {
-            "id": "",
-            "email": email,
-            "state": "",
-        }
-        # Make sure an existing tester is actually on this external group.
-        if created.get("id"):
+        print(f"INVITE tester {email} already present; confirming state")
+        created = existing
+        try:
             result = add_tester_to_group(token, group["id"], created["id"])
             print(f"INVITE external group={group['name']}: {result} {email}")
+        except ASCHTTPError as add_exc:
+            if not tester_cannot_be_assigned(add_exc):
+                raise
     return _confirm_tester_state(token, identifier, created, email, groups)
 
 
