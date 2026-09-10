@@ -6,7 +6,12 @@ struct WordTransition: Equatable {
 }
 
 final class PredictionMemory {
-    static let shared = PredictionMemory()
+    /// Learned word history lives in the shared App Group suite so it persists
+    /// across keyboard-extension launches and is written to the same container
+    /// the app can read. Writing here requires the extension to have Full Access
+    /// (Open Access); without it the shared suite falls back to the extension's
+    /// own defaults and learning still works within the extension.
+    static let shared = PredictionMemory(defaults: KeyboardPreferences.suite)
 
     private var table: [String: [String: Int]]
     private let defaults: UserDefaults?

@@ -25,7 +25,15 @@ final class PredictionProviderTests: XCTestCase {
     func testEmptyPrefixPredictsNextWord() {
         let words = insertions(prefix: "", before: "Please ")
         print("Please _ -> \(words)")
-        XCTAssertEqual(words.count, 3, "next-word bar should not be blank")
+        XCTAssertEqual(words.count, PredictionProvider.maxSuggestions, "next-word bar should fill every slot")
+    }
+
+    func testPrefixFillsUpToSixSlots() {
+        let words = insertions(prefix: "co", before: "co")
+        print("co -> \(words)")
+        XCTAssertEqual(PredictionProvider.maxSuggestions, 6, "bar is sized for six suggestions")
+        XCTAssertEqual(words.count, 6, "a common prefix should offer six suggestions")
+        XCTAssertLessThanOrEqual(words.count, PredictionProvider.maxSuggestions, "never exceed the slot count")
     }
 
     func testLearnedBigramRanksFirst() {
