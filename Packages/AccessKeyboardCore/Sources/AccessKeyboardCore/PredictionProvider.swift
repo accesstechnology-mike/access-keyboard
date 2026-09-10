@@ -14,6 +14,10 @@ public struct Prediction: Equatable {
 }
 
 enum PredictionProvider {
+    /// Number of predicted words shown in the bar. Kept in one place so the
+    /// provider and `PredictionBarView` agree on how many slots to fill.
+    static let maxSuggestions = 6
+
     static func suggestions(
         prefix: String,
         before: String?,
@@ -47,7 +51,7 @@ enum PredictionProvider {
         scored = applyLearned(scored, previousWord: previous, memory: memory)
         scored.sort { $0.score < $1.score }
 
-        return scored.prefix(3).map { item in
+        return scored.prefix(maxSuggestions).map { item in
             Prediction(displayText: item.word, insertion: item.word, isVerbatim: false)
         }
     }
@@ -103,7 +107,7 @@ enum PredictionProvider {
 
         scored = applyContext(scored, previousWord: previous)
         scored.sort { $0.score < $1.score }
-        return scored.prefix(3).map { item in
+        return scored.prefix(maxSuggestions).map { item in
             Prediction(displayText: item.word, insertion: item.word, isVerbatim: false)
         }
     }
@@ -162,7 +166,7 @@ enum PredictionProvider {
             Prediction(displayText: "“\(word)”", insertion: word, isVerbatim: true)
         ]
         var seen = Set([word.lowercased()])
-        for guess in guesses where result.count < 3 {
+        for guess in guesses where result.count < maxSuggestions {
             let value = matchingCase(guess, prefix: word)
             let key = value.lowercased()
             guard seen.insert(key).inserted else { continue }

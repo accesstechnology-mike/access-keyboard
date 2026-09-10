@@ -4,11 +4,17 @@ final class PredictionBarView: UIView {
     var onSelect: ((Prediction) -> Void)?
     var onFix: (() -> Void)?
 
+    /// Number of prediction slots. Matches `PredictionProvider.maxSuggestions`
+    /// so every returned suggestion has a slot to land in.
+    private static let slotCount = PredictionProvider.maxSuggestions
+
     private var predictions: [Prediction] = []
     private let fixButton = UIButton(type: .system)
     private let spinner = UIActivityIndicatorView(style: .medium)
-    private let buttons = [UIButton(type: .system), UIButton(type: .system), UIButton(type: .system)]
-    private let separators = [UIView(), UIView(), UIView()]
+    // One button per prediction slot, plus one separator per slot: separators[0]
+    // divides Fix from the first slot and the rest sit between adjacent slots.
+    private let buttons = (0..<PredictionBarView.slotCount).map { _ in UIButton(type: .system) }
+    private let separators = (0..<PredictionBarView.slotCount).map { _ in UIView() }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -88,7 +94,8 @@ final class PredictionBarView: UIView {
         let count = min(predictions.count, buttons.count)
         let line = appearance.secondaryTextColor.withAlphaComponent(0.45)
         for (index, separator) in separators.enumerated() {
-            // separators[0] divides Fix from the first slot; [1]/[2] sit between slots.
+            // separators[0] divides Fix from the first slot; the rest sit between
+            // adjacent slots. Show a divider only where a filled slot follows.
             separator.backgroundColor = line
             separator.isHidden = count <= index
         }
@@ -105,7 +112,7 @@ final class PredictionBarView: UIView {
 
         let restMinX = fixButton.frame.maxX
         let restWidth = max(0, bounds.width - restMinX)
-        let slotWidth = restWidth / 3
+        let slotWidth = restWidth / CGFloat(buttons.count)
         for (index, button) in buttons.enumerated() {
             button.frame = CGRect(x: restMinX + CGFloat(index) * slotWidth, y: 0, width: slotWidth, height: height)
         }
@@ -116,7 +123,7 @@ final class PredictionBarView: UIView {
             width: separatorWidth,
             height: height * 0.56
         )
-        for index in 0..<2 {
+        for index in 0..<(buttons.count - 1) {
             let x = restMinX + slotWidth * CGFloat(index + 1)
             separators[index + 1].frame = CGRect(x: x, y: height * 0.22, width: separatorWidth, height: height * 0.56)
         }
