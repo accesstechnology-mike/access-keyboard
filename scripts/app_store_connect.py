@@ -437,6 +437,23 @@ def parse_tester(item: dict) -> dict:
     }
 
 
+def get_tester(token: str, tester_id: str) -> dict | None:
+    try:
+        payload = asc_request(
+            token,
+            f"/v1/betaTesters/{tester_id}",
+            {"fields[betaTesters]": TESTER_FIELDS},
+        )
+    except ASCHTTPError as exc:
+        if tester_is_missing(exc):
+            return None
+        raise
+    data = payload.get("data") or {}
+    if not data.get("id"):
+        return None
+    return parse_tester(data)
+
+
 def _merge_testers(dest: dict[str, dict], items: list[dict]) -> None:
     for item in items:
         parsed = parse_tester(item)
@@ -1431,6 +1448,52 @@ def cmd_latest_only(wait_for: int | None) -> int:
     return 0
 
 
+def find_tester_by_email(
+    token: str, identifier: str, email: str, groups: list[dict]
+) -> dict | None:
+    wanted = email.strip().lower()
+    for tester in list_app_testers(token, identifier, groups):
+        if (tester.get("email") or "").strip().lower() == wanted:
+            return tester
+    return None
+
+
+def _confirm_tester_state(
+    token: str, identifier: str, tester: dict, email: str, groups: list[dict]
+) -> dict:
+    # Apple's create/response may omit state; the tester GET is authoritative.
+    if tester.get("id"):
+        fetched = get_tester(token, tester["id"])
+        if fetched and fetched.get("state"):
+            return fetched
+    if not tester.get("state"):
+        found = find_tester_by_email(token, identifier, email, groups)
+        if found:
+            return found
+    return tester
+
+
+def _invite_email_tester(
+    token: str, identifier: str, email: str, group: dict, groups: list[dict]
+) -> dict:
+    try:
+        created = create_tester(token, email, [group["id"]], "")
+    except ASCHTTPError as exc:
+        if not ignore_already_exists(exc):
+            raise
+        print(f"INVITE tester {email} already exists; confirming state")
+        created = find_tester_by_email(token, identifier, email, groups) or {
+            "id": "",
+            "email": email,
+            "state": "",
+        }
+        # Make sure an existing tester is actually on this external group.
+        if created.get("id"):
+            result = add_tester_to_group(token, group["id"], created["id"])
+            print(f"INVITE external group={group['name']}: {result} {email}")
+    return _confirm_tester_state(token, identifier, created, email, groups)
+
+
 def _print_public_link(group: dict) -> str | None:
     link = group.get("public_link") or ""
     if group.get("public_link_enabled") and link:
@@ -1551,7 +1614,7 @@ def cmd_invite_tester(
             file=sys.stderr,
         )
 
-    created = create_tester(token, email, [target["id"]], "")
+    created = _invite_email_tester(token, identifier, email, target, groups)
     print(
         f"INVITE external group={target['name']} email={email} "
         f"state={created['state'] or 'unknown'} id={created['id']}"
