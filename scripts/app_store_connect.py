@@ -261,6 +261,7 @@ def parse_build(item: dict) -> dict | None:
         "processing_state": str(attrs.get("processingState") or ""),
         "uses_non_exempt_encryption": attrs.get("usesNonExemptEncryption"),
         "internal_build_state": None,
+        "external_build_state": None,
     }
 
 
@@ -271,6 +272,10 @@ def parse_group(item: dict) -> dict:
         "name": str(attrs.get("name") or item["id"]),
         "is_internal": bool(attrs.get("isInternalGroup")),
         "has_access_to_all_builds": attrs.get("hasAccessToAllBuilds"),
+        "public_link_enabled": attrs.get("publicLinkEnabled"),
+        "public_link": str(attrs.get("publicLink") or ""),
+        "public_link_limit_enabled": attrs.get("publicLinkLimitEnabled"),
+        "public_link_limit": attrs.get("publicLinkLimit"),
     }
 
 
@@ -296,6 +301,30 @@ BLOCKED_INTERNAL_STATES = frozenset(
         "EXPIRED",
     }
 )
+
+# externalBuildState values Apple reports on a build's buildBetaDetail. A build
+# is only installable by external testers once Beta App Review has approved it.
+EXTERNAL_TESTING_STATES = frozenset(
+    {"BETA_APPROVED", "READY_FOR_BETA_TESTING", "IN_BETA_TESTING"}
+)
+EXTERNAL_REVIEW_PENDING_STATES = frozenset(
+    {"WAITING_FOR_BETA_REVIEW", "IN_BETA_REVIEW"}
+)
+EXTERNAL_NEEDS_SUBMISSION_STATES = frozenset({"READY_FOR_BETA_SUBMISSION"})
+EXTERNAL_REJECTED_STATES = frozenset({"BETA_REJECTED"})
+
+
+def external_build_ready(build: dict) -> bool:
+    return build.get("external_build_state") in EXTERNAL_TESTING_STATES
+
+
+def external_review_pending(build: dict) -> bool:
+    return build.get("external_build_state") in EXTERNAL_REVIEW_PENDING_STATES
+
+
+def external_needs_submission(build: dict) -> bool:
+    state = build.get("external_build_state")
+    return state in EXTERNAL_NEEDS_SUBMISSION_STATES or state in {None, ""}
 
 
 def is_installable(build: dict) -> bool:
@@ -356,9 +385,9 @@ def attach_beta_detail(item: dict, parsed: dict, included: list[dict]) -> dict:
     }
     rel = ((item.get("relationships") or {}).get("buildBetaDetail") or {}).get("data") or {}
     detail = details.get(rel.get("id") or "", {})
-    parsed["internal_build_state"] = (detail.get("attributes") or {}).get(
-        "internalBuildState"
-    )
+    detail_attrs = detail.get("attributes") or {}
+    parsed["internal_build_state"] = detail_attrs.get("internalBuildState")
+    parsed["external_build_state"] = detail_attrs.get("externalBuildState")
     return parsed
 
 
@@ -449,6 +478,10 @@ def list_app_testers(
     if not testers and errors:
         raise RuntimeError("could not list TestFlight testers: " + " ".join(errors))
     return sorted(testers.values(), key=lambda item: item["email"] or item["id"])
+
+
+def tester_live(tester: dict) -> bool:
+    return tester.get("state") in LIVE_TESTER_STATES
 
 
 def tester_needs_reinvite(tester: dict) -> bool:
@@ -747,7 +780,10 @@ def list_beta_groups(token: str, identifier: str) -> list[dict]:
         "/v1/betaGroups",
         {
             "filter[app]": identifier,
-            "fields[betaGroups]": "name,isInternalGroup,hasAccessToAllBuilds",
+            "fields[betaGroups]": (
+                "name,isInternalGroup,hasAccessToAllBuilds,publicLinkEnabled,"
+                "publicLink,publicLinkLimitEnabled,publicLinkLimit"
+            ),
             "limit": "200",
         },
     )
@@ -815,6 +851,68 @@ def enable_group_all_builds(token: str, group: dict) -> str:
         if ignore_already_exists(exc):
             return "already"
         raise
+
+
+def external_groups(groups: list[dict]) -> list[dict]:
+    return [group for group in groups if not group["is_internal"]]
+
+
+def find_group_by_name(groups: list[dict], name: str) -> dict | None:
+    wanted = name.strip().lower()
+    for group in groups:
+        if group["name"].strip().lower() == wanted:
+            return group
+    return None
+
+
+def get_beta_group(token: str, group_id: str) -> dict:
+    payload = asc_request(
+        token,
+        f"/v1/betaGroups/{group_id}",
+        {
+            "fields[betaGroups]": (
+                "name,isInternalGroup,hasAccessToAllBuilds,publicLinkEnabled,"
+                "publicLink,publicLinkLimitEnabled,publicLinkLimit"
+            )
+        },
+    )
+    return parse_group(payload.get("data") or {"id": group_id})
+
+
+def create_external_group(token: str, identifier: str, name: str) -> dict:
+    # Beta groups created through the API are external; internal groups are
+    # managed by App Store Connect and cannot be created here.
+    payload = asc_request(
+        token,
+        "/v1/betaGroups",
+        method="POST",
+        body={
+            "data": {
+                "type": "betaGroups",
+                "attributes": {"name": name},
+                "relationships": {
+                    "app": {"data": {"type": "apps", "id": identifier}}
+                },
+            }
+        },
+    )
+    return parse_group(payload.get("data") or {})
+
+
+def enable_public_link(token: str, group: dict) -> dict:
+    payload = asc_request(
+        token,
+        f"/v1/betaGroups/{group['id']}",
+        method="PATCH",
+        body={
+            "data": {
+                "type": "betaGroups",
+                "id": group["id"],
+                "attributes": {"publicLinkEnabled": True},
+            }
+        },
+    )
+    return parse_group(payload.get("data") or {"id": group["id"]})
 
 
 def expire_build(token: str, build: dict) -> str:
@@ -1230,9 +1328,13 @@ def cmd_status() -> int:
         if latest and build["id"] == latest["id"]:
             flags.append("latest")
         if build.get("internal_build_state"):
-            flags.append(str(build["internal_build_state"]))
+            flags.append(f"internal={build['internal_build_state']}")
+        if build.get("external_build_state"):
+            flags.append(f"external={build['external_build_state']}")
         if is_installable(build):
             flags.append("installable")
+        if external_build_ready(build):
+            flags.append("external-ready")
         print(f"build {build['number']} {' '.join(flags)}")
     testers = list_app_testers(token, identifier, list_beta_groups(token, identifier))
     print(f"app testers={len(testers)}")
@@ -1242,15 +1344,25 @@ def cmd_status() -> int:
             f"invite={tester['invite_type'] or 'unknown'} "
             f"state={tester['state'] or 'unknown'}"
         )
-    for group in list_beta_groups(token, identifier):
+    groups = list_beta_groups(token, identifier)
+    if not external_groups(groups):
+        print("external_group=none")
+    for group in groups:
         kind = "internal" if group["is_internal"] else "external"
         all_builds = group.get("has_access_to_all_builds")
         testers = ",".join(group_testers(token, group["id"])) or "none"
         numbers = ",".join(str(item["number"]) for item in group_builds(token, group["id"])) or "none"
-        print(
+        line = (
             f"group {group['name']} {kind} all_builds={all_builds} "
             f"testers={testers} builds={numbers}"
         )
+        if not group["is_internal"]:
+            link = group.get("public_link") or "none"
+            line += (
+                f" public_link_enabled={group.get('public_link_enabled')} "
+                f"public_link={link}"
+            )
+        print(line)
     return 0
 
 
@@ -1309,6 +1421,154 @@ def cmd_latest_only(wait_for: int | None) -> int:
     return 0
 
 
+def _print_public_link(group: dict) -> str | None:
+    link = group.get("public_link") or ""
+    if group.get("public_link_enabled") and link:
+        print(f"INVITE public_link={link}")
+        return link
+    return None
+
+
+def cmd_invite_tester(
+    email: str,
+    external: bool,
+    internal: bool,
+    group_name: str | None,
+    create_group: bool,
+    submit_review: bool,
+    public_link: bool,
+) -> int:
+    email = email.strip()
+    if "@" not in email:
+        raise RuntimeError(f"invalid tester email: {email!r}")
+    # External is the preferred path unless internal was explicitly requested.
+    want_external = external or not internal
+    token, bundle, identifier = _app_context()
+    builds = list_app_builds(token, identifier)
+    latest = latest_installable_build(builds) or latest_valid_build(builds)
+    if latest is None:
+        raise RuntimeError("no VALID unexpired TestFlight build to invite testers onto")
+    print(f"app={bundle} id={identifier}")
+    print(
+        f"latest build {latest['number']} "
+        f"internal={latest.get('internal_build_state') or 'none'} "
+        f"external={latest.get('external_build_state') or 'none'}"
+    )
+    groups = list_beta_groups(token, identifier)
+
+    if internal and not external:
+        internal_groups = [group for group in groups if group["is_internal"]]
+        if not internal_groups:
+            raise RuntimeError("no internal group exists; create one in App Store Connect")
+        target = internal_groups[0]
+        try:
+            created = create_tester(token, email, [target["id"]], "")
+        except ASCHTTPError as exc:
+            if tester_cannot_be_assigned(exc):
+                print(
+                    f"INVITE BLOCKER internal: {email} is not an App Store Connect user, "
+                    f"so Apple refuses the internal group '{target['name']}'. "
+                    f"Use --external (preferred) or add them as an ASC user first.",
+                    file=sys.stderr,
+                )
+                return 1
+            raise
+        print(
+            f"INVITE internal group={target['name']} email={email} "
+            f"state={created['state'] or 'unknown'} id={created['id']}"
+        )
+        return 0 if tester_live(created) else 1
+
+    # External path (preferred).
+    externals = external_groups(groups)
+    target = None
+    if group_name:
+        target = find_group_by_name(externals, group_name)
+    elif externals:
+        target = externals[0]
+    if target is None:
+        if not create_group:
+            existing = ", ".join(g["name"] for g in externals) or "none"
+            raise RuntimeError(
+                "no matching external beta group "
+                f"(external groups: {existing}); pass --create-group to create "
+                f"'{group_name or 'External Testers'}' or create it in App Store Connect"
+            )
+        name = group_name or "External Testers"
+        target = create_external_group(token, identifier, name)
+        print(f"INVITE created external group={target['name']} id={target['id']}")
+
+    if submit_review and not external_build_ready(latest):
+        try:
+            review = submit_beta_review(token, latest["id"])
+            print(
+                f"INVITE external group={target['name']}: beta review {review} "
+                f"build {latest['number']}"
+            )
+        except ASCHTTPError as exc:
+            print(
+                f"INVITE could not submit build {latest['number']} for Beta Review: {exc}",
+                file=sys.stderr,
+            )
+
+    try:
+        assigned = assign_build_to_group(token, target["id"], latest["id"])
+        print(f"INVITE external group={target['name']}: {assigned} build {latest['number']}")
+    except ASCHTTPError as exc:
+        print(
+            f"INVITE could not assign build {latest['number']} to '{target['name']}': {exc}",
+            file=sys.stderr,
+        )
+
+    # Refresh the build so we report the true external state after any assign/submit.
+    fresh = next(
+        (b for b in list_app_builds(token, identifier) if b["id"] == latest["id"]),
+        latest,
+    )
+    if external_build_ready(fresh):
+        print(f"INVITE external build {fresh['number']} is APPROVED for external testing")
+    elif external_review_pending(fresh):
+        print(
+            f"INVITE BLOCKER external build {fresh['number']} is in Beta App Review "
+            f"(external={fresh.get('external_build_state')}); testers can install once approved",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"INVITE BLOCKER external build {fresh['number']} is not yet approved "
+            f"(external={fresh.get('external_build_state') or 'none'}); it must pass "
+            f"Beta App Review before external testers can install",
+            file=sys.stderr,
+        )
+
+    created = create_tester(token, email, [target["id"]], "")
+    print(
+        f"INVITE external group={target['name']} email={email} "
+        f"state={created['state'] or 'unknown'} id={created['id']}"
+    )
+
+    link = None
+    target = get_beta_group(token, target["id"])
+    if public_link and not target.get("public_link_enabled"):
+        try:
+            target = enable_public_link(token, target)
+            print(f"INVITE external group={target['name']}: public link enabled")
+        except ASCHTTPError as exc:
+            print(
+                f"INVITE could not enable public link on '{target['name']}': {exc}",
+                file=sys.stderr,
+            )
+    link = _print_public_link(target)
+    if public_link and not link:
+        print(
+            f"INVITE public link not available yet on '{target['name']}' "
+            f"(Apple enables it once the group has an approved build)",
+            file=sys.stderr,
+        )
+
+    return 0 if tester_live(created) else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -1326,6 +1586,38 @@ def main() -> int:
         type=int,
         default=None,
         help="wait until this build number is VALID, then make it the only tester build",
+    )
+    invite_p = sub.add_parser("invite-tester")
+    invite_p.add_argument("--email", required=True, help="tester email address")
+    invite_p.add_argument(
+        "--external",
+        action="store_true",
+        help="invite as an external tester (preferred; default when neither flag is set)",
+    )
+    invite_p.add_argument(
+        "--internal",
+        action="store_true",
+        help="invite as an internal tester (requires the email to be an App Store Connect user)",
+    )
+    invite_p.add_argument(
+        "--group",
+        default=None,
+        help="external beta group name to use (matched by name; created with --create-group)",
+    )
+    invite_p.add_argument(
+        "--create-group",
+        action="store_true",
+        help="create the external beta group if no matching one exists",
+    )
+    invite_p.add_argument(
+        "--submit-review",
+        action="store_true",
+        help="submit the latest build for Beta App Review if it is not already approved",
+    )
+    invite_p.add_argument(
+        "--public-link",
+        action="store_true",
+        help="enable and print the external group's public TestFlight link",
     )
     revoke_p = sub.add_parser("revoke-spare-development-certs")
     revoke_p.add_argument(
@@ -1354,6 +1646,16 @@ def main() -> int:
         return cmd_status()
     if args.cmd == "latest-only":
         return cmd_latest_only(args.wait_for)
+    if args.cmd == "invite-tester":
+        return cmd_invite_tester(
+            args.email,
+            args.external,
+            args.internal,
+            args.group,
+            args.create_group,
+            args.submit_review,
+            args.public_link,
+        )
     if args.cmd == "revoke-spare-development-certs":
         return cmd_revoke_spare_development_certs(args.keep, args.execute)
     return 1

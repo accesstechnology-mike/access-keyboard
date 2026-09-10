@@ -46,6 +46,7 @@ class LatestOnlyTests(unittest.TestCase):
                 "processing_state": "VALID",
                 "uses_non_exempt_encryption": False,
                 "internal_build_state": None,
+                "external_build_state": None,
             },
         )
 
@@ -360,6 +361,98 @@ class DevelopmentCertificateTests(unittest.TestCase):
         ]
         to_revoke = asc.spare_certificates_to_revoke(certs, keep=0)
         self.assertEqual([item["id"] for item in to_revoke], ["old", "new"])
+
+
+class ExternalTestingTests(unittest.TestCase):
+    def _build(self, external_state: str | None) -> dict:
+        item = build(11)
+        item["external_build_state"] = external_state
+        return item
+
+    def test_external_build_ready_only_for_approved_states(self) -> None:
+        self.assertTrue(asc.external_build_ready(self._build("BETA_APPROVED")))
+        self.assertTrue(asc.external_build_ready(self._build("IN_BETA_TESTING")))
+        self.assertTrue(asc.external_build_ready(self._build("READY_FOR_BETA_TESTING")))
+        self.assertFalse(asc.external_build_ready(self._build("WAITING_FOR_BETA_REVIEW")))
+        self.assertFalse(asc.external_build_ready(self._build("BETA_REJECTED")))
+        self.assertFalse(asc.external_build_ready(self._build(None)))
+
+    def test_external_review_pending_states(self) -> None:
+        self.assertTrue(asc.external_review_pending(self._build("WAITING_FOR_BETA_REVIEW")))
+        self.assertTrue(asc.external_review_pending(self._build("IN_BETA_REVIEW")))
+        self.assertFalse(asc.external_review_pending(self._build("BETA_APPROVED")))
+
+    def test_external_needs_submission_when_unsubmitted_or_missing(self) -> None:
+        self.assertTrue(asc.external_needs_submission(self._build("READY_FOR_BETA_SUBMISSION")))
+        self.assertTrue(asc.external_needs_submission(self._build(None)))
+        self.assertTrue(asc.external_needs_submission(self._build("")))
+        self.assertFalse(asc.external_needs_submission(self._build("IN_BETA_REVIEW")))
+        self.assertFalse(asc.external_needs_submission(self._build("BETA_APPROVED")))
+
+    def test_parse_build_reads_external_build_state_from_detail(self) -> None:
+        item = {
+            "id": "b",
+            "attributes": {"version": "11"},
+            "relationships": {"buildBetaDetail": {"data": {"id": "d"}}},
+        }
+        included = [
+            {
+                "type": "buildBetaDetails",
+                "id": "d",
+                "attributes": {
+                    "internalBuildState": "IN_BETA_TESTING",
+                    "externalBuildState": "BETA_APPROVED",
+                },
+            }
+        ]
+        parsed = asc.attach_beta_detail(item, asc.parse_build(item), included)
+        self.assertEqual(parsed["internal_build_state"], "IN_BETA_TESTING")
+        self.assertEqual(parsed["external_build_state"], "BETA_APPROVED")
+        self.assertTrue(asc.external_build_ready(parsed))
+
+
+class BetaGroupHelperTests(unittest.TestCase):
+    def _group(self, name: str, *, internal: bool) -> dict:
+        return asc.parse_group(
+            {
+                "id": name.lower(),
+                "attributes": {
+                    "name": name,
+                    "isInternalGroup": internal,
+                    "publicLinkEnabled": not internal,
+                    "publicLink": ""
+                    if internal
+                    else f"https://testflight.apple.com/join/{name.lower()}",
+                },
+            }
+        )
+
+    def test_external_groups_filters_out_internal(self) -> None:
+        alpha = self._group("Alpha", internal=True)
+        ext = self._group("External Testers", internal=False)
+        self.assertEqual(
+            [g["name"] for g in asc.external_groups([alpha, ext])],
+            ["External Testers"],
+        )
+
+    def test_find_group_by_name_is_case_insensitive(self) -> None:
+        ext = self._group("External Testers", internal=False)
+        self.assertIs(asc.find_group_by_name([ext], "external testers"), ext)
+        self.assertIsNone(asc.find_group_by_name([ext], "Nope"))
+
+    def test_parse_group_reads_public_link_fields(self) -> None:
+        ext = self._group("External Testers", internal=False)
+        self.assertTrue(ext["public_link_enabled"])
+        self.assertEqual(
+            ext["public_link"], "https://testflight.apple.com/join/external testers"
+        )
+
+    def test_tester_live_matches_installable_states(self) -> None:
+        self.assertTrue(asc.tester_live({"state": "INVITED"}))
+        self.assertTrue(asc.tester_live({"state": "ACCEPTED"}))
+        self.assertTrue(asc.tester_live({"state": "INSTALLED"}))
+        self.assertFalse(asc.tester_live({"state": "NOT_INVITED"}))
+        self.assertFalse(asc.tester_live({"state": "REVOKED"}))
 
 
 if __name__ == "__main__":

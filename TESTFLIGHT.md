@@ -90,6 +90,47 @@ Every upload assigns the latest build to every group and expires the rest. There
 
 Do this only after an internal install works, including Full Access and Fix.
 
+You can do all of this from CI with the App Store Connect key in repository
+secrets — no Mac and no browser login needed. `gh` is read-only here, so start
+Actions with a tag push (see `AGENTS.md`):
+
+```sh
+# See where things stand first (no changes): external group, external build
+# state, Beta Review readiness, and any public link.
+git tag status-testflight-check
+git push origin status-testflight-check
+
+# Invite an external tester by email. The tag payload is the email. This
+# creates the "External Testers" group if missing, assigns the latest build,
+# submits it for Beta App Review, enables the public link, and emails the tester.
+git tag invite-tester-someone@example.com
+git push origin invite-tester-someone@example.com
+```
+
+**Actions → TestFlight invite → Run workflow** does the same with per-run
+options (`mode` = status or invite, external vs internal, group name, whether to
+submit for review, whether to enable the public link).
+
+Under the hood these run `scripts/app_store_connect.py`:
+
+```sh
+python3 scripts/app_store_connect.py status
+python3 scripts/app_store_connect.py invite-tester --email someone@example.com \
+    --external --create-group --submit-review --public-link
+```
+
+`invite-tester` prints `INVITE …` lines: the tester's Apple `state`
+(`INVITED`/`ACCEPTED`/`INSTALLED` means the invite is live; `NOT_INVITED`/
+`REVOKED` is not), the build's `externalBuildState`, and `INVITE public_link=…`
+when a public TestFlight link is available. External testers can only *install*
+once the build's `externalBuildState` is `BETA_APPROVED` / `READY_FOR_BETA_TESTING`
+/ `IN_BETA_TESTING`; before that the invite is queued behind Beta App Review.
+Pass `--internal` to invite onto the internal group instead — that requires the
+email to be an App Store Connect user, so it reports a blocker rather than
+silently promoting anyone to a Marketing seat.
+
+Doing it by hand in App Store Connect instead:
+
 1. TestFlight → **External Testing** → new group.
 2. Add the build. Fill **What to Test**, contact email, and the review notes below.
 3. Submit for Beta App Review. There is no login; say so.

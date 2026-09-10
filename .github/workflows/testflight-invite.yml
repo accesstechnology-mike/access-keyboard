@@ -1,0 +1,151 @@
+name: TestFlight invite
+
+# Inspect TestFlight and invite a tester without cutting a new archive.
+# The App Store Connect key lives only in repository secrets, so Actions is the
+# only place these commands can run. `gh` is read-only here, but a tag push is
+# not (see AGENTS.md), so both jobs can also be started by pushing a tag.
+#
+#   status-testflight-<reason>          -> print TestFlight status (no changes)
+#   invite-tester-<email>               -> invite <email> as an EXTERNAL tester
+#                                          (creates the external group if needed,
+#                                           submits the latest build for Beta
+#                                           App Review, enables the public link)
+#
+# Actions -> TestFlight invite -> Run workflow gives the same two modes with
+# per-run options (internal vs external, group name, review, public link).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "status or invite"
+        type: choice
+        options:
+          - status
+          - invite
+        default: status
+      email:
+        description: "Tester email (invite mode)"
+        required: false
+        default: ""
+      external:
+        description: "Invite as an external tester (preferred). false = internal."
+        type: boolean
+        default: true
+      group:
+        description: "External beta group name to use or create"
+        required: false
+        default: "External Testers"
+      create_group:
+        description: "Create the external group if it does not exist"
+        type: boolean
+        default: true
+      submit_review:
+        description: "Submit the latest build for Beta App Review if needed"
+        type: boolean
+        default: true
+      public_link:
+        description: "Enable and print the external group's public link"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "status-testflight-*"
+      - "invite-tester-*"
+
+jobs:
+  status:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'status') ||
+      (github.event_name == 'push' && startsWith(github.ref_name, 'status-testflight-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Print TestFlight status
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+        run: python3 scripts/app_store_connect.py status
+
+  invite:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'invite') ||
+      (github.event_name == 'push' && startsWith(github.ref_name, 'invite-tester-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store Connect helpers
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Invite tester
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          IN_EMAIL: ${{ github.event.inputs.email }}
+          IN_EXTERNAL: ${{ github.event.inputs.external }}
+          IN_GROUP: ${{ github.event.inputs.group }}
+          IN_CREATE_GROUP: ${{ github.event.inputs.create_group }}
+          IN_SUBMIT_REVIEW: ${{ github.event.inputs.submit_review }}
+          IN_PUBLIC_LINK: ${{ github.event.inputs.public_link }}
+        run: |
+          set -eu
+          if [ "$EVENT_NAME" = "push" ]; then
+            # Tag payload is the email: invite-tester-<email>. A pushed tag
+            # always takes the preferred external path with sensible defaults.
+            EMAIL="${REF_NAME#invite-tester-}"
+            EXTERNAL=true
+            GROUP="External Testers"
+            CREATE_GROUP=true
+            SUBMIT_REVIEW=true
+            PUBLIC_LINK=true
+          else
+            EMAIL="$IN_EMAIL"
+            EXTERNAL="${IN_EXTERNAL:-true}"
+            GROUP="${IN_GROUP:-External Testers}"
+            CREATE_GROUP="${IN_CREATE_GROUP:-true}"
+            SUBMIT_REVIEW="${IN_SUBMIT_REVIEW:-true}"
+            PUBLIC_LINK="${IN_PUBLIC_LINK:-true}"
+          fi
+          if [ -z "$EMAIL" ] || [ "${EMAIL#*@}" = "$EMAIL" ]; then
+            echo "no valid tester email supplied (got '$EMAIL')" >&2
+            exit 1
+          fi
+          ARGS=(invite-tester --email "$EMAIL")
+          if [ "$EXTERNAL" = "true" ]; then
+            ARGS+=(--external)
+          else
+            ARGS+=(--internal)
+          fi
+          if [ "$CREATE_GROUP" = "true" ]; then ARGS+=(--create-group); fi
+          if [ "$SUBMIT_REVIEW" = "true" ]; then ARGS+=(--submit-review); fi
+          if [ "$PUBLIC_LINK" = "true" ]; then ARGS+=(--public-link); fi
+          if [ -n "$GROUP" ] && [ "$EXTERNAL" = "true" ]; then ARGS+=(--group "$GROUP"); fi
+          echo "Running: app_store_connect.py ${ARGS[*]}"
+          python3 scripts/app_store_connect.py "${ARGS[@]}"
