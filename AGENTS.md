@@ -30,4 +30,16 @@ Apple will not replace a binary already on an iPad. After a new invite, the test
 
 GitHub’s TestFlight workflow **#5** is the 21 August upload of `e64d5ef` (typing gestures). Slack/GitHub “TestFlight #5 / e64d5ef / cursor bot” is that old run, not a new one. Check `gh run list --workflow=testflight.yml` for the live run number and SHA.
 
-Details: `TESTFLIGHT.md`, `scripts/app_store_connect.py`, `.github/workflows/testflight.yml`.
+## External testers
+
+External testers do **not** need an App Store Connect seat, so this is the path for people like `kit@accesstechnology.co.uk` — use it before ever inviting anyone as a MARKETING user. The external group **External Testers** (id `4d494793-b8c2-40c0-b5c1-3c261f654b40`) now exists with public link **https://testflight.apple.com/join/cCNnMmM6** (that URL is the "code" for an iPad). Kit is on it, Apple `state=INVITED`. Build 13 is `externalBuildState=IN_BETA_TESTING`, i.e. approved for external testing, so external testers can install now.
+
+Do it from CI (the ASC key is only in Actions secrets; `gh` is read-only, tag pushes are not):
+
+- `status-testflight-*` tag (or **Actions → TestFlight invite → Run workflow**, mode `status`) → `python3 scripts/app_store_connect.py status`. Prints each build's `externalBuildState`, `external-ready`, and every external group's `public_link`.
+- `invite-tester-<email>` tag → invites `<email>` externally: creates the external group if missing, assigns the latest build, submits it for Beta App Review, emails the tester (one relationship), enables + prints the public link, and confirms the tester's Apple `state` via `GET /v1/betaTesters/{id}` (the create response can omit `state`). Re-runnable: 409 "already exists" **and** 409 "Tester(s) cannot be assigned" on an external group both mean already-invited, not a failure. To re-run the same email, delete then re-push the tag (`git push origin :refs/tags/invite-tester-<email>` then re-tag) since the email is the tag payload.
+- Workflow dispatch exposes `--internal` too; internal still needs an ASC user and reports a blocker rather than issuing a Marketing invite.
+
+External installs are gated on Beta App Review: a build stays `WAITING_FOR_BETA_REVIEW` / `IN_BETA_REVIEW` until Apple approves it, after which `externalBuildState` becomes `BETA_APPROVED` / `READY_FOR_BETA_TESTING` / `IN_BETA_TESTING`. Do not confuse this with internal `Alpha`.
+
+Details: `TESTFLIGHT.md`, `scripts/app_store_connect.py`, `.github/workflows/testflight.yml`, `.github/workflows/testflight-invite.yml`.
