@@ -1498,6 +1498,15 @@ def cmd_invite_tester(
         target = create_external_group(token, identifier, name)
         print(f"INVITE created external group={target['name']} id={target['id']}")
 
+    try:
+        assigned = assign_build_to_group(token, target["id"], latest["id"])
+        print(f"INVITE external group={target['name']}: {assigned} build {latest['number']}")
+    except ASCHTTPError as exc:
+        print(
+            f"INVITE could not assign build {latest['number']} to '{target['name']}': {exc}",
+            file=sys.stderr,
+        )
+
     if submit_review and not external_build_ready(latest):
         try:
             review = submit_beta_review(token, latest["id"])
@@ -1510,15 +1519,6 @@ def cmd_invite_tester(
                 f"INVITE could not submit build {latest['number']} for Beta Review: {exc}",
                 file=sys.stderr,
             )
-
-    try:
-        assigned = assign_build_to_group(token, target["id"], latest["id"])
-        print(f"INVITE external group={target['name']}: {assigned} build {latest['number']}")
-    except ASCHTTPError as exc:
-        print(
-            f"INVITE could not assign build {latest['number']} to '{target['name']}': {exc}",
-            file=sys.stderr,
-        )
 
     # Refresh the build so we report the true external state after any assign/submit.
     fresh = next(
