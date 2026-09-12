@@ -130,9 +130,31 @@ public struct KeyboardLayout: Equatable {
     public var rows: [KeyboardRow]
     public var layoutClass: LayoutClass
 
-    public init(rows: [KeyboardRow], layoutClass: LayoutClass) {
+    /// When set, the view sizes every key from this fixed weight/column count
+    /// instead of each page's own widest row. Stamping the alphabetic frame's
+    /// reference onto the numeric and symbols pages keeps the key size constant
+    /// across ABC / 123 / #+= so the whole board no longer resizes when the user
+    /// switches pages (the number row stays aligned with the letter row).
+    public var referenceUnitWeight: CGFloat?
+    public var referenceKeyCount: Int?
+
+    /// When true, rows are laid out flush against the left edge with square
+    /// keys, leaving the right-hand area empty. Used by the frequency board so
+    /// the letter block docks left for glide/cursor scanners (mockup v3).
+    public var leftDocked: Bool
+
+    public init(
+        rows: [KeyboardRow],
+        layoutClass: LayoutClass,
+        referenceUnitWeight: CGFloat? = nil,
+        referenceKeyCount: Int? = nil,
+        leftDocked: Bool = false
+    ) {
         self.rows = rows
         self.layoutClass = layoutClass
+        self.referenceUnitWeight = referenceUnitWeight
+        self.referenceKeyCount = referenceKeyCount
+        self.leftDocked = leftDocked
     }
 
     /// Whether two layouts have the same number of rows and keys per row. When

@@ -80,7 +80,7 @@ public enum LayoutFactory {
                 KeyboardRow(keys: compactToolbar(mode: .symbols, needsGlobe: needsGlobe, returnKeyType: returnKeyType))
             ]
         }
-        return KeyboardLayout(rows: rows, layoutClass: .compact)
+        return stamped(rows: rows, mode: mode, letterLayout: letterLayout, layoutClass: .compact)
     }
 
     private static func compactBottomLetterRow(_ lettersString: String, shift: ShiftState) -> [KeySpec] {
@@ -167,7 +167,7 @@ public enum LayoutFactory {
                 KeyboardRow(keys: iPadToolbar(mode: .symbols, needsGlobe: needsGlobe, pro: false))
             ]
         }
-        return KeyboardLayout(rows: rows, layoutClass: .iPad)
+        return stamped(rows: rows, mode: mode, letterLayout: letterLayout, layoutClass: .iPad)
     }
 
     // MARK: - iPad Pro (12.9" / 13" and other wide boards)
@@ -262,22 +262,58 @@ public enum LayoutFactory {
                 KeyboardRow(keys: iPadToolbar(mode: .symbols, needsGlobe: needsGlobe, pro: true))
             ]
         }
-        return KeyboardLayout(rows: rows, layoutClass: .iPadPro)
+        return stamped(rows: rows, mode: mode, letterLayout: letterLayout, layoutClass: .iPadPro)
     }
 
-    // MARK: - Frequency (Keeble-style scanning grid)
+    // MARK: - Layout framing
 
-    /// Builds the frequency board as a neat rectangular grid shared by every
-    /// device class. The letters keep the ACE Centre EARDU frequency order but
-    /// are re-flowed into equal-width rows so the most-used letters cluster in
-    /// the top-left and the left-hand letter columns line up perfectly for
-    /// switch scanning. All system/modifier keys (tab, caps lock, shift, 123)
-    /// live in a single leading column of identical width, so they never push
-    /// the letter columns out of alignment. Because every row has the same
-    /// total width, the layout engine centres them identically and the columns
-    /// stay aligned. The period lives once in the grid (never duplicated in the
-    /// toolbar), and backspace / return move to the toolbar to keep the grid a
-    /// clean rectangle.
+    /// Wraps rows in a `KeyboardLayout`, marking the frequency board left-docked
+    /// and stamping every other page with the alphabetic frame reference so key
+    /// size stays constant across ABC / 123 / #+= (no jarring resize on switch).
+    private static func stamped(
+        rows: [KeyboardRow],
+        mode: KeyboardMode,
+        letterLayout: LetterLayout,
+        layoutClass: LayoutClass
+    ) -> KeyboardLayout {
+        if mode == .alphabetic, letterLayout == .frequency {
+            return KeyboardLayout(rows: rows, layoutClass: layoutClass, leftDocked: true)
+        }
+        let reference = frameReference(for: layoutClass)
+        return KeyboardLayout(
+            rows: rows,
+            layoutClass: layoutClass,
+            referenceUnitWeight: reference.weight,
+            referenceKeyCount: reference.count
+        )
+    }
+
+    /// The QWERTY alphabetic frame's widest-row weight and key count per class.
+    /// Stamping this onto the numeric and symbols pages keeps their keys the
+    /// same size and their number row aligned with the letter row. The values
+    /// are verified against the live alphabetic layout by LayoutStabilityTests,
+    /// which fails if the alphabetic frame ever drifts from these numbers.
+    static func frameReference(for layoutClass: LayoutClass) -> (weight: CGFloat, count: Int) {
+        switch layoutClass {
+        case .compact: return (10, 10)
+        case .iPad: return (13.8, 13)
+        case .iPadPro: return (14.3, 13)
+        }
+    }
+
+    // MARK: - Frequency (mockup v3: left-docked Smartbox block)
+
+    /// Builds the frequency board to match approved mockup v3: a Smartbox/Grid
+    /// letter order (`Space earduw / toilfyj / nsmpbxk / hcgvqz` + Shift) laid
+    /// out as an equal-column block that is docked to the LEFT edge of the
+    /// canvas rather than floated/centred. Left-docking keeps the scan origin at
+    /// the top-left and leaves the right-hand area empty, which is what
+    /// glide/cursor and switch scanners expect. `Space` is the first cell
+    /// (top-left) and `Shift` is the last cell (bottom-right); the essential
+    /// function keys (123, globe, backspace, return, hide) sit in one left-
+    /// aligned row beneath the letter block. The owning layout is marked
+    /// `leftDocked` so the view lays every row flush-left with square keys
+    /// instead of stretching to fill the width.
     private static func frequencyRows(
         shift: ShiftState,
         needsGlobe: Bool,
@@ -287,34 +323,15 @@ public enum LayoutFactory {
         let compact = layoutClass == .compact
         let letterRows = LetterMaps.frequencyLetterRows()
 
-        // One fixed-width leading key per row keeps the letter columns aligned.
-        let modWidth: KeyWidth
-        switch layoutClass {
-        case .compact: modWidth = .unit(1.3)
-        case .iPad: modWidth = .unit(1.4)
-        case .iPadPro: modWidth = .unit(1.5)
-        }
-        let leadingColumn: [KeySpec] = [
-            tabKey(width: modWidth),
-            capsLockKey(shift: shift, width: modWidth, compact: compact),
-            shiftKey(compact: compact, shift: shift, width: modWidth),
-            modeKey("123", .numeric, width: modWidth)
-        ]
-
         var rows: [KeyboardRow] = []
-        let lastIndex = letterRows.count - 1
         for (index, letterRow) in letterRows.enumerated() {
             var keys: [KeySpec] = []
-            if index < leadingColumn.count {
-                keys.append(leadingColumn[index])
+            if index == 0 {
+                keys.append(spaceCell())
             }
             keys += letters(letterRow, shift: shift)
-            if index == lastIndex {
-                // Fill the short final row so the grid is a full rectangle. This
-                // is the board's only period, which removes the duplicate `.`
-                // that previously sat in both the grid and the toolbar.
-                keys.append(punctuation("."))
-                keys.append(punctuation(","))
+            if index == letterRows.count - 1 {
+                keys.append(shiftKey(compact: compact, shift: shift, width: .unit(1)))
             }
             rows.append(KeyboardRow(keys: keys))
         }
@@ -326,17 +343,25 @@ public enum LayoutFactory {
         return rows
     }
 
+    /// A labelled Space key sized like a letter cell, for the frequency grid's
+    /// top-left position in mockup v3.
+    private static func spaceCell() -> KeySpec {
+        KeySpec(action: .space, display: .text("Space"), width: .unit(1), style: .space)
+    }
+
     private static func frequencyToolbar(
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
         compact: Bool
     ) -> [KeySpec] {
-        var keys: [KeySpec] = [backspace(compact: compact, width: .unit(compact ? 1.4 : 1.6))]
+        // Function keys only; Space lives in the letter grid now. No flexible
+        // key, so the row stays left-docked in line with the block above.
+        var keys: [KeySpec] = [modeKey("123", .numeric, width: .unit(1))]
         if needsGlobe {
-            keys.append(globe(width: .unit(1.1)))
+            keys.append(globe(width: .unit(1)))
         }
-        keys.append(space(width: .flexible))
-        keys.append(returnKey(returnKeyType, compact: compact, width: .unit(compact ? 2.0 : 1.8)))
+        keys.append(backspace(compact: compact, width: .unit(1)))
+        keys.append(returnKey(returnKeyType, compact: compact, width: .unit(1.4)))
         if !compact {
             keys.append(dismissKey())
         }

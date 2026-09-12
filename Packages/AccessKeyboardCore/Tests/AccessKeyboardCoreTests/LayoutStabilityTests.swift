@@ -144,9 +144,11 @@ final class LayoutStabilityTests: XCTestCase {
     /// the letter row (`,` `.` `/`) and a second beside the space bar. The
     /// toolbar period is removed, so exactly one `.` remains per mode.
     func testIPadLayoutsHaveExactlyOnePeriod() {
+        // The frequency board is a left-docked scanning grid with no period on
+        // the letter page by design (mockup v3), so it is checked separately.
         for layoutClass in [LayoutClass.iPad, .iPadPro] {
             for mode in modes {
-                for letterLayout in letterLayouts {
+                for letterLayout in [LetterLayout.qwerty, .abc] {
                     let candidate = layout(
                         mode: mode,
                         shift: .off,
@@ -189,6 +191,66 @@ final class LayoutStabilityTests: XCTestCase {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Frequency board matches mockup v3 (left-docked Smartbox block)
+
+    func testFrequencyBoardIsLeftDockedWithSmartboxOrder() {
+        for layoutClass in classes {
+            let board = layout(mode: .alphabetic, shift: .off, layoutClass: layoutClass, letterLayout: .frequency)
+            let context = "class=\(layoutClass)"
+
+            XCTAssertTrue(board.leftDocked, "frequency board must be left-docked: \(context)")
+            XCTAssertEqual(board.rows.count, 5, "4 letter rows + 1 function row: \(context)")
+
+            // Space is the first cell (top-left); Shift is the last letter cell.
+            XCTAssertEqual(board.rows.first?.keys.first?.action, .space, "Space must be top-left: \(context)")
+            XCTAssertEqual(board.rows[3].keys.last?.action, .shift, "Shift must end the last letter row: \(context)")
+
+            // Letter order matches the approved mockup, row by row.
+            XCTAssertEqual(rowLetters(board.rows[0]), "earduw", context)
+            XCTAssertEqual(rowLetters(board.rows[1]), "toilfyj", context)
+            XCTAssertEqual(rowLetters(board.rows[2]), "nsmpbxk", context)
+            XCTAssertEqual(rowLetters(board.rows[3]), "hcgvqz", context)
+
+            // Every letter appears exactly once across the board.
+            let all = board.rows.map(rowLetters).joined()
+            XCTAssertEqual(String(all.sorted()), "abcdefghijklmnopqrstuvwxyz", "all 26 letters once: \(context)")
+        }
+    }
+
+    private func rowLetters(_ row: KeyboardRow) -> String {
+        String(row.keys.compactMap { spec -> Character? in
+            guard case .character(let value) = spec.action,
+                  value.count == 1,
+                  let character = value.lowercased().first,
+                  character.isLetter else { return nil }
+            return character
+        })
+    }
+
+    // MARK: - Symbols/numeric pages reuse the alphabetic frame (no resize jump)
+
+    func testNumericAndSymbolsReuseAlphabeticKeySize() {
+        for layoutClass in classes {
+            let alpha = layout(mode: .alphabetic, shift: .off, layoutClass: layoutClass, letterLayout: .qwerty)
+            let widest = alpha.rows.max { rowWeight($0) < rowWeight($1) }!
+            let expectedWeight = rowWeight(widest)
+            let expectedCount = widest.keys.count
+            let context = "class=\(layoutClass)"
+
+            // The hardcoded frame reference must not drift from the live board.
+            let reference = LayoutFactory.frameReference(for: layoutClass)
+            XCTAssertEqual(reference.weight, expectedWeight, accuracy: 0.0001, "frame weight drifted: \(context)")
+            XCTAssertEqual(reference.count, expectedCount, "frame count drifted: \(context)")
+
+            // Numeric and symbols reuse it, so keys stay the same size on switch.
+            for mode in [KeyboardMode.numeric, .symbols] {
+                let page = layout(mode: mode, shift: .off, layoutClass: layoutClass, letterLayout: .qwerty)
+                XCTAssertEqual(page.referenceUnitWeight ?? -1, expectedWeight, accuracy: 0.0001, "\(mode) key size: \(context)")
+                XCTAssertEqual(page.referenceKeyCount ?? -1, expectedCount, "\(mode) column count: \(context)")
             }
         }
     }

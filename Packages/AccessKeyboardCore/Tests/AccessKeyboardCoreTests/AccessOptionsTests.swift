@@ -30,30 +30,31 @@ final class AccessOptionsTests: XCTestCase {
         XCTAssertEqual(layout.letterString(inRow: 2), "zxcvbnm")
     }
 
-    func testEARDUFrequencyOrderIsPreservedButReflowed() {
-        // The letter sequence is the unchanged ACE Centre EARDU order; only the
-        // row grouping changed (now even 7-column rows for a neat grid).
+    func testFrequencyBoardUsesSmartboxGridOrder() {
+        // Approved mockup v3 uses the Smartbox/Grid order, not the old EARDU
+        // sequence. Space leads the first row; Shift ends the last letter row.
         XCTAssertEqual(
             LetterMaps.frequencyLetterRows(),
-            ["earduto", "ilgvnsf", "yxhcpkj", "mbwqz"]
+            ["earduw", "toilfyj", "nsmpbxk", "hcgvqz"]
         )
         XCTAssertEqual(
             LetterMaps.frequencyLetterRows().joined(),
-            "eardutoilgvnsfyxhcpkjmbwqz",
-            "the EARDU frequency order must be preserved exactly"
+            "earduwtoilfyjnsmpbxkhcgvqz",
+            "the Smartbox frequency order must match the mockup exactly"
         )
 
         let layout = compact(.frequency)
-        // Letter rows keep the frequency order; the leading modifier column is
-        // excluded from letterString because those keys are modifiers.
-        XCTAssertEqual(layout.letterString(inRow: 0), "earduto")
-        XCTAssertEqual(layout.letterString(inRow: 1), "ilgvnsf")
-        XCTAssertEqual(layout.letterString(inRow: 2), "yxhcpkj")
-        // Final row: the two least-frequent letters then the grid's punctuation.
-        XCTAssertEqual(layout.letterString(inRow: 3), "mbwqz.,")
+        XCTAssertEqual(layout.letterString(inRow: 0), "earduw")
+        XCTAssertEqual(layout.letterString(inRow: 1), "toilfyj")
+        XCTAssertEqual(layout.letterString(inRow: 2), "nsmpbxk")
+        XCTAssertEqual(layout.letterString(inRow: 3), "hcgvqz")
+        XCTAssertEqual(layout.rows.first?.keys.first?.action, .space, "Space is the top-left cell")
+        XCTAssertEqual(layout.rows[3].keys.last?.action, .shift, "Shift ends the last letter row")
     }
 
-    func testFrequencyBoardHasExactlyOnePeriod() {
+    func testFrequencyBoardHasNoPeriodOnLetterPage() {
+        // Mockup v3 drops punctuation from the letter board; a period is reached
+        // through the 123 page instead.
         for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
             let layout = LayoutFactory.layout(
                 mode: .alphabetic,
@@ -66,17 +67,16 @@ final class AccessOptionsTests: XCTestCase {
             let periods = layout.rows
                 .flatMap { $0.keys }
                 .filter { $0.action == .character(".") }
-            XCTAssertEqual(
-                periods.count, 1,
-                "frequency board (\(layoutClass)) must have exactly one period key, not a duplicate"
+            XCTAssertTrue(
+                periods.isEmpty,
+                "frequency letter board (\(layoutClass)) has no period; it lives on the 123 page"
             )
         }
     }
 
-    func testFrequencyLetterColumnsAlignAcrossRows() {
-        // Every letter row shares one fixed-width leading modifier column, so the
-        // left-hand letter columns line up (equal total row weight → identical
-        // centring in the layout engine).
+    func testFrequencyLetterColumnsAlignAndDockLeft() {
+        // The letter block is a clean rectangle (equal per-row width and count)
+        // and the whole board is docked to the left edge for scanners.
         for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
             let layout = LayoutFactory.layout(
                 mode: .alphabetic,
@@ -86,6 +86,7 @@ final class AccessOptionsTests: XCTestCase {
                 returnKeyType: .default,
                 letterLayout: .frequency
             )
+            XCTAssertTrue(layout.leftDocked, "frequency board must be left-docked (\(layoutClass))")
             let letterRows = layout.rows.filter { row in
                 row.keys.contains { $0.style == .letter }
             }
@@ -95,9 +96,6 @@ final class AccessOptionsTests: XCTestCase {
             let counts = letterRows.map { $0.keys.count }
             XCTAssertEqual(Set(weights).count, 1, "letter rows must share one width so columns align (\(layoutClass))")
             XCTAssertEqual(Set(counts).count, 1, "letter rows must have the same key count so columns align (\(layoutClass))")
-            for row in letterRows {
-                XCTAssertEqual(row.keys.first?.style, .modifier, "each letter row must start with the shared modifier column (\(layoutClass))")
-            }
         }
     }
 

@@ -240,7 +240,14 @@ public final class KeyboardView: UIView {
         var y = metrics.topInset + (engine.showsPredictions ? metrics.predictionBarHeight : 0)
         var buttonIndex = 0
         for row in layout.rows {
-            let frames = framesForRow(row, y: y, usableWidth: usableWidth, unit: unit, metrics: metrics)
+            let frames = framesForRow(
+                row,
+                y: y,
+                usableWidth: usableWidth,
+                unit: unit,
+                metrics: metrics,
+                leftDocked: layout.leftDocked
+            )
             for frame in frames {
                 if buttonIndex < keyButtons.count {
                     keyButtons[buttonIndex].frame = frame
@@ -252,6 +259,21 @@ public final class KeyboardView: UIView {
     }
 
     private func unitWidth(in layout: KeyboardLayout, usableWidth: CGFloat, metrics: LayoutMetrics) -> CGFloat {
+        // Left-docked frequency board: square keys sized by row height, but never
+        // wider than a fill would allow (so narrow devices still fit the block).
+        if layout.leftDocked {
+            let maxWeight = layout.rows.map { fixedWeight(of: $0) }.max() ?? 1
+            let maxCount = layout.rows.map { $0.keys.count }.max() ?? 1
+            let gaps = CGFloat(max(maxCount - 1, 0)) * metrics.keySpacing
+            let fillUnit = (usableWidth - gaps) / max(maxWeight, 1)
+            return min(metrics.keyHeight, fillUnit)
+        }
+        // Fixed frame reference (numeric/symbols reuse the alphabetic frame) so
+        // key size stays constant across pages.
+        if let refWeight = layout.referenceUnitWeight, let refCount = layout.referenceKeyCount {
+            let gaps = CGFloat(max(refCount - 1, 0)) * metrics.keySpacing
+            return (usableWidth - gaps) / max(refWeight, 1)
+        }
         let reference = layout.rows.max { lhs, rhs in
             fixedWeight(of: lhs) < fixedWeight(of: rhs)
         } ?? layout.rows[0]
@@ -265,7 +287,8 @@ public final class KeyboardView: UIView {
         y: CGFloat,
         usableWidth: CGFloat,
         unit: CGFloat,
-        metrics: LayoutMetrics
+        metrics: LayoutMetrics,
+        leftDocked: Bool
     ) -> [CGRect] {
         let gap = metrics.keySpacing
         let gaps = CGFloat(max(row.keys.count - 1, 0)) * gap
@@ -284,7 +307,12 @@ public final class KeyboardView: UIView {
         } else {
             flexWidth = 0
             let rowWidth = fixed * unit + gaps
-            leading = metrics.sideInset + max(0, (usableWidth - rowWidth) / 2) + row.leadingInsetUnits * unit
+            if leftDocked {
+                // Flush left; leaves the right-hand area empty for scanners.
+                leading = metrics.sideInset + row.leadingInsetUnits * unit
+            } else {
+                leading = metrics.sideInset + max(0, (usableWidth - rowWidth) / 2) + row.leadingInsetUnits * unit
+            }
         }
 
         var cursor = leading
@@ -458,11 +486,11 @@ extension KeyboardView: UIGestureRecognizerDelegate {
         return true
     }
 
-    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        // The pan only begins with two touches in motion, so letting it begin
-        // anywhere cannot interfere with single-finger typing.
-        return true
-    }
+    // Note: `gestureRecognizerShouldBegin(_:)` is intentionally NOT implemented
+    // here. It is a `UIView` method (not just a delegate method), so declaring
+    // it in this extension would require `override`, which extensions cannot do.
+    // The default returns true, which is exactly what the scrub needs: the pan
+    // only begins once two touches are in motion, so it never fights typing.
 
     public func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,

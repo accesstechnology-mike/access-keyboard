@@ -11,7 +11,7 @@ public enum LetterLayout: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .qwerty: return "QWERTY"
         case .abc: return "ABC"
-        case .frequency: return "Frequency (EARDU)"
+        case .frequency: return "Frequency (Grid)"
         }
     }
 }
@@ -84,13 +84,12 @@ public enum LetterMaps {
         }
     }
 
-    /// The ACE Centre EARDU switch-scanning frequency order, re-flowed into
-    /// even seven-column rows. The letter sequence is unchanged
-    /// (`eardutoilgvnsfyxhcpkjmbwqz`); only the row grouping changed so the grid
-    /// is a neat rectangle with aligned left columns and the most-used letters
-    /// in the top-left. The layout factory adds the leading modifier column and
-    /// fills the short final row with punctuation.
+    /// The Smartbox/Grid frequency letter order used by approved mockup v3, in
+    /// four seven-column rows. `Space` is prepended to the first row and `Shift`
+    /// appended to the last row by the layout factory, giving the full board
+    /// `Space earduw / toilfyj / nsmpbxk / hcgvqz` + Shift. All 26 letters
+    /// appear exactly once.
     public static func frequencyLetterRows() -> [String] {
-        ["earduto", "ilgvnsf", "yxhcpkj", "mbwqz"]
+        ["earduw", "toilfyj", "nsmpbxk", "hcgvqz"]
     }
 }
