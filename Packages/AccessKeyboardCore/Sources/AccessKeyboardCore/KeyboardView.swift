@@ -486,11 +486,11 @@ extension KeyboardView: UIGestureRecognizerDelegate {
         return true
     }
 
-    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        // The pan only begins with two touches in motion, so letting it begin
-        // anywhere cannot interfere with single-finger typing.
-        return true
-    }
+    // Note: `gestureRecognizerShouldBegin(_:)` is intentionally NOT implemented
+    // here. It is a `UIView` method (not just a delegate method), so declaring
+    // it in this extension would require `override`, which extensions cannot do.
+    // The default returns true, which is exactly what the scrub needs: the pan
+    // only begins once two touches are in motion, so it never fights typing.
 
     public func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
