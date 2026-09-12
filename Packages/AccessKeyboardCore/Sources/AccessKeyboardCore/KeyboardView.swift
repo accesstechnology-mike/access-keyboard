@@ -451,10 +451,25 @@ extension KeyboardView: UIGestureRecognizerDelegate {
         shouldReceive touch: UITouch
     ) -> Bool {
         guard gestureRecognizer === cursorTrackpad else { return true }
-        // Accept touches anywhere on the keyboard so a two-finger pan scrubs the
-        // cursor over the whole surface, not just the space bar. The prediction
-        // bar keeps its own single-tap buttons; the two-touch requirement means
-        // this never steals a single-finger tap from a key or a suggestion.
+        // Accept touches anywhere on the keyboard, even when they land on a key
+        // button, so a two-finger pan scrubs the cursor over the whole surface,
+        // not just the space bar. The two-touch requirement means this never
+        // steals a single-finger tap from a key or a prediction.
         return true
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // The pan only begins with two touches in motion, so letting it begin
+        // anywhere cannot interfere with single-finger typing.
+        return true
+    }
+
+    public func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        // Never let another recognizer block the cursor scrub, or require it to
+        // fail first, when fingers start on a key.
+        gestureRecognizer === cursorTrackpad || other === cursorTrackpad
     }
 }

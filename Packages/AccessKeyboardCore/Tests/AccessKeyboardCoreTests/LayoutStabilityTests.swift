@@ -193,6 +193,41 @@ final class LayoutStabilityTests: XCTestCase {
         }
     }
 
+    // MARK: - Two-finger scrub works from any key (not only space)
+
+    /// An exclusive-touch key blocks a second concurrent touch from reaching the
+    /// keyboard's two-finger cursor-scrub pan, so the scrub could only start on
+    /// the space bar. Every key must be non-exclusive so scrubbing can begin
+    /// from a letter key too.
+    @MainActor
+    func testKeyButtonsAreNotExclusiveTouch() {
+        let metrics = LayoutMetrics.metrics(
+            for: .iPadPro,
+            bounds: CGSize(width: 1024, height: 1366),
+            safeBottom: 0
+        )
+        let specs: [KeySpec] = [
+            .letter("e"),
+            .punctuation("."),
+            KeySpec(action: .space, display: .blank, style: .space),
+            KeySpec(action: .backspace, display: .text("delete"), style: .modifier),
+            KeySpec(action: .shift, display: .text("shift"), style: .modifier)
+        ]
+        for spec in specs {
+            let button = KeyButton(
+                spec: spec,
+                appearance: .system(for: .light),
+                metrics: metrics,
+                shift: .off,
+                isModifierHighlighted: false
+            )
+            XCTAssertFalse(
+                button.isExclusiveTouch,
+                "\(spec.action) must not be exclusive-touch or it blocks the two-finger scrub"
+            )
+        }
+    }
+
     // MARK: - Board reuse keeps structure stable (item 2)
 
     func testFrequencyAndAlphabeticShareNoStructureSoRebuildIsSafe() {

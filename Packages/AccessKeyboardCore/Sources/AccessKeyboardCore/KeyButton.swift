@@ -36,7 +36,16 @@ final class KeyButton: UIControl {
         self.shift = shift
         self.isModifierHighlighted = isModifierHighlighted
         super.init(frame: .zero)
-        isExclusiveTouch = spec.action != .space
+        // No key is exclusive-touch. An exclusive-touch control blocks the
+        // delivery of a second concurrent touch to everything else in the
+        // window, including the keyboard's two-finger cursor-scrub pan, so the
+        // pan could only ever start on the space bar (the one key that was
+        // already non-exclusive). Making every key non-exclusive lets the
+        // whole-keyboard scrub begin from any key, matching the stock keyboard.
+        // Single-finger typing is unaffected: one touch still tracks its key
+        // normally, and an actual scrub cancels the key press once the pan
+        // begins.
+        isExclusiveTouch = false
         layer.cornerRadius = metrics.cornerRadius
         layer.shadowOffset = CGSize(width: 0, height: 1)
         layer.shadowRadius = 0
@@ -96,7 +105,6 @@ final class KeyButton: UIControl {
             // and touch state left over from the previous action.
             cancelTimers()
             didLongPress = false
-            isExclusiveTouch = spec.action != .space
         }
         if contentChanged {
             applyContent()
