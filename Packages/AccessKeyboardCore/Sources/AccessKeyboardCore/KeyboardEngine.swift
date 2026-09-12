@@ -359,6 +359,16 @@ public final class KeyboardEngine {
     private func applyAutocapitalization() {
         guard mode == .alphabetic, shift != .capsLock else { return }
 
+        // URL / email / web-search / credential fields must never be
+        // autocapitalized, so a typed address stays `x.com` rather than
+        // `X.Com`. This also suppresses the capital after a `.` inside a URL.
+        // Only clear an auto-shift; a manual shift the user just tapped is left
+        // intact so they can still type an occasional capital.
+        if traits.isURLLikeField {
+            if shift == .autoShifted { shift = .off }
+            return
+        }
+
         switch traits.autocapitalizationType {
         case .none:
             return

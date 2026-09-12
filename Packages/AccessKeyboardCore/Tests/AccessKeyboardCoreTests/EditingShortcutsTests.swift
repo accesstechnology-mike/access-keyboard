@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import AccessKeyboardCore
 
 final class EditingShortcutsTests: XCTestCase {
@@ -83,6 +84,51 @@ final class KeyboardEditingTests: XCTestCase {
         XCTAssertEqual(document.text, "hello ")
         engine.continueBackspace(byWord: true)
         XCTAssertEqual(document.text, "")
+    }
+
+    func testURLFieldSuppressesAutocapitalization() {
+        for keyboardType in [UIKeyboardType.URL, .webSearch, .emailAddress] {
+            let document = FakeDocument(text: "")
+            let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+            engine.document = document
+            engine.traits = KeyboardTraits(
+                autocapitalizationType: .sentences,
+                keyboardType: keyboardType
+            )
+            engine.documentDidChange()
+            XCTAssertEqual(engine.shift, .off, "URL field should not auto-shift at the start (\(keyboardType))")
+
+            engine.handle(.character("x"))
+            XCTAssertEqual(engine.shift, .off, "URL field should not auto-shift while typing (\(keyboardType))")
+
+            engine.handle(.character("."))
+            XCTAssertEqual(engine.shift, .off, "no capital after a period inside a URL (\(keyboardType))")
+        }
+    }
+
+    func testURLTextContentTypeSuppressesAutocapitalization() {
+        let document = FakeDocument(text: "")
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.traits = KeyboardTraits(
+            autocapitalizationType: .sentences,
+            keyboardType: .default,
+            textContentType: .URL
+        )
+        engine.documentDidChange()
+        XCTAssertEqual(engine.shift, .off, "a .URL content-type field should not auto-shift")
+    }
+
+    func testSentenceFieldStillAutocapitalizes() {
+        let document = FakeDocument(text: "")
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.traits = KeyboardTraits(
+            autocapitalizationType: .sentences,
+            keyboardType: .default
+        )
+        engine.documentDidChange()
+        XCTAssertEqual(engine.shift, .autoShifted, "a normal sentence field still capitalizes the first letter")
     }
 
     func testTwoFingerCursorMovement() {
