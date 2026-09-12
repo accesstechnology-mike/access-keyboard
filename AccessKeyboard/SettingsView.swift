@@ -19,7 +19,7 @@ struct SettingsView: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("QWERTY is the standard iPad board. ABC keeps that frame and spells the alphabet in order. Frequency uses the EARDU letter order from ACE Centre’s switch-scanning analysis. Space stays on the toolbar.")
+                    Text("QWERTY is the standard iPad board. ABC keeps that frame and spells the alphabet in order. Frequency uses a Smartbox-style grid order docked to the left of the keyboard for glide and switch scanning, with Space in the top-left and Shift in the bottom-right.")
                     Link(
                         "ACE Centre switch-scanning frequency analysis",
                         destination: URL(string: "https://acecentre.org.uk/projects/switch-scanning-frequency-analysis")!
