@@ -24,17 +24,20 @@ public struct KeyboardTraits: Equatable {
     public var keyboardType: UIKeyboardType
     public var returnKeyType: UIReturnKeyType
     public var isSecureTextEntry: Bool
+    public var textContentType: UITextContentType?
 
     public init(
         autocapitalizationType: UITextAutocapitalizationType = .sentences,
         keyboardType: UIKeyboardType = .default,
         returnKeyType: UIReturnKeyType = .default,
-        isSecureTextEntry: Bool = false
+        isSecureTextEntry: Bool = false,
+        textContentType: UITextContentType? = nil
     ) {
         self.autocapitalizationType = autocapitalizationType
         self.keyboardType = keyboardType
         self.returnKeyType = returnKeyType
         self.isSecureTextEntry = isSecureTextEntry
+        self.textContentType = textContentType
     }
 
     public static func from(_ traits: UITextInputTraits) -> KeyboardTraits {
@@ -42,8 +45,36 @@ public struct KeyboardTraits: Equatable {
             autocapitalizationType: traits.autocapitalizationType ?? .sentences,
             keyboardType: traits.keyboardType ?? .default,
             returnKeyType: traits.returnKeyType ?? .default,
-            isSecureTextEntry: traits.isSecureTextEntry ?? false
+            isSecureTextEntry: traits.isSecureTextEntry ?? false,
+            // `UITextInputTraits` members are optional ObjC requirements, so
+            // `textContentType` imports as a double optional; `?? nil` flattens
+            // it to a single `UITextContentType?` regardless.
+            textContentType: traits.textContentType ?? nil
         )
+    }
+
+    /// Whether the focused field is a URL, email, web-search, or credential
+    /// field where sentence/word autocapitalization is wrong. Browser address
+    /// bars report `keyboardType == .webSearch` (Safari) or `.URL`, so typing
+    /// should stay verbatim like `x.com` instead of being title-cased to
+    /// `X.Com`. This is the reliable, system-exposed signal a keyboard
+    /// extension can read from the document proxy's `UITextInputTraits`; the
+    /// per-field `autocapitalizationType` alone cannot be trusted because many
+    /// browsers leave it at the `.sentences` default on the address bar.
+    public var isURLLikeField: Bool {
+        switch keyboardType {
+        case .URL, .emailAddress, .webSearch:
+            return true
+        default:
+            break
+        }
+        switch textContentType {
+        case .some(.URL), .some(.emailAddress), .some(.username),
+             .some(.password), .some(.newPassword):
+            return true
+        default:
+            return false
+        }
     }
 }
 

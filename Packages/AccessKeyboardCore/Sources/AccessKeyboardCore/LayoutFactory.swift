@@ -251,7 +251,7 @@ public enum LayoutFactory {
                 KeyboardRow(keys: [
                     redoKey(),
                     modeKey("123", .numeric, width: .unit(1.4))
-                ] + chars("§¡¿–—«»") + [
+                ] + chars(".§¡¿–—«»") + [
                     modeKey("123", .numeric, width: .unit(1.8))
                 ]),
                 KeyboardRow(keys: [
@@ -357,7 +357,10 @@ public enum LayoutFactory {
             keys.append(undoKey())
         }
         keys.append(space(width: .flexible))
-        keys.append(punctuation(".", width: .unit(1.1)))
+        // The full stop already lives on the row above (the letter row's `,` `.`
+        // `/` in alphabetic mode, or `.,?!'` in numeric/symbols), matching the
+        // stock iPad keyboard. A second period beside the space bar was
+        // redundant, so it is removed to leave a single clear affordance.
         if mode == .alphabetic {
             keys.append(modeKey(".?123", .numeric, width: .unit(1.4)))
         } else {

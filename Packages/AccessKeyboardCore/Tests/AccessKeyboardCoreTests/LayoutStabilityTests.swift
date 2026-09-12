@@ -138,6 +138,61 @@ final class LayoutStabilityTests: XCTestCase {
         XCTAssertFalse(button.point(inside: CGPoint(x: 20, y: -metrics.rowSpacing / 2 - 1), with: nil))
     }
 
+    // MARK: - Single full stop (no duplicate period)
+
+    /// The iPad and iPad Pro QWERTY boards used to show two full stops: one on
+    /// the letter row (`,` `.` `/`) and a second beside the space bar. The
+    /// toolbar period is removed, so exactly one `.` remains per mode.
+    func testIPadLayoutsHaveExactlyOnePeriod() {
+        for layoutClass in [LayoutClass.iPad, .iPadPro] {
+            for mode in modes {
+                for letterLayout in letterLayouts {
+                    let candidate = layout(
+                        mode: mode,
+                        shift: .off,
+                        layoutClass: layoutClass,
+                        letterLayout: letterLayout
+                    )
+                    let periods = candidate.rows
+                        .flatMap { $0.keys }
+                        .filter { $0.action == .character(".") }
+                        .count
+                    XCTAssertEqual(
+                        periods, 1,
+                        "expected a single period: class=\(layoutClass) mode=\(mode) letters=\(letterLayout)"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Regression guard: no keyboard board should place a period immediately to
+    /// the right of the space bar (the duplicate Mike reported).
+    func testNoPeriodSitsNextToTheSpaceBar() {
+        for layoutClass in classes {
+            for mode in modes {
+                for letterLayout in letterLayouts {
+                    let candidate = layout(
+                        mode: mode,
+                        shift: .off,
+                        layoutClass: layoutClass,
+                        letterLayout: letterLayout
+                    )
+                    for row in candidate.rows {
+                        guard let spaceIndex = row.keys.firstIndex(where: { $0.action == .space }) else { continue }
+                        let after = row.keys.index(after: spaceIndex)
+                        if after < row.keys.endIndex {
+                            XCTAssertNotEqual(
+                                row.keys[after].action, .character("."),
+                                "period directly right of space: class=\(layoutClass) mode=\(mode) letters=\(letterLayout)"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Board reuse keeps structure stable (item 2)
 
     func testFrequencyAndAlphabeticShareNoStructureSoRebuildIsSafe() {
