@@ -7,7 +7,6 @@ public final class KeyboardView: UIView {
     public var extraBottomInset: CGFloat = 0
 
     private var keyButtons: [KeyButton] = []
-    private var spaceButton: KeyButton?
     private var currentLayout: KeyboardLayout?
     private var currentMetrics: LayoutMetrics?
     private var contentDirty = false
@@ -16,7 +15,7 @@ public final class KeyboardView: UIView {
     private var preferenceObservation: KeyboardPreferenceObservation?
     private let predictionBar = PredictionBarView()
     private let haptics = UIImpactFeedbackGenerator(style: .light)
-    private var spaceTrackpad: UIPanGestureRecognizer?
+    private var cursorTrackpad: UIPanGestureRecognizer?
     private var trackpadRemainder = CGPoint.zero
 
     public convenience init() {
@@ -43,13 +42,17 @@ public final class KeyboardView: UIView {
         engine.onPredictionsChange = { [weak self] in
             self?.refreshPredictions()
         }
-        let trackpad = UIPanGestureRecognizer(target: self, action: #selector(handleSpaceTrackpad(_:)))
+        // Two-finger pan scrubs the text cursor across the whole keyboard
+        // surface, like the stock iOS/iPadOS keyboard. Requiring two touches
+        // keeps single-finger typing untouched: a lone touch never starts the
+        // pan, so it flows straight through to the key buttons.
+        let trackpad = UIPanGestureRecognizer(target: self, action: #selector(handleCursorTrackpad(_:)))
         trackpad.minimumNumberOfTouches = 2
         trackpad.maximumNumberOfTouches = 2
         trackpad.cancelsTouchesInView = true
         trackpad.delegate = self
         addGestureRecognizer(trackpad)
-        spaceTrackpad = trackpad
+        cursorTrackpad = trackpad
         predictionBar.onSelect = { [weak self] prediction in
             UIDevice.current.playInputClick()
             self?.haptics.impactOccurred(intensity: 0.55)
@@ -162,7 +165,6 @@ public final class KeyboardView: UIView {
 
     private func rebuildKeys(layout: KeyboardLayout, metrics: LayoutMetrics) {
         keyButtons.forEach { $0.removeFromSuperview() }
-        spaceButton = nil
         keyButtons = layout.rows.flatMap { row in
             row.keys.map { spec in
                 let button = KeyButton(
@@ -191,9 +193,6 @@ public final class KeyboardView: UIView {
                     self?.finishLongPress(spec)
                 }
                 addSubview(button)
-                if spec.action == .space {
-                    self.spaceButton = button
-                }
                 return button
             }
         }
@@ -205,7 +204,6 @@ public final class KeyboardView: UIView {
             rebuildKeys(layout: layout, metrics: metrics)
             return
         }
-        spaceButton = nil
         for (index, spec) in specs.enumerated() {
             let button = keyButtons[index]
             button.update(
@@ -215,9 +213,6 @@ public final class KeyboardView: UIView {
                 shift: engine.shift,
                 isModifierHighlighted: isHighlightedModifier(spec)
             )
-            if spec.action == .space {
-                spaceButton = button
-            }
         }
     }
 
@@ -370,7 +365,7 @@ public final class KeyboardView: UIView {
         }
     }
 
-    @objc private func handleSpaceTrackpad(_ gesture: UIPanGestureRecognizer) {
+    @objc private func handleCursorTrackpad(_ gesture: UIPanGestureRecognizer) {
         switch gesture.state {
         case .began:
             trackpadRemainder = .zero
@@ -455,8 +450,11 @@ extension KeyboardView: UIGestureRecognizerDelegate {
         _ gestureRecognizer: UIGestureRecognizer,
         shouldReceive touch: UITouch
     ) -> Bool {
-        guard gestureRecognizer === spaceTrackpad else { return true }
-        guard let spaceButton else { return false }
-        return spaceButton.bounds.contains(touch.location(in: spaceButton))
+        guard gestureRecognizer === cursorTrackpad else { return true }
+        // Accept touches anywhere on the keyboard so a two-finger pan scrubs the
+        // cursor over the whole surface, not just the space bar. The prediction
+        // bar keeps its own single-tap buttons; the two-touch requirement means
+        // this never steals a single-finger tap from a key or a suggestion.
+        return true
     }
 }
