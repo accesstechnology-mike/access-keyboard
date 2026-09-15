@@ -1,5 +1,9 @@
 # Agent notes
 
+## Device support
+
+`access: keyboard` is **universal**: it runs on **iPhone and iPad** on iOS/iPadOS 18. `TARGETED_DEVICE_FAMILY = "1,2"` on both the app and the keyboard-extension targets. The keyboard adapts by size class — `LayoutClassResolver` returns the `.compact` board for the iPhone (phone) idiom and the `.iPad` / `.iPadPro` boards on iPad — so the same binary lays out correctly on a narrow phone and a wide tablet. Do **not** reintroduce an iPad-only device family. If iPhone testers still see "no builds available" after a universal binary is live, that is an App Store Connect availability flag, not a binary problem: an ASC admin (Mike) must enable iPhone availability for the app.
+
 ## TestFlight
 
 Testers must only ever have the latest build. That is not optional.
@@ -26,7 +30,7 @@ When CI archives fail with `Choose a certificate to revoke. Your account has rea
 
 Do not expire older builds until the new one is installable **and** every emailed tester has a live invite. `latest-only` must fail if anyone is still `REVOKED` or `NOT_INVITED`.
 
-Apple will not replace a binary already on an iPad. After a new invite, the tester must accept the email and install. Force-quit TestFlight if the old revoked page is still showing.
+Apple will not replace a binary already on a device (iPhone or iPad). After a new invite, the tester must accept the email and install. Force-quit TestFlight if the old revoked page is still showing.
 
 GitHub’s TestFlight workflow **#5** is the 21 August upload of `e64d5ef` (typing gestures). Slack/GitHub “TestFlight #5 / e64d5ef / cursor bot” is that old run, not a new one. Check `gh run list --workflow=testflight.yml` for the live run number and SHA.
 

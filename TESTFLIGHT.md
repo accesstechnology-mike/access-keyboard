@@ -1,6 +1,6 @@
 # TestFlight, step by step
 
-This is an iPad-only keyboard (`access: keyboard`). Archive the **AccessKeyboard** scheme. That already embeds `AccessKeyboardExtension`. You cannot do the upload from Linux; the last mile is Xcode on a Mac signed into team `A688GUK8XK` (Access Technology North Limited).
+This is a universal keyboard (`access: keyboard`) that runs on **iPhone and iPad** (iOS/iPadOS 18). Archive the **AccessKeyboard** scheme. That already embeds `AccessKeyboardExtension`. You cannot do the upload from Linux; the last mile is Xcode on a Mac signed into team `A688GUK8XK` (Access Technology North Limited).
 
 Debug and Release builds call the live Fix proxy at `https://access-keyboard.vercel.app/api/fix`. Both send `Authorization: Bearer` with `AK_FIX_PROXY_SECRET`. That value is not in git: copy `Secrets.xcconfig.example` to `Secrets.xcconfig`, and put the same string in Vercel as `FIX_PROXY_SECRET` (Production and Preview). GitHub deploys do not wipe Vercel env vars. Do not enable Vercel Authentication; the keyboard cannot log in.
 
@@ -38,7 +38,7 @@ On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.key
 6. SKU: use the bundle ID (`app.access.keyboard.6M3Z27M69P`) unless you already have a SKU scheme.
 7. User Access: Full Access.
 
-This app is **iPad only** (`TARGETED_DEVICE_FAMILY = 2`) and needs **iPadOS 18.0**. Do not add iPhone in App Store Connect.
+This app is **universal** (`TARGETED_DEVICE_FAMILY = "1,2"`, iPhone + iPad) and needs **iOS/iPadOS 18.0**. In App Store Connect, leave device availability set so **both iPhone and iPad** are offered the build — if the app was previously created as iPad-only, an admin (Mike) must flip iPhone availability on for the app in App Store Connect after the first universal binary is uploaded, or iPhone testers will still see "no builds available". The binary now supports both; ASC just has to advertise it.
 
 Export compliance is already answered in the project (`ITSAppUsesNonExemptEncryption = NO`). If App Store Connect still asks, choose **No**.
 
@@ -54,7 +54,7 @@ Use these only; they match the privacy manifests and the Fix proxy.
 | Used for tracking? | No |
 | Purpose | App Functionality |
 | When | Only if the tester taps **Fix** |
-| Third party? | Yes. The Release proxy at `https://access-keyboard.vercel.app/api/fix` forwards that field to OpenAI with `store` disabled. The proxy does not keep the text. Ordinary keystrokes stay on the iPad. |
+| Third party? | Yes. The Release proxy at `https://access-keyboard.vercel.app/api/fix` forwards that field to OpenAI with `store` disabled. The proxy does not keep the text. Ordinary keystrokes stay on the device. |
 | Colour settings / predictions | On-device only (App Group + UserDefaults) |
 
 Internal TestFlight does not need a public privacy-policy URL. External testers / App Review will. After you deploy `proxy/public/privacy.html`, the URL is `https://access-keyboard.vercel.app/privacy.html`.
@@ -82,7 +82,7 @@ Internal testers skip Beta App Review. They must be Users in App Store Connect (
 2. Add **every** App Store Connect user who should test, including the developer/test Apple ID. Being an Admin does not put that Apple ID in the group. A first-build email invite is a per-build invite; it will not follow later uploads.
 3. Turn on **Automatically Distribute Builds**. Do not add a specific old build. Uploads wait until the new build is installable, put every existing tester in the internal groups and on that build, then expire older builds.
 
-Each person installs **TestFlight** from the App Store on an **iPad running iPadOS 18**, accepts the invite, and installs `access: keyboard`. An iPhone will not be offered the build.
+Each person installs **TestFlight** from the App Store on an **iPhone or iPad running iOS/iPadOS 18**, accepts the invite, and installs `access: keyboard`. Both device families are offered the build once ASC advertises iPhone availability (see §2).
 
 Every upload assigns the latest build to every group and expires the rest. There is no opt-in. **Actions → TestFlight → Run workflow** does the same for the build already in App Store Connect, without cutting a new archive. Testers who still have an old install must open TestFlight and tap Update; Apple cannot replace an already-installed binary by itself.
 
@@ -141,15 +141,15 @@ Doing it by hand in App Store Connect instead:
 Paste this into the TestFlight group:
 
 ```
-iPad + iPadOS 18 only. iPhone will not install this build.
+iPhone or iPad on iOS/iPadOS 18. The keyboard adapts: a compact single-column board on iPhone, the larger multi-column board on iPad.
 
-1. Open access: keyboard. Type on the Type screen. Confirm the layout matches a normal iPad keyboard, including the globe key. Keys should be larger than a stock iPad board, and letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the space bar should move the cursor.
+1. Open access: keyboard. Type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
 2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. Undo should restore the original. Password fields must not send text.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
 4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too.
 5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on).
 
-Full Access is required for colour settings and Fix outside this app. Keystrokes stay on the iPad. Fix sends only the current field to https://access-keyboard.vercel.app/api/fix.
+Full Access is required for colour settings and Fix outside this app. Keystrokes stay on the device. Fix sends only the current field to https://access-keyboard.vercel.app/api/fix.
 ```
 
 ## Beta review notes
@@ -157,7 +157,7 @@ Full Access is required for colour settings and Fix outside this app. Keystrokes
 Paste this into the Beta App Review notes:
 
 ```
-This is an assistive iPad keyboard. There is no account or login.
+This is an assistive keyboard for iPhone and iPad. There is no account or login.
 
 The keyboard will not appear in other apps until the reviewer adds it:
 Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
