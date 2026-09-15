@@ -7,7 +7,7 @@ struct SetupView: View {
                 Text("Use this keyboard in every app")
                     .font(.title2.weight(.semibold))
 
-                Text("iPadOS only lets a custom keyboard run after you add it in Settings. The keyboard inside this app works immediately; these steps turn it on system-wide.")
+                Text("iOS and iPadOS only let a custom keyboard run after you add it in Settings. The keyboard inside this app works immediately; these steps turn it on system-wide.")
                     .foregroundStyle(.secondary)
 
                 step(1, title: "Open Settings", detail: "Settings → General → Keyboard → Keyboards.")
@@ -15,12 +15,12 @@ struct SetupView: View {
                 step(3, title: "Allow Full Access", detail: "Open access: keyboard in that list and turn on Allow Full Access. Colour settings need it so the extension sees the same choice. Fix needs it to reach the correction service. Typing keys stay on this device; tapping Fix sends the current field to the proxy.")
                 step(4, title: "Switch to it", detail: "In any text field, tap the globe key until you see access: keyboard.")
 
-                Text("iPadOS does not let an app open the keyboard list for you. You have to add it in Settings yourself — that’s an Apple restriction, not a missing feature.")
+                Text("iOS and iPadOS do not let an app open the keyboard list for you. You have to add it in Settings yourself — that’s an Apple restriction, not a missing feature.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
 
-                Text("On a physical iPad the app and keyboard must be signed with the same development team so they can share an App Group.")
+                Text("On a physical iPhone or iPad the app and keyboard must be signed with the same development team so they can share an App Group.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

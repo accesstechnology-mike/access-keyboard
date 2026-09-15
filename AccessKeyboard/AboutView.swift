@@ -23,14 +23,14 @@ struct AboutView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("access: keyboard, from access: technology")
 
-                Text("An assistive iPad keyboard that starts from the standard iPadOS layout, especially the large iPad Pro board. Extra tools come later without throwing away the layout you already know. ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional; QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on.")
+                Text("An assistive keyboard for iPhone and iPad that starts from the standard iOS/iPadOS layout, adapting from a compact board on iPhone up to the large iPad Pro board. Extra tools come later without throwing away the layout you already know. ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional; QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on.")
                     .foregroundStyle(.secondary)
 
                 Group {
                     labeled("Who it’s for", "People who need a keyboard they can extend — motor, cognitive, vision, or other access needs — without learning a new key map first.")
                     labeled("Privacy", privacyText)
                     labeled("VoiceOver", "Every key is a keyboard accessibility element with a spoken label (Shift, Delete, Next Keyboard, and so on).")
-                    labeled("What matches iPadOS", "Size-class layouts (compact, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space period, hold-delete that moves from letters to words, two-finger cursor movement on the space bar, and the globe key Apple requires.")
+                    labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space period, hold-delete that moves from letters to words, two-finger cursor movement on the space bar, and the globe key Apple requires.")
                 }
             }
             .padding(24)
