@@ -155,10 +155,10 @@ def check_project() -> None:
         note(f"bundle identifiers are {BUNDLE_ID} and {EXTENSION_BUNDLE_ID}")
 
     families = {quoted(v) for v in setting_values(pbxproj, "TARGETED_DEVICE_FAMILY")}
-    if families != {"2"}:
-        error(f"TARGETED_DEVICE_FAMILY is {sorted(families)}; testers need iPad-only")
+    if families != {"1,2"}:
+        error(f"TARGETED_DEVICE_FAMILY is {sorted(families)}; testers need universal 1,2 (iPhone + iPad)")
     else:
-        note("device family is iPad only")
+        note("device family is universal (iPhone + iPad)")
 
     encryption = {
         quoted(v) for v in setting_values(pbxproj, "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption")
