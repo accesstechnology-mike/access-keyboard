@@ -203,11 +203,13 @@ final class LayoutStabilityTests: XCTestCase {
             let context = "class=\(layoutClass)"
 
             XCTAssertTrue(board.leftDocked, "frequency board must be left-docked: \(context)")
-            XCTAssertEqual(board.rows.count, 5, "4 letter rows + 1 function row: \(context)")
+            XCTAssertEqual(board.rows.count, 4, "four grid rows; the toolbar folds into the right block: \(context)")
 
-            // Space is the first cell (top-left); Shift is the last letter cell.
+            // Space is the first cell (top-left); Shift closes the letter block
+            // (index 6, after the six bottom-row letters) with utility keys
+            // following it to the right.
             XCTAssertEqual(board.rows.first?.keys.first?.action, .space, "Space must be top-left: \(context)")
-            XCTAssertEqual(board.rows[3].keys.last?.action, .shift, "Shift must end the last letter row: \(context)")
+            XCTAssertEqual(board.rows[3].keys[6].action, .shift, "Shift must end the letter block: \(context)")
 
             // Letter order matches the approved mockup, row by row.
             XCTAssertEqual(rowLetters(board.rows[0]), "earduw", context)
