@@ -315,6 +315,103 @@ final class LayoutStabilityTests: XCTestCase {
         XCTAssertFalse(alpha.hasSameStructure(as: nil))
     }
 
+    // MARK: - Compact boards fit iPhone widths (no overflow / broken bands)
+
+    /// The compact class is what an iPhone gets (LayoutClassResolver returns
+    /// `.compact` for the phone idiom). Every compact board — QWERTY, ABC, and
+    /// the left-docked Frequency grid, across all three modes — must lay out
+    /// entirely inside the usable width at real iPhone sizes, portrait and
+    /// landscape, with predictions shown or hidden. A key whose right edge spills
+    /// past the side inset would clip; this guards against that regression as new
+    /// iPhone support lands.
+    func testCompactBoardsFitIPhoneWidths() {
+        // Portrait widths from the smallest supported iPhone (SE, 320pt) up to
+        // the largest Plus/Max (430pt), plus a couple of landscape widths (the
+        // phone idiom stays compact in landscape too).
+        let iPhoneWidths: [CGFloat] = [320, 360, 375, 390, 393, 402, 414, 428, 430, 667, 736, 844, 932]
+        let safeBottoms: [CGFloat] = [0, 34]
+
+        for width in iPhoneWidths {
+            for safeBottom in safeBottoms {
+                for mode in modes {
+                    for letterLayout in letterLayouts {
+                        for showsPredictions in [true, false] {
+                            let board = layout(
+                                mode: mode,
+                                shift: .off,
+                                layoutClass: .compact,
+                                letterLayout: letterLayout
+                            )
+                            let metrics = LayoutMetrics.metrics(
+                                for: .compact,
+                                bounds: CGSize(width: width, height: 320),
+                                safeBottom: safeBottom,
+                                rowCount: board.rows.count
+                            )
+                            let rows = KeyboardGeometry.frames(
+                                for: board,
+                                metrics: metrics,
+                                boundsWidth: width,
+                                showsPredictions: showsPredictions
+                            )
+                            let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(showsPredictions) safe=\(safeBottom)"
+                            let leftLimit = metrics.sideInset
+                            let rightLimit = width - metrics.sideInset
+                            for frames in rows {
+                                for frame in frames {
+                                    XCTAssertGreaterThan(frame.width, 0, "zero/negative key width: \(context)")
+                                    XCTAssertGreaterThanOrEqual(
+                                        frame.minX, leftLimit - 0.5,
+                                        "key starts left of the side inset: \(context)"
+                                    )
+                                    XCTAssertLessThanOrEqual(
+                                        frame.maxX, rightLimit + 0.5,
+                                        "key overflows the right edge: \(context)"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// A compact board must not leave a broken empty band: the non-docked
+    /// QWERTY/ABC pages should span the full usable width (their widest row
+    /// reaches both edges), and the left-docked Frequency grid must start flush
+    /// at the left inset. This catches layouts that collapse to a narrow strip.
+    func testCompactBoardsUseTheFullWidth() {
+        let width: CGFloat = 390
+        for mode in modes {
+            for letterLayout in letterLayouts {
+                let board = layout(mode: mode, shift: .off, layoutClass: .compact, letterLayout: letterLayout)
+                let metrics = LayoutMetrics.metrics(
+                    for: .compact,
+                    bounds: CGSize(width: width, height: 320),
+                    safeBottom: 0,
+                    rowCount: board.rows.count
+                )
+                let rows = KeyboardGeometry.frames(
+                    for: board,
+                    metrics: metrics,
+                    boundsWidth: width,
+                    showsPredictions: true
+                )
+                let context = "mode=\(mode) letters=\(letterLayout)"
+                let leftEdge = rows.compactMap { $0.first?.minX }.min() ?? 0
+                let rightEdge = rows.compactMap { $0.last?.maxX }.max() ?? 0
+                XCTAssertLessThanOrEqual(leftEdge, metrics.sideInset + 0.5, "board not flush left: \(context)")
+                // The widest row should reach close to the right inset — allow a
+                // little slack for centring and inter-key gaps.
+                XCTAssertGreaterThan(
+                    rightEdge, width - metrics.sideInset - metrics.keyHeight,
+                    "board leaves a broken empty band on the right: \(context)"
+                )
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func layout(
