@@ -1227,8 +1227,9 @@ CERTIFICATE_FIELDS = (
 )
 # Development certificate types that consume the Apple Development cert cap and
 # therefore block Automatic signing once the account is full. This is an
-# iPad-only app, so the iOS/Apple Development types are what matter; Mac
-# development certs are included because they share the same development pool.
+# universal iPhone + iPad app, so the iOS/Apple Development types are what
+# matter; Mac development certs are included because they share the same
+# development pool.
 DEVELOPMENT_CERT_TYPES = frozenset(
     {"DEVELOPMENT", "IOS_DEVELOPMENT", "MAC_APP_DEVELOPMENT"}
 )
