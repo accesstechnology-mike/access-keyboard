@@ -19,7 +19,7 @@ struct SettingsView: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("QWERTY is the standard iPad board. ABC keeps that frame and spells the alphabet in order. Frequency uses a Smartbox-style grid order docked to the left of the keyboard for glide and switch scanning, with Space in the top-left and Shift in the bottom-right.")
+                    Text("QWERTY is the standard keyboard board. ABC keeps that frame and spells the alphabet in order. Frequency uses a Smartbox-style grid order docked to the left of the keyboard for glide and switch scanning, with Space in the top-left and Shift in the bottom-right.")
                     Link(
                         "ACE Centre switch-scanning frequency analysis",
                         destination: URL(string: "https://acecentre.org.uk/projects/switch-scanning-frequency-analysis")!
@@ -35,7 +35,7 @@ struct SettingsView: View {
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("System keeps the ordinary iPad key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Beth uses Beth Moulam’s synesthetic colours. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black.")
+                    Text("System keeps the ordinary system key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Beth uses Beth Moulam’s synesthetic colours. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black.")
                     Link(
                         "Beth’s article on synaesthesia",
                         destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
@@ -55,7 +55,7 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("To use these settings or Fix in other apps, iPadOS still requires Settings → General → Keyboard → Keyboards → access: keyboard → Allow Full Access.")
+                Text("To use these settings or Fix in other apps, iOS and iPadOS still require Settings → General → Keyboard → Keyboards → access: keyboard → Allow Full Access.")
                 if !extensionHasFullAccess {
                     Text("The system-wide keyboard has not reported Full Access yet, so it will not see these settings or Fix until that switch is on. The Type screen in this app can Fix without that switch.")
                 }
