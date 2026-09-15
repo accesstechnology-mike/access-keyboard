@@ -301,19 +301,26 @@ public enum LayoutFactory {
         }
     }
 
-    // MARK: - Frequency (mockup v3: left-docked Smartbox block)
+    // MARK: - Frequency (left-docked Smartbox block + right-hand utility grid)
 
-    /// Builds the frequency board to match approved mockup v3: a Smartbox/Grid
-    /// letter order (`Space earduw / toilfyj / nsmpbxk / hcgvqz` + Shift) laid
-    /// out as an equal-column block that is docked to the LEFT edge of the
-    /// canvas rather than floated/centred. Left-docking keeps the scan origin at
-    /// the top-left and leaves the right-hand area empty, which is what
-    /// glide/cursor and switch scanners expect. `Space` is the first cell
-    /// (top-left) and `Shift` is the last cell (bottom-right); the essential
-    /// function keys (123, globe, backspace, return, hide) sit in one left-
-    /// aligned row beneath the letter block. The owning layout is marked
-    /// `leftDocked` so the view lays every row flush-left with square keys
-    /// instead of stretching to fill the width.
+    /// Builds the frequency board as a single dense grid: a left-docked
+    /// Smartbox/Grid letter block (`Space earduw / toilfyj / nsmpbxk / hcgvqz`
+    /// + Shift) with a utility block of function keys and symbols filling the
+    /// space to its RIGHT, instead of leaving that area empty (Mike's ask —
+    /// the earlier mockup-v3 board wasted the whole right-hand side and needed a
+    /// separate toolbar row underneath).
+    ///
+    /// The letters keep their exact positions and left-docking so glide/cursor
+    /// and switch scanners still start top-left and scan the familiar block;
+    /// `Space` stays the top-left cell and `Shift` stays at the end of the
+    /// letter block. The function keys (backspace, return, 123, globe, hide)
+    /// are grouped in the column immediately right of the letters — the next
+    /// cells a left-to-right scan reaches — and common punctuation fills the
+    /// remaining cells so every column of the board does useful work. Folding
+    /// the old toolbar into this block also drops a whole row, reclaiming
+    /// vertical space and making the keys taller. The layout is marked
+    /// `leftDocked` so the view keeps square keys flush-left rather than
+    /// stretching them across the width.
     private static func frequencyRows(
         shift: ShiftState,
         needsGlobe: Bool,
@@ -322,6 +329,13 @@ public enum LayoutFactory {
     ) -> [KeyboardRow] {
         let compact = layoutClass == .compact
         let letterRows = LetterMaps.frequencyLetterRows()
+        let rightCells = frequencyRightCells(
+            rowCount: letterRows.count,
+            columns: frequencyRightColumnCount(for: layoutClass),
+            needsGlobe: needsGlobe,
+            returnKeyType: returnKeyType,
+            compact: compact
+        )
 
         var rows: [KeyboardRow] = []
         for (index, letterRow) in letterRows.enumerated() {
@@ -333,40 +347,85 @@ public enum LayoutFactory {
             if index == letterRows.count - 1 {
                 keys.append(shiftKey(compact: compact, shift: shift, width: .unit(1)))
             }
+            keys += rightCells[index]
             rows.append(KeyboardRow(keys: keys))
         }
-        rows.append(KeyboardRow(keys: frequencyToolbar(
-            needsGlobe: needsGlobe,
-            returnKeyType: returnKeyType,
-            compact: compact
-        )))
         return rows
     }
 
     /// A labelled Space key sized like a letter cell, for the frequency grid's
-    /// top-left position in mockup v3.
+    /// top-left position.
     private static func spaceCell() -> KeySpec {
         KeySpec(action: .space, display: .text("Space"), width: .unit(1), style: .space)
     }
 
-    private static func frequencyToolbar(
+    /// How many utility columns sit to the right of the frequency letter block.
+    /// Wider size classes get one more so more of the extra width is used.
+    private static func frequencyRightColumnCount(for layoutClass: LayoutClass) -> Int {
+        switch layoutClass {
+        case .compact: return 3
+        case .iPad: return 3
+        case .iPadPro: return 4
+        }
+    }
+
+    /// The utility block that fills the space to the right of the letters: a
+    /// `rowCount × columns` rectangle of function keys and symbols, returned one
+    /// key array per letter row. Function keys are laid down the first column
+    /// (nearest the letters, so a left-to-right scan reaches them first); any
+    /// that overflow are tucked into the bottom-right corner, and every other
+    /// cell is a common punctuation key so no cell is wasted.
+    private static func frequencyRightCells(
+        rowCount: Int,
+        columns: Int,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
         compact: Bool
-    ) -> [KeySpec] {
-        // Function keys only; Space lives in the letter grid now. No flexible
-        // key, so the row stays left-docked in line with the block above.
-        var keys: [KeySpec] = [modeKey("123", .numeric, width: .unit(1))]
+    ) -> [[KeySpec]] {
+        var functions: [KeySpec] = [
+            backspace(compact: compact, width: .unit(1)),
+            returnKey(returnKeyType, compact: compact, width: .unit(1)),
+            modeKey("123", .numeric, width: .unit(1))
+        ]
         if needsGlobe {
-            keys.append(globe(width: .unit(1)))
+            functions.append(globe(width: .unit(1)))
         }
-        keys.append(backspace(compact: compact, width: .unit(1)))
-        keys.append(returnKey(returnKeyType, compact: compact, width: .unit(1.4)))
         if !compact {
-            keys.append(dismissKey())
+            functions.append(dismissKey(width: .unit(1)))
         }
-        return keys
+
+        let total = rowCount * columns
+        var grid: [KeySpec?] = Array(repeating: nil, count: total)
+
+        // First utility column holds up to `rowCount` function keys.
+        let firstColumnCount = min(functions.count, rowCount)
+        for row in 0..<firstColumnCount {
+            grid[row * columns] = functions[row]
+        }
+        // Any remaining function keys fill from the bottom-right corner back.
+        var tail = total - 1
+        for index in rowCount..<functions.count {
+            grid[tail] = functions[index]
+            tail -= 1
+        }
+        // Punctuation fills every still-empty cell in reading order.
+        var symbolIndex = 0
+        for cell in 0..<total where grid[cell] == nil {
+            let symbol = frequencySymbols[symbolIndex % frequencySymbols.count]
+            grid[cell] = punctuation(symbol)
+            symbolIndex += 1
+        }
+
+        return (0..<rowCount).map { row in
+            Array(grid[(row * columns)..<((row + 1) * columns)].compactMap { $0 })
+        }
     }
+
+    /// Common punctuation used to fill the frequency board's right-hand cells,
+    /// most-used first.
+    private static let frequencySymbols = [
+        ".", ",", "?", "!", "'", "\"", "-", "@", ":", ";", "&", "/", "(", ")"
+    ]
 
     private static func iPadToolbar(mode: KeyboardMode, needsGlobe: Bool, pro: Bool) -> [KeySpec] {
         var keys: [KeySpec] = []
@@ -470,8 +529,8 @@ public enum LayoutFactory {
         KeySpec(action: .nextKeyboard, display: .symbol("globe"), width: width, style: .modifier)
     }
 
-    private static func dismissKey() -> KeySpec {
-        KeySpec(action: .dismissKeyboard, display: .symbol("keyboard.chevron.compact.down"), width: .unit(1.2), style: .modifier)
+    private static func dismissKey(width: KeyWidth = .unit(1.2)) -> KeySpec {
+        KeySpec(action: .dismissKeyboard, display: .symbol("keyboard.chevron.compact.down"), width: width, style: .modifier)
     }
 
     private static func undoKey() -> KeySpec {

@@ -31,8 +31,8 @@ final class AccessOptionsTests: XCTestCase {
     }
 
     func testFrequencyBoardUsesSmartboxGridOrder() {
-        // Approved mockup v3 uses the Smartbox/Grid order, not the old EARDU
-        // sequence. Space leads the first row; Shift ends the last letter row.
+        // The Smartbox/Grid letter order is unchanged by the right-hand utility
+        // block. Space leads the first row; Shift ends the last letter block.
         XCTAssertEqual(
             LetterMaps.frequencyLetterRows(),
             ["earduw", "toilfyj", "nsmpbxk", "hcgvqz"]
@@ -44,17 +44,21 @@ final class AccessOptionsTests: XCTestCase {
         )
 
         let layout = compact(.frequency)
-        XCTAssertEqual(layout.letterString(inRow: 0), "earduw")
-        XCTAssertEqual(layout.letterString(inRow: 1), "toilfyj")
-        XCTAssertEqual(layout.letterString(inRow: 2), "nsmpbxk")
-        XCTAssertEqual(layout.letterString(inRow: 3), "hcgvqz")
+        XCTAssertEqual(frequencyLetters(layout.rows[0]), "earduw")
+        XCTAssertEqual(frequencyLetters(layout.rows[1]), "toilfyj")
+        XCTAssertEqual(frequencyLetters(layout.rows[2]), "nsmpbxk")
+        XCTAssertEqual(frequencyLetters(layout.rows[3]), "hcgvqz")
         XCTAssertEqual(layout.rows.first?.keys.first?.action, .space, "Space is the top-left cell")
-        XCTAssertEqual(layout.rows[3].keys.last?.action, .shift, "Shift ends the last letter row")
+        // Shift closes the letter block (right after the six bottom letters),
+        // with the utility keys following it, not before it.
+        XCTAssertEqual(layout.rows[3].keys[6].action, .shift, "Shift ends the letter block")
     }
 
-    func testFrequencyBoardHasNoPeriodOnLetterPage() {
-        // Mockup v3 drops punctuation from the letter board; a period is reached
-        // through the 123 page instead.
+    func testFrequencyBoardPlacesSymbolsAndFunctionKeysRightOfLetters() {
+        // Mike's ask: reclaim the empty right-hand area by putting symbols and
+        // the function keys there. Each row's utility cells all sit to the right
+        // of the letter block, and the board is a single grid (no extra toolbar
+        // row underneath).
         for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
             let layout = LayoutFactory.layout(
                 mode: .alphabetic,
@@ -64,19 +68,34 @@ final class AccessOptionsTests: XCTestCase {
                 returnKeyType: .default,
                 letterLayout: .frequency
             )
-            let periods = layout.rows
-                .flatMap { $0.keys }
-                .filter { $0.action == .character(".") }
-            XCTAssertTrue(
-                periods.isEmpty,
-                "frequency letter board (\(layoutClass)) has no period; it lives on the 123 page"
-            )
+            let context = "\(layoutClass)"
+
+            XCTAssertEqual(layout.rows.count, 4, "board is four grid rows, no toolbar row (\(context))")
+
+            let keys = layout.rows.flatMap { $0.keys }
+            XCTAssertTrue(keys.contains { $0.action == .backspace }, "backspace on the board (\(context))")
+            XCTAssertTrue(keys.contains { $0.action == .returnKey }, "return on the board (\(context))")
+            XCTAssertTrue(keys.contains { $0.action == .setMode(.numeric) }, "123 on the board (\(context))")
+            XCTAssertTrue(keys.contains { $0.action == .character(".") }, "a period now lives on the board (\(context))")
+            XCTAssertTrue(keys.contains { $0.action == .character(",") }, "a comma now lives on the board (\(context))")
+
+            // Every function/symbol key sits strictly right of the letters in
+            // its row: the letter block is a contiguous run starting at index 0,
+            // and no letter appears after a utility key.
+            for row in layout.rows {
+                let lastLetter = row.keys.lastIndex { isLetterCell($0) } ?? -1
+                let firstUtility = row.keys.firstIndex { isUtilityCell($0) } ?? row.keys.count
+                XCTAssertLessThan(
+                    lastLetter, firstUtility,
+                    "utility keys must follow the letters, not interleave (\(context))"
+                )
+            }
         }
     }
 
-    func testFrequencyLetterColumnsAlignAndDockLeft() {
-        // The letter block is a clean rectangle (equal per-row width and count)
-        // and the whole board is docked to the left edge for scanners.
+    func testFrequencyBoardIsAFullLeftDockedGrid() {
+        // The whole board is a clean rectangle (equal per-row width and count)
+        // docked to the left edge for scanners — no wasted, ragged right side.
         for layoutClass in [LayoutClass.compact, .iPad, .iPadPro] {
             let layout = LayoutFactory.layout(
                 mode: .alphabetic,
@@ -87,15 +106,42 @@ final class AccessOptionsTests: XCTestCase {
                 letterLayout: .frequency
             )
             XCTAssertTrue(layout.leftDocked, "frequency board must be left-docked (\(layoutClass))")
-            let letterRows = layout.rows.filter { row in
-                row.keys.contains { $0.style == .letter }
-            }
-            let weights = letterRows.map { row in
+            let weights = layout.rows.map { row in
                 row.keys.reduce(CGFloat(0)) { $0 + self.weight(of: $1.width) }
             }
-            let counts = letterRows.map { $0.keys.count }
-            XCTAssertEqual(Set(weights).count, 1, "letter rows must share one width so columns align (\(layoutClass))")
-            XCTAssertEqual(Set(counts).count, 1, "letter rows must have the same key count so columns align (\(layoutClass))")
+            let counts = layout.rows.map { $0.keys.count }
+            XCTAssertEqual(Set(weights).count, 1, "rows must share one width so columns align (\(layoutClass))")
+            XCTAssertEqual(Set(counts).count, 1, "rows must have the same key count so columns align (\(layoutClass))")
+        }
+    }
+
+    /// The alphabetic letters in a row, in order, ignoring Space/Shift/symbols.
+    private func frequencyLetters(_ row: KeyboardRow) -> String {
+        String(row.keys.compactMap { spec -> Character? in
+            guard case .character(let value) = spec.action,
+                  value.count == 1,
+                  let character = value.lowercased().first,
+                  character.isLetter else { return nil }
+            return character
+        })
+    }
+
+    private func isLetterCell(_ spec: KeySpec) -> Bool {
+        if case .character(let value) = spec.action, value.count == 1, value.lowercased().first?.isLetter == true {
+            return true
+        }
+        return false
+    }
+
+    private func isUtilityCell(_ spec: KeySpec) -> Bool {
+        switch spec.action {
+        case .space, .shift:
+            return false
+        case .character(let value):
+            // Punctuation cells in the right-hand block count as utility.
+            return !(value.count == 1 && value.lowercased().first?.isLetter == true)
+        default:
+            return true
         }
     }
 
