@@ -176,6 +176,24 @@ final class AccessOptionsTests: XCTestCase {
         XCTAssertEqual(caps.rows[0].keys.first?.action, .character("A"))
     }
 
+    func testBethSchemeIsHiddenFromThePublicListUntilTheFlagIsOn() {
+        XCTAssertFalse(FeatureFlags.bethSchemeListed)
+        XCTAssertTrue(FeatureFlags.fixConsentRequired)
+        XCTAssertFalse(ColourOption.visibleCases().contains(.beth))
+        XCTAssertTrue(ColourOption.allCases.contains(.beth))
+        XCTAssertEqual(
+            ColourOption.visibleCases(bethListed: false).map(\.title),
+            ["System", "Coloured vowels", "Hi-contrast white", "Hi-contrast yellow"]
+        )
+        XCTAssertEqual(
+            ColourOption.visibleCases(bethListed: true).map(\.title),
+            ["System", "Coloured vowels", "Beth", "Hi-contrast white", "Hi-contrast yellow"]
+        )
+        XCTAssertEqual(ColourOption.beth.listedTitle(bethListed: false), "Custom colours")
+        XCTAssertEqual(ColourOption.beth.listedTitle(bethListed: true), "Beth")
+        XCTAssertNotNil(BethColorMap.fill(for: "a"))
+    }
+
     func testColourOptionsAreTheSimplifiedSet() {
         XCTAssertEqual(
             ColourOption.allCases.map(\.title),

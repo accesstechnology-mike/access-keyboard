@@ -1,9 +1,22 @@
 # access: keyboard
 
 An assistive custom keyboard for **iPhone and iPad** (iOS / iPadOS 18). It pairs
-a literacy font, an accessible colour scheme (including Beth Moulam's colours), a
-prediction bar, and an optional "Fix" that cleans up the current text field with
-a hosted proxy when Full Access is enabled.
+a literacy font, optional colour themes, a prediction bar that learns on the
+device, and an optional "Fix" that can correct the current text field through a
+hosted proxy. The keyboard still types with Full Access off and with no network.
+Fix sends text only when the user taps Fix, and only after they allow it when
+consent is required.
+
+## Feature flags
+
+Both switches are compile-time constants in
+`Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/FeatureFlags.swift`.
+Change the constant and ship a new build. They are not Settings toggles.
+
+| Constant | Default | Effect |
+| --- | --- | --- |
+| `FeatureFlags.fixConsentRequired` | `true` | The first Fix call shows Allow / Not now before any text is sent to OpenAI. Allow is remembered in the App Group and can be turned off under Settings → Allow Fix to send text. `false` sends on Fix without that step. |
+| `FeatureFlags.bethSchemeListed` | `false` | `false` hides that letter-colour scheme from the Settings list and from public copy. The colours stay in `BethColorMap`. Set `true` to list and name the scheme again. A device that already stored it keeps the colours under the neutral label "Custom colours" until the user picks another scheme. |
 
 ## Device support
 

@@ -35,6 +35,22 @@ public enum ColourOption: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Schemes shown in Settings. Beth stays in `allCases` so stored preferences
+    /// and the colour map still resolve, but it is omitted from the public list
+    /// unless `FeatureFlags.bethSchemeListed` is on.
+    public static func visibleCases(bethListed: Bool = FeatureFlags.bethSchemeListed) -> [ColourOption] {
+        allCases.filter { $0 != .beth || bethListed }
+    }
+
+    /// Name shown in the app. When the Beth scheme is hidden, a stored selection
+    /// still has a neutral label so the picker is not blank and does not use that name.
+    public func listedTitle(bethListed: Bool = FeatureFlags.bethSchemeListed) -> String {
+        if self == .beth, !bethListed {
+            return "Custom colours"
+        }
+        return title
+    }
+
     public var isHighContrast: Bool {
         switch self {
         case .highContrastWhite, .highContrastYellow:

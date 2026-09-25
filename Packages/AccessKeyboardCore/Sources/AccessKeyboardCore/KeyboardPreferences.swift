@@ -10,6 +10,7 @@ public enum KeyboardPreferences {
     public static let letterLayoutKey = "letterLayout"
     public static let colourOptionKey = "colourOption"
     public static let extensionHasFullAccessKey = "extensionHasFullAccess"
+    public static let fixConsentGrantedKey = "fixConsentGranted"
 
     static let legacyKeyColouringKey = "keyColouring"
     static let legacyContrastThemeKey = "contrastTheme"
@@ -22,7 +23,7 @@ public enum KeyboardPreferences {
 
     public static var letterLayout: LetterLayout {
         get { value(LetterLayout.self, key: letterLayoutKey, default: .qwerty) }
-        set { set(newValue.rawValue, forKey: letterLayoutKey) }
+        set { write(newValue.rawValue, forKey: letterLayoutKey) }
     }
 
     public static var colourOption: ColourOption {
@@ -48,6 +49,14 @@ public enum KeyboardPreferences {
     public static var extensionHasFullAccess: Bool {
         get { suite.bool(forKey: extensionHasFullAccessKey) }
         set { suite.set(newValue, forKey: extensionHasFullAccessKey) }
+    }
+
+    /// One-time Allow for Fix. Stored in the App Group so the keyboard and the
+    /// containing app see the same choice. Revoking it in Settings makes the
+    /// next Fix ask again when consent is required.
+    public static var fixConsentGranted: Bool {
+        get { suite.bool(forKey: fixConsentGrantedKey) }
+        set { write(newValue, forKey: fixConsentGrantedKey) }
     }
 
     public static func persistMigratedColourOptionIfNeeded() {
@@ -110,7 +119,7 @@ public enum KeyboardPreferences {
         return value
     }
 
-    private static func set(_ value: Any, forKey key: String) {
+    private static func write(_ value: Any, forKey key: String) {
         suite.set(value, forKey: key)
         notify()
     }

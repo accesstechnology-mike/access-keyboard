@@ -28,13 +28,22 @@ public final class KeyboardEngine {
     public var onChange: (() -> Void)?
     public var onPredictionsChange: (() -> Void)?
     public var fixClient: (any FixClient)?
+    /// False in the keyboard extension until the user turns on Allow Full Access.
+    /// The extension also has no general network entitlement without that switch.
     public var networkAllowed: Bool = false
+    /// When false, the engine does not read the shared App Group (no Full Access).
+    public var sharedPreferencesAvailable: Bool = true
     public private(set) var fixStatus: FixStatus = .idle
+    public private(set) var fixNotice: FixNotice = .none
+    /// Build-time switch. Tests can override this without editing `FeatureFlags`.
+    public var fixConsentRequired: Bool = FeatureFlags.fixConsentRequired
+    public var fixConsentIsGranted: () -> Bool = { KeyboardPreferences.fixConsentGranted }
+    public var recordFixConsent: (Bool) -> Void = { KeyboardPreferences.fixConsentGranted = $0 }
 
     private var undoStack: [UndoRecord] = []
     private var redoStack: [UndoRecord] = []
     private var lastShiftTap: TimeInterval = 0
-    private let memory: PredictionMemory
+    private var memory: PredictionMemory
 
     public convenience init() {
         self.init(memory: .shared)
@@ -54,6 +63,7 @@ public final class KeyboardEngine {
     }
 
     public func handle(_ action: KeyAction) {
+        dismissTransientFixNotice()
         switch action {
         case .character(let text):
             if text.contains(where: { $0.isPunctuation || $0.isNewline }) {
@@ -143,19 +153,29 @@ public final class KeyboardEngine {
     public func requestFix() {
         guard fixStatus != .running else { return }
         guard !traits.isSecureTextEntry else {
-            failFix()
+            presentFixNotice(.secureField)
             return
         }
-        guard networkAllowed, let client = fixClient else {
-            failFix()
-            return
-        }
-
         let original = currentDocumentText()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
+        // Full Access is what lets the extension open a network connection.
+        // Without it, Fix must not pretend to run and must not block typing.
+        guard networkAllowed else {
+            presentFixNotice(.fullAccess)
+            return
+        }
+        guard let client = fixClient else {
+            presentFixNotice(.unavailable)
+            return
+        }
+        if fixConsentRequired && !fixConsentIsGranted() {
+            presentFixNotice(.consent)
+            return
+        }
 
+        fixNotice = .none
         fixStatus = .running
         notify()
 
@@ -170,7 +190,23 @@ public final class KeyboardEngine {
         }
     }
 
+    public func allowFixConsentAndSend() {
+        recordFixConsent(true)
+        fixNotice = .none
+        requestFix()
+    }
+
+    public func declineFixConsent() {
+        fixNotice = .none
+        notify()
+    }
+
+    func usePredictionStore(sharedWithApp: Bool) {
+        memory = PredictionMemory.store(sharedWithApp: sharedWithApp)
+    }
+
     public func applyPrediction(_ prediction: Prediction) {
+        dismissTransientFixNotice()
         let before = document?.documentContextBeforeInput
         let prefix = currentWordPrefix()
         let previous = PredictionProvider.previousWord(in: before, currentPrefix: prefix)
@@ -195,7 +231,7 @@ public final class KeyboardEngine {
             layoutClass: layoutClass,
             needsInputModeSwitchKey: needsInputModeSwitchKey,
             returnKeyType: traits.returnKeyType,
-            letterLayout: KeyboardPreferences.letterLayout
+            letterLayout: sharedPreferencesAvailable ? KeyboardPreferences.letterLayout : .qwerty
         )
     }
 
@@ -350,10 +386,25 @@ public final class KeyboardEngine {
             + (document?.documentContextAfterInput ?? "")
     }
 
+    private func presentFixNotice(_ notice: FixNotice) {
+        fixNotice = notice
+        fixStatus = .idle
+        notify()
+        if !notice.message.isEmpty {
+            UIAccessibility.post(notification: .announcement, argument: notice.message)
+        }
+    }
+
+    private func dismissTransientFixNotice() {
+        guard fixNotice.isTransient else { return }
+        fixNotice = .none
+    }
+
     private func failFix() {
         fixStatus = .failed
+        fixNotice = .offline
         notify()
-        UIAccessibility.post(notification: .announcement, argument: "Fix failed")
+        UIAccessibility.post(notification: .announcement, argument: FixNotice.offline.message)
     }
 
     private func applyAutocapitalization() {

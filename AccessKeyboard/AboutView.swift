@@ -23,14 +23,14 @@ struct AboutView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("access: keyboard, from access: technology")
 
-                Text("An assistive keyboard for iPhone and iPad that starts from the standard iOS/iPadOS layout, adapting from a compact board on iPhone up to the large iPad Pro board. Extra tools come later without throwing away the layout you already know. ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional; QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on.")
+                Text(summary)
                     .foregroundStyle(.secondary)
 
                 Group {
                     labeled("Who it’s for", "People who need a keyboard they can extend — motor, cognitive, vision, or other access needs — without learning a new key map first.")
                     labeled("Privacy", privacyText)
                     labeled("VoiceOver", "Every key is a keyboard accessibility element with a spoken label (Shift, Delete, Next Keyboard, and so on).")
-                    labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space period, hold-delete that moves from letters to words, two-finger cursor movement on the space bar, and the globe key Apple requires.")
+                    labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space period, hold-delete that moves from letters to words, two-finger cursor movement anywhere on the keyboard, and the globe key Apple requires.")
                 }
             }
             .padding(24)
@@ -38,8 +38,20 @@ struct AboutView: View {
         }
     }
 
+    private var summary: String {
+        let schemes = FeatureFlags.bethSchemeListed
+            ? "ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional"
+            : "ABC, frequency, coloured vowels, and hi-contrast themes are optional"
+        return "An assistive keyboard for iPhone and iPad that starts from the standard iOS/iPadOS layout, adapting from a compact board on iPhone up to the large iPad Pro board. Extra tools come later without throwing away the layout you already know. \(schemes); QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on."
+    }
+
     private var privacyText: String {
-        var text = "Full Access is requested so layout and colour settings can be shared with the keyboard extension, and so Fix can call the correction proxy. Keystrokes stay on this device. Tapping Fix sends the current field’s text to that proxy and does not store it there."
+        var text = "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and on-device learned predictions (PredictionMemory in the shared App Group) be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device."
+        if FeatureFlags.fixConsentRequired {
+            text += " Tapping Fix asks once before sending this field’s text to that proxy, which forwards it to OpenAI and does not store it. You can turn that off in Settings."
+        } else {
+            text += " Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI and does not store it."
+        }
         if let endpoint = URLSessionFixClient.configuredEndpointString() {
             text += " This build’s proxy is \(endpoint)."
         }

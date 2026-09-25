@@ -9,6 +9,17 @@ struct SettingsView: View {
 
     @State private var extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
 
+    @AppStorage(KeyboardPreferences.fixConsentGrantedKey, store: KeyboardPreferences.suite)
+    private var fixConsentGranted = false
+
+    private var colourChoices: [ColourOption] {
+        var choices = ColourOption.visibleCases()
+        if let current = ColourOption(rawValue: colourOptionRaw), !choices.contains(current) {
+            choices.append(current)
+        }
+        return choices
+    }
+
     var body: some View {
         List {
             Section {
@@ -29,17 +40,19 @@ struct SettingsView: View {
 
             Section {
                 Picker("Colours", selection: $colourOptionRaw) {
-                    ForEach(ColourOption.allCases) { value in
-                        Text(value.title).tag(value.rawValue)
+                    ForEach(colourChoices) { value in
+                        Text(value.listedTitle()).tag(value.rawValue)
                     }
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("System keeps the ordinary system key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Beth uses Beth Moulam’s synesthetic colours. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black.")
-                    Link(
-                        "Beth’s article on synaesthesia",
-                        destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
-                    )
+                    Text(colourFooter)
+                    if FeatureFlags.bethSchemeListed {
+                        Link(
+                            "Beth’s article on synaesthesia",
+                            destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
+                        )
+                    }
                 }
             }
 
@@ -47,17 +60,25 @@ struct SettingsView: View {
                 Text("Fix sits on the suggestion bar. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent.")
+                    Text(fixFooter)
                     if let endpoint = URLSessionFixClient.configuredEndpointString() {
                         Text("This build calls \(endpoint).")
                     }
                 }
             }
 
+            if FeatureFlags.fixConsentRequired {
+                Section {
+                    Toggle("Allow Fix to send text", isOn: $fixConsentGranted)
+                } footer: {
+                    Text("Fix sends the current text field to OpenAI to correct it. Turn this off to stop that. The next Fix will ask again. Password fields are never sent.")
+                }
+            }
+
             Section {
-                Text("To use these settings or Fix in other apps, iOS and iPadOS still require Settings → General → Keyboard → Keyboards → access: keyboard → Allow Full Access.")
+                Text("The keyboard still types in other apps with Full Access off and with no network. Allow Full Access to share colour and layout settings and on-device learned predictions, and to let Fix reach the correction service.")
                 if !extensionHasFullAccess {
-                    Text("The system-wide keyboard has not reported Full Access yet, so it will not see these settings or Fix until that switch is on. The Type screen in this app can Fix without that switch.")
+                    Text("The system keyboard has not reported Full Access, so it keeps its own colours and its own learned words. Fix explains that and does not send text. The Type screen in this app can still Fix.")
                 }
             }
         }
@@ -74,6 +95,24 @@ struct SettingsView: View {
                 KeyboardPreferences.notify()
             }
         }
+        .onChange(of: fixConsentGranted) { _, _ in
+            KeyboardPreferences.notify()
+        }
+    }
+
+    private var colourFooter: String {
+        var text = "System keeps the ordinary system key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black."
+        if FeatureFlags.bethSchemeListed {
+            text += " Beth uses Beth Moulam’s synesthetic colours."
+        }
+        return text
+    }
+
+    private var fixFooter: String {
+        if FeatureFlags.fixConsentRequired {
+            return "Tapping Fix sends that field’s text to OpenAI through the correction proxy, and only after you allow it. Ordinary keystrokes are not sent."
+        }
+        return "Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent."
     }
 }
 

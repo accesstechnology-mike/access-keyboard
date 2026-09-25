@@ -144,12 +144,12 @@ Paste this into the TestFlight group:
 iPhone or iPad on iOS/iPadOS 18. The keyboard adapts: a compact single-column board on iPhone, the larger multi-column board on iPad.
 
 1. Open access: keyboard. Type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
-2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. Undo should restore the original. Password fields must not send text.
+2. Settings → Colours → Coloured vowels. Vowels, consonants, numbers, and punctuation take their colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. The first Fix asks before sending the field; Allow sends it, Not now does not. Undo should restore the original. Password fields must not send text. With Full Access off, typing still works and Fix explains that it needs Full Access.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
 4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too.
 5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on).
 
-Full Access is required for colour settings and Fix outside this app. Keystrokes stay on the device. Fix sends only the current field to https://access-keyboard.vercel.app/api/fix.
+The keyboard still types with Full Access off. Full Access shares colour settings and on-device learned words, and lets Fix reach https://access-keyboard.vercel.app/api/fix. Keystrokes stay on the device. Fix sends only the current field, and only after you tap Allow.
 ```
 
 ## Beta review notes
@@ -161,15 +161,16 @@ This is an assistive keyboard for iPhone and iPad. There is no account or login.
 
 The keyboard will not appear in other apps until the reviewer adds it:
 Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
-Then open that keyboard and enable Allow Full Access.
 
-Full Access is required for two things only:
-1. Share colour settings with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
+The keyboard is fully usable with Allow Full Access turned off and with no network. Typing, layouts, and two-finger cursor movement anywhere on the keyboard do not need either. With Full Access off, Fix does not send text; it shows a short hint, and the keys stay usable.
+
+Full Access is optional and used for two things only:
+1. Share colour and layout settings, and on-device learned predictions (PredictionMemory), with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
 2. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
 
-Keystrokes are not sent off the device. Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI with store disabled and does not keep the text. Password fields are skipped.
+Keystrokes are not sent off the device. Tapping Fix sends the current field’s text only after the reviewer taps Allow. That choice can be turned off in the app’s Settings. The proxy forwards that field to OpenAI with store disabled and does not keep the text. Password fields are skipped. If there is no network, Fix shows a short hint and does not change the field.
 
-The in-app Type screen uses the same keyboard without Full Access, so you can test layout, colours, and Fix before enabling the system keyboard.
+The in-app Type screen uses the same keyboard, so layout, colours, and Fix can be tried before enabling the system keyboard.
 ```
 
 ## 4b. Upload from this repo
