@@ -61,6 +61,7 @@ final class KeyboardEngineLearningTests: XCTestCase {
         let memory = PredictionMemory(table: [:])
         let document = FakeDocument(text: "")
         let engine = KeyboardEngine(memory: memory)
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 
@@ -76,6 +77,7 @@ final class KeyboardEngineLearningTests: XCTestCase {
         let memory = PredictionMemory(table: [:])
         let document = FakeDocument(text: "please ")
         let engine = KeyboardEngine(memory: memory)
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 

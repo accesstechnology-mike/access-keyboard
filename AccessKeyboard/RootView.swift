@@ -1,7 +1,43 @@
+import AccessKeyboardCore
 import SwiftUI
 
 struct RootView: View {
+    @EnvironmentObject private var subscriptions: SubscriptionManager
+    @State private var showSubscription = false
+
+    private var needsSubscription: Bool {
+        SubscriptionConfig.keyboardRequiresSubscription
+            && !subscriptions.record.isActive(at: Date())
+    }
+
     var body: some View {
+        Group {
+            if needsSubscription {
+                PaywallView()
+            } else {
+                main
+            }
+        }
+        .onOpenURL { url in
+            guard url.scheme == SubscriptionConfig.urlScheme else { return }
+            if !needsSubscription {
+                showSubscription = true
+            }
+        }
+        .sheet(isPresented: $showSubscription) {
+            NavigationStack {
+                PaywallView()
+                    .navigationTitle("access: keyboard")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showSubscription = false }
+                        }
+                    }
+            }
+        }
+    }
+
+    private var main: some View {
         NavigationSplitView {
             List {
                 NavigationLink {
@@ -18,9 +54,9 @@ struct RootView: View {
                 }
                 NavigationLink {
                     PaywallView()
-                        .navigationTitle("Pro")
+                        .navigationTitle("Subscription")
                 } label: {
-                    Label("Pro", systemImage: "checkmark.seal")
+                    Label("Subscription", systemImage: "checkmark.seal")
                 }
                 NavigationLink {
                     SetupView()
@@ -54,4 +90,5 @@ struct TypingScreen: View {
 
 #Preview {
     RootView()
+        .environmentObject(SubscriptionManager())
 }

@@ -54,6 +54,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testDoubleSpaceInsertsAPeriod() {
         let document = FakeDocument(text: "Hello")
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 
@@ -66,6 +67,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testDoubleSpaceDoesNotConvertAfterPunctuation() {
         let document = FakeDocument(text: "Hello.")
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 
@@ -77,6 +79,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testHoldDeleteRemovesAWord() {
         let document = FakeDocument(text: "hello world")
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 
@@ -90,6 +93,7 @@ final class KeyboardEditingTests: XCTestCase {
         for keyboardType in [UIKeyboardType.URL, .webSearch, .emailAddress] {
             let document = FakeDocument(text: "")
             let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+            engine.entitleForTests()
             engine.document = document
             engine.traits = KeyboardTraits(
                 autocapitalizationType: .sentences,
@@ -109,6 +113,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testURLTextContentTypeSuppressesAutocapitalization() {
         let document = FakeDocument(text: "")
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits = KeyboardTraits(
             autocapitalizationType: .sentences,
@@ -122,6 +127,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testSentenceFieldStillAutocapitalizes() {
         let document = FakeDocument(text: "")
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits = KeyboardTraits(
             autocapitalizationType: .sentences,
@@ -134,6 +140,7 @@ final class KeyboardEditingTests: XCTestCase {
     func testTwoFingerCursorMovement() {
         let document = FakeDocument(text: "hello\nworld", cursor: 11)
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.entitleForTests()
         engine.document = document
         engine.traits.autocapitalizationType = .none
 

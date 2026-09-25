@@ -65,12 +65,12 @@
       "id" : "PRO",
       "localizations" : [
         {
-          "description" : "Fix for the current text field.",
-          "displayName" : "access: keyboard Pro",
+          "description" : "The access: keyboard subscription.",
+          "displayName" : "access: keyboard",
           "locale" : "en_GB"
         }
       ],
-      "name" : "access: keyboard Pro",
+      "name" : "access: keyboard",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -87,18 +87,18 @@
             "internalID" : "PROMONTHLYINTRO",
             "numberOfPeriods" : 1,
             "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
+            "subscriptionPeriod" : "P14D"
           },
           "localizations" : [
             {
-              "description" : "Fix, renewing every month. The introductory offer in this file is a simulator stand-in. App Store Connect chooses the real trial length.",
+              "description" : "access: keyboard, renewing every month. The 14-day introductory offer in this file matches the trial Mike sets in App Store Connect. The app reads the offer from StoreKit.",
               "displayName" : "Monthly",
               "locale" : "en_GB"
             }
           ],
           "productID" : "app.access.keyboard.6M3Z27M69P.pro.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Pro Monthly",
+          "referenceName" : "Monthly",
           "subscriptionGroupID" : "PRO",
           "type" : "RecurringSubscription"
         },
@@ -117,18 +117,18 @@
             "internalID" : "PROYEARLYINTRO",
             "numberOfPeriods" : 1,
             "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
+            "subscriptionPeriod" : "P14D"
           },
           "localizations" : [
             {
-              "description" : "Fix, renewing every year. The introductory offer in this file is a simulator stand-in. App Store Connect chooses the real trial length.",
+              "description" : "access: keyboard, renewing every year. The 14-day introductory offer in this file matches the trial Mike sets in App Store Connect. The app reads the offer from StoreKit.",
               "displayName" : "Yearly",
               "locale" : "en_GB"
             }
           ],
           "productID" : "app.access.keyboard.6M3Z27M69P.pro.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Pro Yearly",
+          "referenceName" : "Yearly",
           "subscriptionGroupID" : "PRO",
           "type" : "RecurringSubscription"
         }

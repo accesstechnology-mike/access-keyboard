@@ -29,6 +29,9 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         board.onPreferredHeightChange = { [weak self] in
             self?.updateHeight()
         }
+        board.onOpenContainingApp = { [weak self] in
+            self?.openContainingApp()
+        }
         board.engine.document = DocumentProxyAdapter(textDocumentProxy)
         board.engine.host = self
         board.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
@@ -45,8 +48,36 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         updateHeight()
     }
 
-    /// Full Access gates the shared prediction memory and the Fix network call.
-    /// Typing does not use either, so a denied switch leaves the keys working.
+    /// Opens the containing app on the paywall. Tries the extension context first,
+    /// then the responder chain. The keyboard never presents a purchase sheet.
+    private func openContainingApp() {
+        let url = SubscriptionConfig.paywallURL
+        guard let context = extensionContext else {
+            openURLThroughResponderChain(url)
+            return
+        }
+        context.open(url) { [weak self] opened in
+            guard !opened else { return }
+            DispatchQueue.main.async {
+                self?.openURLThroughResponderChain(url)
+            }
+        }
+    }
+
+    private func openURLThroughResponderChain(_ url: URL) {
+        var responder: UIResponder? = self
+        let selector = NSSelectorFromString("openURL:")
+        while let current = responder {
+            if current.responds(to: selector) {
+                _ = current.perform(selector, with: url)
+                return
+            }
+            responder = current.next
+        }
+    }
+
+    /// Full Access lets the extension read the subscription record, shared settings,
+    /// and the Fix network call. Without it the board stays on the locked panel.
     private func applyAccess() {
         keyboard.engine.sharedPreferencesAvailable = hasFullAccess
         keyboard.engine.networkAllowed = hasFullAccess

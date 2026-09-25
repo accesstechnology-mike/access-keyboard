@@ -66,9 +66,9 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("The keyboard still types in other apps with Full Access off and with no network. Allow Full Access to share colour and layout settings and on-device learned predictions, and to let Fix reach the correction service.")
+                Text(fullAccessSummary)
                 if !extensionHasFullAccess {
-                    Text("The system keyboard has not reported Full Access, so it keeps its own colours and its own learned words. Fix explains that and does not send text. The Type screen in this app can still Fix.")
+                    Text(fullAccessWarning)
                 }
             }
         }
@@ -90,12 +90,28 @@ struct SettingsView: View {
         }
     }
 
+    private var fullAccessSummary: String {
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            return "In other apps the keyboard stays locked until Allow Full Access is on, so it can see your subscription. The locked keyboard shows how to open this app and keeps a globe key that switches keyboards. Allow Full Access also shares colour and layout settings and on-device learned predictions, and lets Fix reach the correction service."
+        }
+        return "The keyboard still types in other apps with Full Access off and with no network. Allow Full Access to share colour and layout settings and on-device learned predictions, and to let Fix reach the correction service."
+    }
+
+    private var fullAccessWarning: String {
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            return "The system keyboard has not reported Full Access, so it cannot see your subscription and stays locked. The Type screen in this app can still be used."
+        }
+        return "The system keyboard has not reported Full Access, so it keeps its own colours and its own learned words. Fix explains that and does not send text. The Type screen in this app can still Fix."
+    }
+
     private var fixFooter: String {
         var text = FeatureFlags.fixConsentRequired
             ? "Tapping Fix sends that field’s text to OpenAI through the correction proxy, and only after you allow it. Ordinary keystrokes are not sent."
             : "Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent."
-        if SubscriptionConfig.fixRequiresSubscription {
-            text += " Fix is part of Pro."
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            text += " The keyboard, including Fix, requires a subscription."
+        } else if SubscriptionConfig.fixRequiresSubscription {
+            text += " Fix requires a subscription."
         }
         return text
     }

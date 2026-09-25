@@ -63,6 +63,7 @@ final class FixEngineTests: XCTestCase {
 
     func testTypingStillWorksWhenFixCannotRun() {
         let (engine, document) = makeEngine(text: "", network: false)
+        engine.keyboardRequiresSubscription = false
         engine.sharedPreferencesAvailable = false
         engine.fixClient = MockFixClient { _ in
             XCTFail("must not send")

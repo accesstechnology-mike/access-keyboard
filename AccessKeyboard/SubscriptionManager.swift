@@ -35,7 +35,7 @@ final class SubscriptionManager: ObservableObject {
                 let transaction = try verified(verification)
                 await transaction.finish()
                 await refreshEntitlements()
-                statusMessage = record.isActive(at: Date()) ? "Pro is active." : nil
+                statusMessage = record.isActive(at: Date()) ? "Your subscription is active." : nil
             case .userCancelled:
                 break
             case .pending:
@@ -58,7 +58,7 @@ final class SubscriptionManager: ObservableObject {
         }
         await refreshEntitlements()
         statusMessage = record.isActive(at: Date())
-            ? "Pro is active."
+            ? "Your subscription is active."
             : "No active subscription was found."
     }
 

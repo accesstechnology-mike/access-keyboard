@@ -9,28 +9,40 @@ import Foundation
 public enum SubscriptionConfig {
     public static let bundleID = "app.access.keyboard.6M3Z27M69P"
 
-    /// Name of the single auto-renewing subscription group.
-    public static let subscriptionGroupName = "access: keyboard Pro"
+    /// Name of the single auto-renewing subscription group. One offering, two prices.
+    public static let subscriptionGroupName = "access: keyboard"
 
     public static let monthlyProductID = "\(bundleID).pro.monthly"
     public static let yearlyProductID = "\(bundleID).pro.yearly"
 
     public static let productIDs: Set<String> = [monthlyProductID, yearlyProductID]
 
-    /// What is free and what requires Pro. One switch for the whole app.
-    /// The core keyboard stays usable without a subscription. Fix does not.
-    public static let monetization: KeyboardMonetization = .coreKeyboardFreeFixSubscribed
+    /// What the subscription covers. The default locks the whole keyboard, including Fix.
+    public static let monetization: KeyboardMonetization = .allSubscribed
+
+    public static var keyboardRequiresSubscription: Bool {
+        switch monetization {
+        case .allSubscribed:
+            return true
+        case .coreKeyboardFreeFixSubscribed:
+            return false
+        }
+    }
 
     public static var fixRequiresSubscription: Bool {
         switch monetization {
-        case .coreKeyboardFreeFixSubscribed:
+        case .allSubscribed, .coreKeyboardFreeFixSubscribed:
             return true
         }
     }
 
+    /// Opens the containing app on the paywall. The keyboard extension has no purchase UI.
+    public static let urlScheme = "accesskeyboard"
+    public static let paywallURL = URL(string: "\(urlScheme)://subscribe")!
+
     /// Paywall presentation only. `true` lets the paywall show a trial headline
     /// when StoreKit reports an introductory offer the user is eligible for.
-    /// It does not create a trial and it does not unlock Fix.
+    /// It does not create a trial and it does not unlock the keyboard.
     public static let showTrialHeadlineDefault = true
 
     /// Optional JSON on the existing site. Only `showTrialHeadline` is read.
@@ -42,8 +54,30 @@ public enum SubscriptionConfig {
 }
 
 public enum KeyboardMonetization: String, Sendable {
-    /// Typing, layouts, colours, and on-device predictions stay free. Fix requires an active subscription.
+    /// The keyboard, including Fix, requires an active subscription or introductory offer.
+    case allSubscribed
+    /// Typing stays free. Fix requires an active subscription.
     case coreKeyboardFreeFixSubscribed
+}
+
+public enum KeyboardLock {
+    public static let trialMessage = "Start your free trial in the access: keyboard app to use this keyboard."
+    public static let fullAccessMessage = "Turn on Allow Full Access so this keyboard can see your subscription."
+    public static let openAppButtonTitle = "Open access: keyboard"
+    public static let nextKeyboardTitle = "Next Keyboard"
+
+    public static func isLocked(requiresSubscription: Bool, canReadEntitlement: Bool, entitled: Bool) -> Bool {
+        guard requiresSubscription else { return false }
+        if !canReadEntitlement { return true }
+        return !entitled
+    }
+
+    public static func message(canReadEntitlement: Bool) -> String {
+        if canReadEntitlement {
+            return trialMessage
+        }
+        return trialMessage + " " + fullAccessMessage
+    }
 }
 
 /// What the paywall may say. Never an entitlement.

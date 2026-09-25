@@ -10,11 +10,11 @@ struct PaywallView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("access: keyboard Pro")
+                Text("access: keyboard")
                     .font(.largeTitle.bold())
                     .accessibilityAddTraits(.isHeader)
 
-                Text("The keyboard stays free to use. Pro adds Fix, which can correct the current text field after you allow it.")
+                Text("Subscribe to use the keyboard, including Fix. Monthly and yearly are two prices for the same keyboard. A free trial, when Apple offers one for your account, is shown on the plan.")
                     .font(.body)
 
                 if let headline = trialHeadline {
@@ -53,7 +53,7 @@ struct PaywallView: View {
                 actionButton("Restore Purchases") {
                     Task { await subscriptions.restore() }
                 }
-                .accessibilityHint("Checks your Apple ID for an existing Pro subscription")
+                .accessibilityHint("Checks your Apple ID for an existing subscription")
 
                 actionButton("Manage Subscriptions") {
                     Task { await manageSubscriptions() }
@@ -82,9 +82,9 @@ struct PaywallView: View {
 
     private var activeSummary: String {
         if let expires = subscriptions.record.expiresAt {
-            return "Pro is active until \(expires.formatted(date: .abbreviated, time: .shortened))."
+            return "Your subscription is active until \(expires.formatted(date: .abbreviated, time: .shortened))."
         }
-        return "Pro is active."
+        return "Your subscription is active."
     }
 
     private var renewalTerms: String {

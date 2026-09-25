@@ -40,10 +40,20 @@ public final class KeyboardEngine {
     public var fixConsentIsGranted: () -> Bool = { KeyboardPreferences.fixConsentGranted }
     public var recordFixConsent: (Bool) -> Void = { KeyboardPreferences.fixConsentGranted = $0 }
     /// From `SubscriptionConfig.monetization`. Tests can override the split.
+    public var keyboardRequiresSubscription: Bool = SubscriptionConfig.keyboardRequiresSubscription
     public var fixRequiresSubscription: Bool = SubscriptionConfig.fixRequiresSubscription
     /// Reads the App Group record written by the containing app. The extension never purchases.
     public var subscriptionIsActive: () -> Bool = {
         SubscriptionEntitlementStore.readShared().isActive(at: Date())
+    }
+
+    /// True when this build locks the keyboard and the extension cannot see an active subscription.
+    public var keyboardIsLocked: Bool {
+        KeyboardLock.isLocked(
+            requiresSubscription: keyboardRequiresSubscription,
+            canReadEntitlement: sharedPreferencesAvailable,
+            entitled: sharedPreferencesAvailable && subscriptionIsActive()
+        )
     }
 
     private var undoStack: [UndoRecord] = []
@@ -69,6 +79,12 @@ public final class KeyboardEngine {
     }
 
     public func handle(_ action: KeyAction) {
+        if keyboardIsLocked {
+            if case .nextKeyboard = action {
+                host?.advanceToNextInputMode()
+            }
+            return
+        }
         dismissTransientFixNotice()
         switch action {
         case .character(let text):
@@ -118,6 +134,7 @@ public final class KeyboardEngine {
     }
 
     public func continueBackspace(byWord: Bool) {
+        guard !keyboardIsLocked else { return }
         if byWord {
             deleteBackwardWord()
         } else {
@@ -128,6 +145,7 @@ public final class KeyboardEngine {
     }
 
     public func moveCursor(horizontal: Int, vertical: Int) {
+        guard !keyboardIsLocked else { return }
         let before = document?.documentContextBeforeInput ?? ""
         let after = document?.documentContextAfterInput ?? ""
         let offset = EditingShortcuts.cursorOffset(
@@ -224,6 +242,7 @@ public final class KeyboardEngine {
     }
 
     public func applyPrediction(_ prediction: Prediction) {
+        guard !keyboardIsLocked else { return }
         dismissTransientFixNotice()
         let before = document?.documentContextBeforeInput
         let prefix = currentWordPrefix()

@@ -31,7 +31,12 @@ struct SetupView: View {
     }
 
     private var setupFullAccessDetail: String {
-        var detail = "Open access: keyboard in that list and turn on Allow Full Access if you want colour settings and learned predictions to be shared, or if you want Fix to reach the correction service. The keyboard still types with Full Access off. Typing stays on this device."
+        var detail: String
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            detail = "Open access: keyboard in that list and turn on Allow Full Access. Other apps can only see your subscription through that switch. Without it, the keyboard stays locked, with a button back to this app and a globe key that switches keyboards."
+        } else {
+            detail = "Open access: keyboard in that list and turn on Allow Full Access if you want colour settings and learned predictions to be shared, or if you want Fix to reach the correction service. The keyboard still types with Full Access off. Typing stays on this device."
+        }
         if FeatureFlags.fixConsentRequired {
             detail += " Tapping Fix asks before it sends the current field, and you can turn that off in Settings."
         } else {
