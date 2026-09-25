@@ -246,6 +246,16 @@ def check_privacy_page() -> None:
         error("proxy/public/privacy.html does not name the live Fix URL")
     else:
         note("privacy page names the live Fix URL")
+    if "iPhone" not in text or "iPad" not in text:
+        error("privacy page must describe an iPhone and iPad keyboard")
+    if "assistive iPad keyboard" in text:
+        error("privacy page still says it is only an iPad keyboard")
+    if "PredictionMemory" not in text:
+        error("privacy page does not describe on-device PredictionMemory")
+    if "OpenAI" not in text:
+        error("privacy page does not say Fix forwards the field to OpenAI")
+    if "mike@accesstechnology.co.uk" not in text:
+        error("privacy page is missing the contact address")
 
 
 def check_live_proxy() -> None:

@@ -402,11 +402,17 @@ public enum LayoutFactory {
         for row in 0..<firstColumnCount {
             grid[row * columns] = functions[row]
         }
-        // Any remaining function keys fill from the bottom-right corner back.
-        var tail = total - 1
-        for index in rowCount..<functions.count {
-            grid[tail] = functions[index]
-            tail -= 1
+        // Extra function keys (more than one column's worth) fill from the
+        // bottom-right corner back. A compact board with no globe has fewer
+        // function keys than rows, and `rowCount..<count` traps when the
+        // upper bound is smaller, so only build that range when there is overflow.
+        if functions.count > rowCount {
+            var tail = total - 1
+            for index in rowCount..<functions.count {
+                guard tail >= 0 else { break }
+                grid[tail] = functions[index]
+                tail -= 1
+            }
         }
         // Punctuation fills every still-empty cell in reading order.
         var symbolIndex = 0

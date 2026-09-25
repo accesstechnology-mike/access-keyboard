@@ -21,6 +21,13 @@ final class PredictionMemoryTests: XCTestCase {
         super.tearDown()
     }
 
+    func testFullAccessOffUsesTheExtensionDefaultsNotTheAppGroup() {
+        XCTAssertTrue(PredictionMemory.defaults(sharedWithApp: false) === UserDefaults.standard)
+        let local = PredictionMemory(defaults: defaults, storageKey: "test.wordBigrams")
+        local.record(previous: "please", next: "help")
+        XCTAssertEqual(local.count(previous: "please", next: "help"), 1)
+    }
+
     func testRecordedBigramPersistsAcrossInstances() {
         let key = "test.wordBigrams"
         let first = PredictionMemory(defaults: defaults, storageKey: key)

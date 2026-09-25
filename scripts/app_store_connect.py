@@ -216,6 +216,23 @@ def tester_cannot_be_assigned(exc: ASCHTTPError) -> bool:
     return exc.code == 409 and "cannot be assigned" in exc.body.lower()
 
 
+def nonfatal_tester_assignment(exc: ASCHTTPError) -> str | None:
+    """Assignment results that must not fail an otherwise successful upload.
+
+    ``already`` is an existing relationship. ``cannot-assign`` is Apple's
+    409 ``Tester(s) cannot be assigned``, which internal Alpha returns for
+    testers who are not App Store Connect users (and sometimes for people
+    already on an auto-distribute group). Alpha still delivers every
+    unexpired build to members who do have a live invite, so this is a
+    warning. Any other HTTP error stays fatal.
+    """
+    if ignore_already_exists(exc):
+        return "already"
+    if tester_cannot_be_assigned(exc):
+        return "cannot-assign"
+    return None
+
+
 def tester_is_missing(exc: ASCHTTPError) -> bool:
     return exc.code == 404
 
@@ -796,8 +813,9 @@ def add_tester_to_group(token: str, group_id: str, tester_id: str) -> str:
         )
         return "added"
     except ASCHTTPError as exc:
-        if ignore_already_exists(exc):
-            return "already"
+        outcome = nonfatal_tester_assignment(exc)
+        if outcome:
+            return outcome
         raise
 
 
@@ -1025,7 +1043,16 @@ def assign_individual_testers(token: str, build_id: str, tester_ids: list[str]) 
             )
             added += 1
         except ASCHTTPError as exc:
-            if ignore_already_exists(exc):
+            outcome = nonfatal_tester_assignment(exc)
+            if outcome == "already":
+                continue
+            if outcome == "cannot-assign":
+                print(
+                    "WARNING individual tester "
+                    f"{tester_id} cannot be assigned "
+                    "(409 Tester(s) cannot be assigned). Continuing.",
+                    file=sys.stderr,
+                )
                 continue
             raise
     return added
@@ -1117,16 +1144,17 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
         if not group["is_internal"]:
             continue
         for tester in records:
-            try:
-                result = add_tester_to_group(token, group["id"], tester["id"])
-                label = tester["email"] or tester["id"]
-                print(f"internal group {group['name']}: {result} {label}")
-            except ASCHTTPError as exc:
-                label = tester["email"] or tester["id"]
+            label = tester["email"] or tester["id"]
+            result = add_tester_to_group(token, group["id"], tester["id"])
+            if result == "cannot-assign":
                 print(
-                    f"internal group {group['name']}: could not add {label}: {exc}",
+                    f"WARNING internal group {group['name']}: {label} cannot be assigned "
+                    "(409 Tester(s) cannot be assigned). "
+                    "Non-App-Store-Connect users cannot join an internal group. Continuing.",
                     file=sys.stderr,
                 )
+            else:
+                print(f"internal group {group['name']}: {result} {label}")
 
     added = assign_individual_testers(
         token, latest["id"], [tester["id"] for tester in records]
@@ -1490,12 +1518,8 @@ def _invite_email_tester(
             raise
         print(f"INVITE tester {email} already present; confirming state")
         created = existing
-        try:
-            result = add_tester_to_group(token, group["id"], created["id"])
-            print(f"INVITE external group={group['name']}: {result} {email}")
-        except ASCHTTPError as add_exc:
-            if not tester_cannot_be_assigned(add_exc):
-                raise
+        result = add_tester_to_group(token, group["id"], created["id"])
+        print(f"INVITE external group={group['name']}: {result} {email}")
     return _confirm_tester_state(token, identifier, created, email, groups)
 
 

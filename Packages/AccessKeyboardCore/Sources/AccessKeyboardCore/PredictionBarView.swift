@@ -3,6 +3,8 @@ import UIKit
 final class PredictionBarView: UIView {
     var onSelect: ((Prediction) -> Void)?
     var onFix: (() -> Void)?
+    var onAllowConsent: (() -> Void)?
+    var onDeclineConsent: (() -> Void)?
 
     /// Number of prediction slots. Matches `PredictionProvider.maxSuggestions`
     /// so every returned suggestion has a slot to land in.
@@ -15,6 +17,10 @@ final class PredictionBarView: UIView {
     // divides Fix from the first slot and the rest sit between adjacent slots.
     private let buttons = (0..<PredictionBarView.slotCount).map { _ in UIButton(type: .system) }
     private let separators = (0..<PredictionBarView.slotCount).map { _ in UIView() }
+    private let noticeLabel = UILabel()
+    private let allowButton = UIButton(type: .system)
+    private let declineButton = UIButton(type: .system)
+    private var notice: FixNotice = .none
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -37,6 +43,26 @@ final class PredictionBarView: UIView {
         separators.forEach { separator in
             addSubview(separator)
         }
+        noticeLabel.numberOfLines = 3
+        noticeLabel.adjustsFontSizeToFitWidth = true
+        noticeLabel.minimumScaleFactor = 0.75
+        noticeLabel.isHidden = true
+        noticeLabel.isAccessibilityElement = true
+        addSubview(noticeLabel)
+        configureChoice(allowButton, title: "Allow", action: #selector(tapAllow))
+        configureChoice(declineButton, title: "Not now", action: #selector(tapDecline))
+        allowButton.accessibilityLabel = "Allow Fix to send this field to OpenAI"
+        declineButton.accessibilityLabel = "Not now"
+    }
+
+    private func configureChoice(_ button: UIButton, title: String, action: Selector) {
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        button.layer.cornerRadius = 8
+        button.clipsToBounds = true
+        button.isHidden = true
+        button.addTarget(self, action: action, for: .touchUpInside)
+        addSubview(button)
     }
 
     @available(*, unavailable)
@@ -47,19 +73,28 @@ final class PredictionBarView: UIView {
     func update(
         predictions: [Prediction],
         fixStatus: FixStatus,
+        notice: FixNotice,
         appearance: KeyboardAppearance,
         fontSize: CGFloat
     ) {
         self.predictions = predictions
+        self.notice = notice
         let running = fixStatus == .running
+        let showingNotice = notice != .none
         fixButton.setTitle(running ? "" : "Fix", for: .normal)
         fixButton.isEnabled = !running
         fixButton.backgroundColor = appearance.primaryFill
         fixButton.setTitleColor(appearance.primaryTextColor, for: .normal)
         fixButton.titleLabel?.font = .systemFont(ofSize: fontSize, weight: .semibold)
-        fixButton.accessibilityLabel = running
-            ? "Fix in progress"
-            : (fixStatus == .failed ? "Fix failed, try again" : "Fix typing errors")
+        if showingNotice && notice != .consent {
+            fixButton.accessibilityLabel = notice.message
+        } else if running {
+            fixButton.accessibilityLabel = "Fix in progress"
+        } else if fixStatus == .failed {
+            fixButton.accessibilityLabel = "Fix failed, try again"
+        } else {
+            fixButton.accessibilityLabel = "Fix typing errors"
+        }
         fixButton.accessibilityTraits = .button
         if running {
             spinner.startAnimating()
@@ -68,7 +103,26 @@ final class PredictionBarView: UIView {
         }
         spinner.color = appearance.primaryTextColor
 
+        noticeLabel.isHidden = !showingNotice
+        noticeLabel.text = notice.message
+        noticeLabel.textColor = appearance.textColor
+        noticeLabel.font = .systemFont(ofSize: min(fontSize, 15))
+        noticeLabel.accessibilityLabel = showingNotice ? notice.message : nil
+        let choosing = notice == .consent
+        allowButton.isHidden = !choosing
+        declineButton.isHidden = !choosing
+        allowButton.backgroundColor = appearance.primaryFill
+        allowButton.setTitleColor(appearance.primaryTextColor, for: .normal)
+        declineButton.backgroundColor = appearance.modifierFill
+        declineButton.setTitleColor(appearance.modifierTextColor, for: .normal)
+
         for (index, button) in buttons.enumerated() {
+            if showingNotice {
+                button.isHidden = true
+                button.isEnabled = false
+                button.accessibilityLabel = nil
+                continue
+            }
             if predictions.indices.contains(index) {
                 let item = predictions[index]
                 button.isHidden = false
@@ -91,7 +145,7 @@ final class PredictionBarView: UIView {
                 button.accessibilityLabel = nil
             }
         }
-        let count = min(predictions.count, buttons.count)
+        let count = showingNotice ? 0 : min(predictions.count, buttons.count)
         let line = appearance.secondaryTextColor.withAlphaComponent(0.45)
         for (index, separator) in separators.enumerated() {
             // separators[0] divides Fix from the first slot; the rest sit between
@@ -106,25 +160,47 @@ final class PredictionBarView: UIView {
         super.layoutSubviews()
         let fixWidth = min(92, max(72, bounds.width * 0.14))
         let height = bounds.height
-        fixButton.frame = CGRect(x: 0, y: 2, width: fixWidth, height: height - 4)
-        fixButton.layer.cornerRadius = min(8, (height - 4) / 4)
+        let fixHeight = min(44, height - 4)
+        fixButton.frame = CGRect(x: 0, y: (height - fixHeight) / 2, width: fixWidth, height: fixHeight)
+        fixButton.layer.cornerRadius = min(8, fixHeight / 4)
         spinner.center = fixButton.center
 
-        let restMinX = fixButton.frame.maxX
+        let restMinX = fixButton.frame.maxX + 8
         let restWidth = max(0, bounds.width - restMinX)
-        let slotWidth = restWidth / CGFloat(buttons.count)
+        if notice == .consent {
+            let buttonHeight: CGFloat = 44
+            let buttonGap: CGFloat = 8
+            let buttonsY = height - buttonHeight - 4
+            let buttonWidth = min(128, max(76, (restWidth - buttonGap) / 2))
+            allowButton.frame = CGRect(x: restMinX, y: buttonsY, width: buttonWidth, height: buttonHeight)
+            declineButton.frame = CGRect(
+                x: restMinX + buttonWidth + buttonGap,
+                y: buttonsY,
+                width: buttonWidth,
+                height: buttonHeight
+            )
+            noticeLabel.frame = CGRect(x: restMinX, y: 4, width: restWidth, height: max(0, buttonsY - 6))
+            return
+        }
+        if notice != .none {
+            noticeLabel.frame = CGRect(x: restMinX, y: 4, width: restWidth, height: height - 8)
+            return
+        }
+
+        let slotsMinX = fixButton.frame.maxX
+        let slotWidth = max(0, bounds.width - slotsMinX) / CGFloat(buttons.count)
         for (index, button) in buttons.enumerated() {
-            button.frame = CGRect(x: restMinX + CGFloat(index) * slotWidth, y: 0, width: slotWidth, height: height)
+            button.frame = CGRect(x: slotsMinX + CGFloat(index) * slotWidth, y: 0, width: slotWidth, height: height)
         }
         let separatorWidth: CGFloat = 1 / max(traitCollection.displayScale, 1)
         separators[0].frame = CGRect(
-            x: restMinX,
+            x: slotsMinX,
             y: height * 0.22,
             width: separatorWidth,
             height: height * 0.56
         )
         for index in 0..<(buttons.count - 1) {
-            let x = restMinX + slotWidth * CGFloat(index + 1)
+            let x = slotsMinX + slotWidth * CGFloat(index + 1)
             separators[index + 1].frame = CGRect(x: x, y: height * 0.22, width: separatorWidth, height: height * 0.56)
         }
     }
@@ -136,5 +212,13 @@ final class PredictionBarView: UIView {
 
     @objc private func tapFix() {
         onFix?()
+    }
+
+    @objc private func tapAllow() {
+        onAllowConsent?()
+    }
+
+    @objc private func tapDecline() {
+        onDeclineConsent?()
     }
 }

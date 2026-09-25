@@ -248,6 +248,20 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertTrue(asc.tester_cannot_be_assigned(blocked))
         self.assertFalse(asc.tester_cannot_be_assigned(other))
         self.assertFalse(asc.tester_is_missing(blocked))
+        self.assertEqual(asc.nonfatal_tester_assignment(blocked), "cannot-assign")
+        self.assertEqual(asc.nonfatal_tester_assignment(other), "already")
+        real = asc.ASCHTTPError(
+            500,
+            "/v1/builds/1/relationships/individualTesters",
+            '{"errors":[{"detail":"internal error"}]}',
+        )
+        self.assertIsNone(asc.nonfatal_tester_assignment(real))
+        upload_failure = asc.ASCHTTPError(
+            422,
+            "/v1/builds/1",
+            '{"errors":[{"detail":"The build is not available."}]}',
+        )
+        self.assertIsNone(asc.nonfatal_tester_assignment(upload_failure))
 
     def test_create_tester_sends_only_groups_or_only_builds(self) -> None:
         groups = asc.tester_create_relationships(["alpha", "beta"], "build-11")

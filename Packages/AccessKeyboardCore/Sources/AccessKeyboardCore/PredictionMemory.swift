@@ -6,12 +6,22 @@ struct WordTransition: Equatable {
 }
 
 final class PredictionMemory {
-    /// Learned word history lives in the shared App Group suite so it persists
-    /// across keyboard-extension launches and is written to the same container
-    /// the app can read. Writing here requires the extension to have Full Access
-    /// (Open Access); without it the shared suite falls back to the extension's
-    /// own defaults and learning still works within the extension.
+    /// Learned word history. With Full Access, the extension and the containing
+    /// app share the App Group suite. Without Full Access the extension must not
+    /// touch that container: `store(sharedWithApp: false)` uses the extension's
+    /// own defaults, so learning still works inside the keyboard and nothing crashes.
     static let shared = PredictionMemory(defaults: KeyboardPreferences.suite)
+
+    static func defaults(sharedWithApp: Bool) -> UserDefaults {
+        if sharedWithApp {
+            return KeyboardPreferences.suite
+        }
+        return .standard
+    }
+
+    static func store(sharedWithApp: Bool) -> PredictionMemory {
+        PredictionMemory(defaults: defaults(sharedWithApp: sharedWithApp))
+    }
 
     private var table: [String: [String: Int]]
     private let defaults: UserDefaults?
