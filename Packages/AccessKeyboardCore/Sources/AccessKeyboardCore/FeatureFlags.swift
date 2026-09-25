@@ -8,9 +8,4 @@ public enum FeatureFlags {
     /// When `true` (the default), the first Fix call waits for Allow.
     /// Set to `false` to send on Fix without that step.
     public static let fixConsentRequired = true
-
-    /// When `true`, the Beth letter-colour scheme is named and listed in Settings.
-    /// The default is `false` until that naming is agreed. `BethColorMap` stays
-    /// in the binary either way.
-    public static let bethSchemeListed = false
 }

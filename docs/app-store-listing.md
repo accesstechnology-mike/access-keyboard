@@ -1,14 +1,15 @@
 # App Store listing draft — access: keyboard
 
-Draft for the first App Store submission. The binary is the universal iPhone + iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS/iPadOS 18). Latest TestFlight upload is build 18. Do not treat this file as already entered in App Store Connect.
+Draft for the first public App Store release. This is not a private or unlisted release. The binary is the universal iPhone + iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS/iPadOS 18). Latest TestFlight upload is build 18. Do not treat this file as already entered in App Store Connect.
+
+Fix ships in v1. `FeatureFlags.fixConsentRequired` is **on**, so the first Fix tap asks Allow / Not now before any text is sent.
 
 Source for the review notes and privacy answers: `TESTFLIGHT.md`.
 
 ## TODO — Mike decides
 
-- **Price.** Not chosen. Suggestion if it should be free: Free. Do not enter a price until Mike says so.
-- **Whether Fix ships in v1.** The binary includes Fix. `FeatureFlags.fixConsentRequired` defaults to **on**, so the first Fix tap asks Allow / Not now before any text is sent. If Fix should **not** be in v1, say so before submission: the description, promotional text, privacy nutrition label, review notes, and privacy page below all describe Fix as included. Turning the feature off is a product change, not a listing-only edit.
-- **Privacy page deploy.** The page source is `proxy/public/privacy.html`. App Store Connect should use `https://access-keyboard.vercel.app/privacy.html`, which serves that file. The live URL updates when the Vercel project deploys. Confirm the deployed page matches this repo before review.
+- **Price.** Not chosen. Do not enter a price until Mike says so.
+- **Privacy page deploy.** The page source is `proxy/public/privacy.html`. App Store Connect should use `https://access-keyboard.vercel.app/privacy.html`, which serves that file. The live URL updates when the Vercel project deploys from `main`. Confirm the deployed page matches this repo before review.
 - **Support URL.** Proposed below from the company site already referenced in the repo (`scripts/generate-icon.swift`). Confirm it, or replace it, before submission.
 
 ## Identity
@@ -36,7 +37,7 @@ Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotio
 An assistive keyboard for iPhone and iPad. Familiar layout, large keys, a literacy font, and optional colour themes. Fix can correct the current field after you allow it.
 ```
 
-If Mike pulls Fix from v1, delete the last sentence.
+Fix ships in this version. The last sentence stays.
 
 ## Description
 
@@ -102,7 +103,7 @@ The keyboard does not browse the web, host a social feed, or show ads. Fix sends
 
 Tracking: **No**.
 
-If Fix ships in v1 (the current binary):
+Fix ships in v1, with the consent step on:
 
 | Question | Answer |
 | --- | --- |
@@ -113,8 +114,6 @@ If Fix ships in v1 (the current binary):
 | When | Only if the user taps Fix, and only after they tap Allow while consent is required |
 | Third party | Yes. `https://access-keyboard.vercel.app/api/fix` forwards that field to OpenAI with `store` disabled. The proxy does not keep the text. Ordinary keystrokes stay on the device. Password fields are skipped. |
 | Colour settings and learned predictions | On-device only (App Group `group.6M3Z27M69P.app.access.keyboard` and UserDefaults). Not collected. |
-
-If Mike decides Fix does **not** ship in v1: answer **Data Not Collected**, and remove the Other User Content row. That depends on the TODO above.
 
 The privacy manifests already declare UserDefaults (`CA92.1`) and Other User Content for app functionality, not linked, not tracking.
 
@@ -159,6 +158,5 @@ Demo: open the app, type on the Type screen, then try Fix and choose Allow. To r
 | Flag | Default | Where |
 | --- | --- | --- |
 | `FeatureFlags.fixConsentRequired` | on | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/FeatureFlags.swift` |
-| `FeatureFlags.bethSchemeListed` | off | same file |
 
-With the defaults, Settings does not list or name the Beth colour scheme. The colour values remain in `BethColorMap`. Set `bethSchemeListed` to `true` and ship a new build if that scheme should be public. Do not delete the map to hide it.
+Beth mode is listed in Settings under the name Beth. `BethColorMap` supplies the colours.

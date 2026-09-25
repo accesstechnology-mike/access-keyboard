@@ -12,14 +12,6 @@ struct SettingsView: View {
     @AppStorage(KeyboardPreferences.fixConsentGrantedKey, store: KeyboardPreferences.suite)
     private var fixConsentGranted = false
 
-    private var colourChoices: [ColourOption] {
-        var choices = ColourOption.visibleCases()
-        if let current = ColourOption(rawValue: colourOptionRaw), !choices.contains(current) {
-            choices.append(current)
-        }
-        return choices
-    }
-
     var body: some View {
         List {
             Section {
@@ -40,19 +32,17 @@ struct SettingsView: View {
 
             Section {
                 Picker("Colours", selection: $colourOptionRaw) {
-                    ForEach(colourChoices) { value in
-                        Text(value.listedTitle()).tag(value.rawValue)
+                    ForEach(ColourOption.allCases) { value in
+                        Text(value.title).tag(value.rawValue)
                     }
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(colourFooter)
-                    if FeatureFlags.bethSchemeListed {
-                        Link(
-                            "Beth’s article on synaesthesia",
-                            destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
-                        )
-                    }
+                    Text("System keeps the ordinary system key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Beth uses Beth Moulam’s synesthetic colours. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black.")
+                    Link(
+                        "Beth’s article on synaesthesia",
+                        destination: URL(string: "https://www.bethmoulam.com/life-skills/learning/learning-styles-synaesthesia/")!
+                    )
                 }
             }
 
@@ -98,14 +88,6 @@ struct SettingsView: View {
         .onChange(of: fixConsentGranted) { _, _ in
             KeyboardPreferences.notify()
         }
-    }
-
-    private var colourFooter: String {
-        var text = "System keeps the ordinary system key colours. Coloured vowels paint a, e, i, o, u purple, consonants green, numbers red, and punctuation yellow. Hi-contrast white is white on black. Hi-contrast yellow is yellow on black."
-        if FeatureFlags.bethSchemeListed {
-            text += " Beth uses Beth Moulam’s synesthetic colours."
-        }
-        return text
     }
 
     private var fixFooter: String {

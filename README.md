@@ -9,14 +9,15 @@ consent is required.
 
 ## Feature flags
 
-Both switches are compile-time constants in
+The switch is a compile-time constant in
 `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/FeatureFlags.swift`.
-Change the constant and ship a new build. They are not Settings toggles.
+Change the constant and ship a new build. It is not a Settings toggle.
 
 | Constant | Default | Effect |
 | --- | --- | --- |
 | `FeatureFlags.fixConsentRequired` | `true` | The first Fix call shows Allow / Not now before any text is sent to OpenAI. Allow is remembered in the App Group and can be turned off under Settings → Allow Fix to send text. `false` sends on Fix without that step. |
-| `FeatureFlags.bethSchemeListed` | `false` | `false` hides that letter-colour scheme from the Settings list and from public copy. The colours stay in `BethColorMap`. Set `true` to list and name the scheme again. A device that already stored it keeps the colours under the neutral label "Custom colours" until the user picks another scheme. |
+
+Beth mode stays in the Settings colour list under the name Beth. The colours are `BethColorMap`.
 
 ## Device support
 

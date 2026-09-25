@@ -39,10 +39,7 @@ struct AboutView: View {
     }
 
     private var summary: String {
-        let schemes = FeatureFlags.bethSchemeListed
-            ? "ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional"
-            : "ABC, frequency, coloured vowels, and hi-contrast themes are optional"
-        return "An assistive keyboard for iPhone and iPad that starts from the standard iOS/iPadOS layout, adapting from a compact board on iPhone up to the large iPad Pro board. Extra tools come later without throwing away the layout you already know. \(schemes); QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on."
+        "An assistive keyboard for iPhone and iPad that starts from the standard iOS/iPadOS layout, adapting from a compact board on iPhone up to the large iPad Pro board. Extra tools come later without throwing away the layout you already know. ABC, frequency, coloured vowels, Beth colours, and hi-contrast themes are optional; QWERTY stays the starting board. Keys stay large for eye-gaze, and the literacy font is always on."
     }
 
     private var privacyText: String {
