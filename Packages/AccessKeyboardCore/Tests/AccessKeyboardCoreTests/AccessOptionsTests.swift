@@ -52,6 +52,10 @@ final class AccessOptionsTests: XCTestCase {
         // Shift closes the letter block (right after the six bottom letters),
         // with the utility keys following it, not before it.
         XCTAssertEqual(layout.rows[3].keys[6].action, .shift, "Shift ends the letter block")
+        let actions = layout.rows.flatMap { $0.keys.map(\.action) }
+        XCTAssertTrue(actions.contains(.backspace), "compact frequency without a globe still has delete")
+        XCTAssertTrue(actions.contains(.returnKey), "compact frequency without a globe still has return")
+        XCTAssertTrue(actions.contains(.setMode(.numeric)), "compact frequency without a globe still has 123")
     }
 
     func testFrequencyBoardPlacesSymbolsAndFunctionKeysRightOfLetters() {
