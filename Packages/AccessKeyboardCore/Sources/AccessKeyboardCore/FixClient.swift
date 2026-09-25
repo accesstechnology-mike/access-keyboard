@@ -13,6 +13,7 @@ public enum FixNotice: Equatable {
     case offline
     case secureField
     case unavailable
+    case subscribe
     case consent
 
     public var message: String {
@@ -27,6 +28,8 @@ public enum FixNotice: Equatable {
             return "Passwords are not sent."
         case .unavailable:
             return "Fix isn’t set up in this build. Typing still works."
+        case .subscribe:
+            return "Fix is part of access: keyboard Pro. Open the app to subscribe. Typing still works."
         case .consent:
             return "Fix sends this field’s text to OpenAI to correct it. Nothing is sent until you tap Allow. You can turn this off in the app’s Settings."
         }
@@ -35,7 +38,7 @@ public enum FixNotice: Equatable {
     /// Hints that should disappear on the next keystroke. Consent stays until Allow or Not now.
     public var isTransient: Bool {
         switch self {
-        case .fullAccess, .offline, .secureField, .unavailable:
+        case .fullAccess, .offline, .secureField, .unavailable, .subscribe:
             return true
         case .none, .consent:
             return false

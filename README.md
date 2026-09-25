@@ -19,6 +19,20 @@ Change the constant and ship a new build. It is not a Settings toggle.
 
 Beth mode stays in the Settings colour list under the name Beth. The colours are `BethColorMap`.
 
+## Subscription
+
+Pro is an auto-renewing subscription sold only in the containing app. The keyboard reads a record in the App Group and never shows a purchase screen. Configuration, including the product IDs Mike must create, is `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift`.
+
+| Value | Default |
+| --- | --- |
+| `SubscriptionConfig.monthlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.monthly` |
+| `SubscriptionConfig.yearlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.yearly` |
+| `SubscriptionConfig.subscriptionGroupName` | `access: keyboard Pro` |
+| `SubscriptionConfig.monetization` | `.coreKeyboardFreeFixSubscribed` (the keyboard stays usable; Fix needs Pro) |
+| `SubscriptionConfig.showTrialHeadlineDefault` | `true` |
+
+`showTrialHeadline` only controls whether the paywall may show introductory-offer wording. The optional file `https://access-keyboard.vercel.app/config.json` (source `proxy/public/config.json`) may set that boolean. It cannot grant Pro and it cannot set the trial length. The length (7 or 14 days) is an introductory offer in App Store Connect. Prices on the paywall come from StoreKit. `AccessKeyboard/AccessKeyboard.storekit` is the local simulator catalogue (£1.99 / £19.99, with a one-week free trial stand-in) and is selected on the AccessKeyboard scheme.
+
 ## Device support
 
 Universal (`TARGETED_DEVICE_FAMILY = "1,2"`). The keyboard adapts to the device

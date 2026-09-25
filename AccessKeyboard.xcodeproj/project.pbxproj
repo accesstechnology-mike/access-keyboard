@@ -47,6 +47,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				AccessKeyboard.storekit,
 			);
 			target = A10000000000000000000010 /* AccessKeyboard */;
 		};

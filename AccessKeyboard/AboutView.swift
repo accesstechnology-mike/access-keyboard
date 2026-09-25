@@ -43,7 +43,7 @@ struct AboutView: View {
     }
 
     private var privacyText: String {
-        var text = "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and on-device learned predictions (PredictionMemory in the shared App Group) be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device."
+        var text = "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and on-device learned predictions (PredictionMemory in the shared App Group) be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device. Purchases are handled by Apple. Pro status is stored on this device so the keyboard knows whether Fix is included."
         if FeatureFlags.fixConsentRequired {
             text += " Tapping Fix asks once before sending this field’s text to that proxy, which forwards it to OpenAI and does not store it. You can turn that off in Settings."
         } else {

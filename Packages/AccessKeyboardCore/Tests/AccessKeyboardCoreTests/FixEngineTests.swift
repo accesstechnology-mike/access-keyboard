@@ -103,6 +103,7 @@ final class FixEngineTests: XCTestCase {
         engine.networkAllowed = true
         engine.traits.autocapitalizationType = .none
         engine.fixConsentRequired = true
+        engine.subscriptionIsActive = { true }
         let box = ConsentBox()
         engine.fixConsentIsGranted = { box.granted }
         engine.recordFixConsent = { box.granted = $0 }
@@ -143,6 +144,7 @@ final class FixEngineTests: XCTestCase {
         engine.networkAllowed = true
         engine.traits.autocapitalizationType = .none
         engine.fixConsentRequired = true
+        engine.subscriptionIsActive = { true }
         let box = ConsentBox()
         box.granted = true
         engine.fixConsentIsGranted = { box.granted }
@@ -163,6 +165,49 @@ final class FixEngineTests: XCTestCase {
         XCTAssertEqual(document.text, "the")
     }
 
+    func testFixRequiresASubscriptionBeforeItAsksForConsent() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.fixConsentRequired = true
+        engine.fixRequiresSubscription = true
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { false }
+        engine.fixConsentIsGranted = { false }
+        var sent = 0
+        engine.fixClient = MockFixClient { _ in
+            sent += 1
+            return "the"
+        }
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .subscribe)
+        XCTAssertEqual(sent, 0)
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertFalse(engine.fixNotice.message.isEmpty)
+
+        engine.subscriptionIsActive = { true }
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .consent)
+        XCTAssertEqual(sent, 0)
+        XCTAssertEqual(document.text, "teh")
+    }
+
+    func testUnreadableEntitlementAsksForFullAccess() {
+        let (engine, document) = makeEngine(text: "teh", network: false)
+        engine.sharedPreferencesAvailable = false
+        engine.subscriptionIsActive = {
+            XCTFail("the extension must not treat a hidden App Group as a subscription decision")
+            return false
+        }
+        engine.fixClient = MockFixClient { _ in
+            XCTFail("must not send")
+            return "the"
+        }
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .fullAccess)
+        XCTAssertEqual(document.text, "teh")
+    }
+
     func testWithoutSharedPreferencesTheBoardStaysQWERTY() {
         let previous = KeyboardPreferences.letterLayout
         defer { KeyboardPreferences.letterLayout = previous }
@@ -180,6 +225,9 @@ final class FixEngineTests: XCTestCase {
         engine.networkAllowed = network
         engine.traits.autocapitalizationType = .none
         engine.fixConsentRequired = false
+        engine.fixRequiresSubscription = true
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { true }
         return (engine, document)
     }
 

@@ -39,6 +39,12 @@ public final class KeyboardEngine {
     public var fixConsentRequired: Bool = FeatureFlags.fixConsentRequired
     public var fixConsentIsGranted: () -> Bool = { KeyboardPreferences.fixConsentGranted }
     public var recordFixConsent: (Bool) -> Void = { KeyboardPreferences.fixConsentGranted = $0 }
+    /// From `SubscriptionConfig.monetization`. Tests can override the split.
+    public var fixRequiresSubscription: Bool = SubscriptionConfig.fixRequiresSubscription
+    /// Reads the App Group record written by the containing app. The extension never purchases.
+    public var subscriptionIsActive: () -> Bool = {
+        SubscriptionEntitlementStore.readShared().isActive(at: Date())
+    }
 
     private var undoStack: [UndoRecord] = []
     private var redoStack: [UndoRecord] = []
@@ -159,6 +165,18 @@ public final class KeyboardEngine {
         let original = currentDocumentText()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
+        }
+        // Entitlement before consent. Without the App Group the extension cannot
+        // see the record the app wrote, and Fix cannot use the network either.
+        if fixRequiresSubscription {
+            guard sharedPreferencesAvailable else {
+                presentFixNotice(.fullAccess)
+                return
+            }
+            guard subscriptionIsActive() else {
+                presentFixNotice(.subscribe)
+                return
+            }
         }
         // Full Access is what lets the extension open a network connection.
         // Without it, Fix must not pretend to run and must not block typing.

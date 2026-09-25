@@ -91,10 +91,13 @@ struct SettingsView: View {
     }
 
     private var fixFooter: String {
-        if FeatureFlags.fixConsentRequired {
-            return "Tapping Fix sends that field’s text to OpenAI through the correction proxy, and only after you allow it. Ordinary keystrokes are not sent."
+        var text = FeatureFlags.fixConsentRequired
+            ? "Tapping Fix sends that field’s text to OpenAI through the correction proxy, and only after you allow it. Ordinary keystrokes are not sent."
+            : "Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent."
+        if SubscriptionConfig.fixRequiresSubscription {
+            text += " Fix is part of Pro."
         }
-        return "Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent."
+        return text
     }
 }
 

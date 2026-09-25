@@ -256,6 +256,8 @@ def check_privacy_page() -> None:
         error("privacy page does not say Fix forwards the field to OpenAI")
     if "mike@accesstechnology.co.uk" not in text:
         error("privacy page is missing the contact address")
+    if "Purchases are handled by Apple" not in text:
+        error("privacy page does not say purchases are handled by Apple")
 
 
 def check_live_proxy() -> None:

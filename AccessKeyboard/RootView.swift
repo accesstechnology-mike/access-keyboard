@@ -17,6 +17,12 @@ struct RootView: View {
                     Label("Settings", systemImage: "slider.horizontal.3")
                 }
                 NavigationLink {
+                    PaywallView()
+                        .navigationTitle("Pro")
+                } label: {
+                    Label("Pro", systemImage: "checkmark.seal")
+                }
+                NavigationLink {
                     SetupView()
                         .navigationTitle("Enable system-wide")
                 } label: {

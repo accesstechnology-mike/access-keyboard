@@ -195,7 +195,7 @@ public final class KeyboardView: UIView {
         switch engine.fixNotice {
         case .consent:
             metrics.predictionBarHeight = max(metrics.predictionBarHeight, 112)
-        case .fullAccess, .offline, .secureField, .unavailable:
+        case .fullAccess, .offline, .secureField, .unavailable, .subscribe:
             metrics.predictionBarHeight = max(metrics.predictionBarHeight, 72)
         case .none:
             break
