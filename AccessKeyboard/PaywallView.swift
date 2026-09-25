@@ -128,14 +128,13 @@ struct PaywallView: View {
             return nil
         }
         let length = Self.periodDescription(offer.period, repeats: offer.periodCount)
-        switch offer.paymentMode {
-        case .freeTrial:
+        if offer.paymentMode == .freeTrial {
             return "\(product.displayName) includes a free trial of \(length) if you are eligible. Then \(product.displayPrice) per \(renewal)."
-        case .payAsYouGo, .payUpFront:
-            return "\(product.displayName) has an introductory offer of \(offer.displayPrice) for \(length) if you are eligible. Then \(product.displayPrice) per \(renewal)."
-        @unknown default:
-            return nil
         }
+        if offer.paymentMode == .payAsYouGo || offer.paymentMode == .payUpFront {
+            return "\(product.displayName) has an introductory offer of \(offer.displayPrice) for \(length) if you are eligible. Then \(product.displayPrice) per \(renewal)."
+        }
+        return nil
     }
 
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
