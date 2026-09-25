@@ -1,0 +1,142 @@
+{
+  "identifier" : "AccessKeyboardSubscriptions",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "ACCESSKEYBOARD",
+    "_developerTeamID" : "A688GUK8XK",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_GB",
+    "_storefront" : "GBR",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "PRO",
+      "localizations" : [
+        {
+          "description" : "The access: keyboard subscription.",
+          "displayName" : "access: keyboard",
+          "locale" : "en_GB"
+        }
+      ],
+      "name" : "access: keyboard",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "PROMONTHLY",
+          "introductoryOffer" : {
+            "internalID" : "PROMONTHLYINTRO",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P14D"
+          },
+          "localizations" : [
+            {
+              "description" : "access: keyboard, renewing every month. The 14-day introductory offer in this file matches the trial Mike sets in App Store Connect. The app reads the offer from StoreKit.",
+              "displayName" : "Monthly",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "app.access.keyboard.6M3Z27M69P.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly",
+          "subscriptionGroupID" : "PRO",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "PROYEARLY",
+          "introductoryOffer" : {
+            "internalID" : "PROYEARLYINTRO",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P14D"
+          },
+          "localizations" : [
+            {
+              "description" : "access: keyboard, renewing every year. The 14-day introductory offer in this file matches the trial Mike sets in App Store Connect. The app reads the offer from StoreKit.",
+              "displayName" : "Yearly",
+              "locale" : "en_GB"
+            }
+          ],
+          "productID" : "app.access.keyboard.6M3Z27M69P.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Yearly",
+          "subscriptionGroupID" : "PRO",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

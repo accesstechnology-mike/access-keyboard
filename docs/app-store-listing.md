@@ -6,10 +6,16 @@ Fix ships in v1. `FeatureFlags.fixConsentRequired` is **on**, so the first Fix t
 
 Source for the review notes and privacy answers: `TESTFLIGHT.md`.
 
-## TODO — Mike decides
+## TODO — Mike in App Store Connect
 
-- **Price.** Not chosen. Do not enter a price until Mike says so.
-- **Privacy page deploy.** The page source is `proxy/public/privacy.html`. App Store Connect should use `https://access-keyboard.vercel.app/privacy.html`, which serves that file. The live URL updates when the Vercel project deploys from `main`. Confirm the deployed page matches this repo before review.
+The product IDs are decided. There is no free tier. The whole keyboard, including Fix, requires an active subscription or the 14-day free trial. Mike still has to create that subscription in App Store Connect before review. The app does not hardcode prices and does not grant access from config.
+
+- **Paid Apps agreement, banking, and tax.** A subscription cannot be submitted until the Paid Apps agreement is active and banking and tax are complete.
+- **Subscription group.** One group, name `access: keyboard`.
+- **Products.** Create exactly `app.access.keyboard.6M3Z27M69P.pro.monthly` at £1.99 per month and `app.access.keyboard.6M3Z27M69P.pro.yearly` at £19.99 per year. Those IDs stay as written, including `.pro.`, and are `SubscriptionConfig` in `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift`. They are two prices for one offering, not a separate Pro tier.
+- **Introductory offer.** Set a 14-day free introductory offer on both products. The trial length is chosen here, not in the app. The paywall shows that offer only when StoreKit returns it and the user is eligible.
+- **Subscription review screenshot.** Apple asks for a screenshot of the paywall when the subscription is submitted.
+- **Privacy page deploy.** The page source is `proxy/public/privacy.html`. App Store Connect should use `https://access-keyboard.vercel.app/privacy.html`, which serves that file. The live URL updates when the Vercel project deploys from `main`. Confirm the deployed page matches this repo before review. `proxy/public/config.json` is the optional paywall headline switch at `https://access-keyboard.vercel.app/config.json`.
 - **Support URL.** Proposed below from the company site already referenced in the repo (`scripts/generate-icon.swift`). Confirm it, or replace it, before submission.
 
 ## Identity
@@ -25,34 +31,34 @@ Source for the review notes and privacy answers: `TESTFLIGHT.md`.
 | Primary language | English (UK), unless the App Store Connect record is already English (US). The keyboard’s `PrimaryLanguage` is `en-US`. |
 | Copyright | Access Technology North Limited |
 | Version | `0.1.0` (marketing version in the Xcode project) |
-| Price | **TODO Mike** |
+| Price | Free to download. Using the keyboard requires one auto-renewing subscription: £1.99 a month or £19.99 a year, entered in App Store Connect, or the 14-day free trial on that subscription. The paywall shows StoreKit’s localized price and trial. |
 
-Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotional text is 170 characters (limit 170). Keywords are 79 characters (limit 100).
+Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotional text is 157 characters (limit 170). Keywords are 79 characters (limit 100).
 
 ## Promotional text
 
 170 characters maximum. This draft is within that limit.
 
 ```
-An assistive keyboard for iPhone and iPad. Familiar layout, large keys, a literacy font, and optional colour themes. Fix can correct the current field after you allow it.
+An assistive keyboard for iPhone and iPad. Large keys and a literacy font. Subscribe to use it, including Fix. A free trial is available for new subscribers.
 ```
 
-Fix ships in this version. The last sentence stays.
+Fix ships in this version for subscribers and trial users, with the consent step on.
 
 ## Description
 
 ```
 access: keyboard is an assistive keyboard for iPhone and iPad. It starts from the layout you already know and keeps the keys large.
 
-It runs on iPhone and iPad on iOS and iPadOS 18. The same app lays out a compact board on iPhone and the larger iPad and iPad Pro boards. QWERTY is the starting layout. ABC order and a frequency grid are optional. Coloured vowels and high-contrast themes are optional. A literacy font is used on the keys.
+It runs on iPhone and iPad on iOS and iPadOS 18. The same app lays out a compact board on iPhone and the larger iPad and iPad Pro boards. QWERTY is the starting layout. ABC order and a frequency grid are optional. Coloured vowels, Beth colours, and high-contrast themes are optional. A literacy font is used on the keys.
 
 Two fingers anywhere on the keyboard move the cursor, as on the system keyboard. Hold delete to remove letters, then words. Double-space inserts a full stop. Long-press a letter for accents. VoiceOver speaks each key.
 
 The suggestion bar can learn words you type. That learning stays on the device (PredictionMemory in the app’s shared App Group when Full Access is on). It is not uploaded.
 
-Fix is optional. Tapping Fix can correct the text in the current field. Nothing is sent until you tap Fix, and this version asks you to Allow it once before the first send. You can turn that off in Settings. Only that field is sent, to OpenAI through access: keyboard’s server, so it can be corrected. The server does not keep the text. Ordinary keystrokes are not sent. Password fields are skipped. With no network, Fix does not send anything and the keyboard keeps typing.
+Using the keyboard requires a subscription. Monthly and yearly are two prices for the same keyboard, including Fix, purchased in this app through Apple. A free trial is the introductory offer Apple shows when your account is eligible. Tapping Fix can correct the text in the current field. Nothing is sent until you tap Fix, and this version asks you to Allow it once before the first send. You can turn that off in Settings. Only that field is sent, to OpenAI through access: keyboard’s server, so it can be corrected. The server does not keep the text. Ordinary keystrokes are not sent. Password fields are skipped. With no network, Fix does not send anything.
 
-You can type with Allow Full Access turned off. Full Access is only for sharing colour, layout, and learned words with the keyboard in other apps, and for letting Fix reach the network. The app includes a Type screen so you can try the keyboard before enabling it system-wide.
+Without an active subscription the keyboard in other apps shows “Open access: keyboard to start your free trial or subscribe.”, a button that opens this app, and a globe key that switches to another keyboard. The letter keys are not shown. It does not show a purchase screen. Allow Full Access has to be on so that keyboard can read the subscription. The app includes a Type screen once you are subscribed.
 
 To use it in other apps: Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
 ```
@@ -114,30 +120,42 @@ Fix ships in v1, with the consent step on:
 | When | Only if the user taps Fix, and only after they tap Allow while consent is required |
 | Third party | Yes. `https://access-keyboard.vercel.app/api/fix` forwards that field to OpenAI with `store` disabled. The proxy does not keep the text. Ordinary keystrokes stay on the device. Password fields are skipped. |
 | Colour settings and learned predictions | On-device only (App Group `group.6M3Z27M69P.app.access.keyboard` and UserDefaults). Not collected. |
+| Purchases | Handled by Apple. Payment details are not collected by the app. Subscription status (active, product, expiry) stays on the device in that App Group. |
 
 The privacy manifests already declare UserDefaults (`CA92.1`) and Other User Content for app functionality, not linked, not tracking.
 
 ## App Review notes
 
-Paste this into App Review. It matches `TESTFLIGHT.md` and Guideline 4.4.1: the keyboard is fully usable with Full Access off and with no network. Full Access is optional and is justified below.
+Paste this into App Review. The app requires a subscription. Full Access is required for the system keyboard to read that subscription. The locked state keeps a working globe key.
 
 ```
-This is an assistive keyboard for iPhone and iPad. There is no account or login.
+This is an assistive keyboard for iPhone and iPad. There is no account or login. There is no free tier.
+
+The whole app requires a subscription after the 14-day free trial. The keyboard and Fix are one product. Monthly and yearly are two prices in the same subscription group. The 14-day free trial is the introductory offer configured in App Store Connect. The paywall shows trial wording only when StoreKit reports an introductory offer and the Sandbox account is eligible. Config cannot grant access and cannot change the trial length.
+
+On first launch, with no subscription, the app opens on the paywall. It is titled access: keyboard. It lists both plans with the price, period, and renewal terms from StoreKit, plus auto-renew wording, Manage Subscriptions, Restore Purchases, the Privacy Policy (https://access-keyboard.vercel.app/privacy.html), and Terms of Use (https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).
+
+Subscription group: access: keyboard.
+Products: app.access.keyboard.6M3Z27M69P.pro.monthly (£1.99 per month) and app.access.keyboard.6M3Z27M69P.pro.yearly (£19.99 per year). Both auto-renew until cancelled. The product IDs contain “.pro.”; the offering is not a separate Pro tier.
+
+Sandbox path: Settings → Developer → Sandbox Apple Account, or sign in when the paywall asks. Start the free trial or buy either plan. Restore Purchases is on the same screen. After the subscription is active, the Type screen, Settings, and About are available. Tap Fix on the Type screen and choose Allow. Consent (Allow / Not now) is asked only after the entitlement check, and only for an active subscription or trial.
 
 The keyboard will not appear in other apps until the reviewer adds it:
 Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
+Then open that keyboard and turn on Allow Full Access.
 
-The keyboard is fully usable with Allow Full Access turned off and with no network. Typing, layouts, and two-finger cursor movement anywhere on the keyboard do not need either. With Full Access off, Fix does not send text; it shows a short hint, and the keys stay usable.
+Without a subscription, or with Allow Full Access off, the system keyboard does not show a blank view, typing keys, or a purchase screen. It shows: “Open access: keyboard to start your free trial or subscribe.” Because the app registers the accesskeyboard URL scheme, it also shows a button that opens this app (accesskeyboard://subscribe). A globe (Next Keyboard) key always switches to another keyboard, so the reviewer is not trapped.
 
-Full Access is optional and used for two things only:
-1. Share colour and layout settings, and on-device learned predictions (PredictionMemory), with the keyboard extension through App Group group.6M3Z27M69P.app.access.keyboard.
-2. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
+Full Access is used for three things:
+1. Let the keyboard extension read the subscription record in App Group group.6M3Z27M69P.app.access.keyboard.
+2. Share colour and layout settings, and on-device learned predictions (PredictionMemory), through that App Group.
+3. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
 
-Keystrokes are not sent off the device. Tapping Fix sends the current field’s text only after the reviewer taps Allow. That choice can be turned off in the app’s Settings (Allow Fix to send text). The proxy forwards that field to OpenAI with store disabled and does not keep the text. Password fields are skipped. If there is no network, Fix shows a short hint and does not change the field.
+The containing app verifies Transaction.currentEntitlements, listens to Transaction.updates, finishes transactions, and writes active, product, and expiry into that App Group. It refreshes that record on launch and when the app returns to the foreground. The keyboard only reads the record. A missing or expired record means not subscribed.
 
-The in-app Type screen uses the same keyboard, so layout, colours, and Fix can be tried before enabling the system keyboard.
+Keystrokes are not sent off the device. Tapping Fix sends the current field’s text only after the reviewer taps Allow. That choice can be turned off in the app’s Settings (Allow Fix to send text). The proxy forwards that field to OpenAI with store disabled and does not keep the text. Password fields are skipped. If there is no network, Fix shows a short hint and does not change the field. With no network, an already subscribed keyboard still types.
 
-Demo: open the app, type on the Type screen, then try Fix and choose Allow. To review the system keyboard, add it in Settings as above. Full Access can stay off; the keys still work.
+Demo: open the app, start the sandbox trial or subscribe, type on the Type screen, then try Fix and choose Allow. Add the keyboard in Settings, turn on Allow Full Access, and switch to it with the globe key. To see the locked state, use a Sandbox account with no subscription, or turn Allow Full Access off.
 ```
 
 ## App Review information
@@ -158,5 +176,7 @@ Demo: open the app, type on the Type screen, then try Fix and choose Allow. To r
 | Flag | Default | Where |
 | --- | --- | --- |
 | `FeatureFlags.fixConsentRequired` | on | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/FeatureFlags.swift` |
+| `SubscriptionConfig.monetization` | `.allFeaturesSubscribed` | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift` |
+| `SubscriptionConfig.showTrialHeadlineDefault` | on | same file; remote `config.json` can hide the headline only |
 
 Beth mode is listed in Settings under the name Beth. `BethColorMap` supplies the colours.

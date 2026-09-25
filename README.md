@@ -3,9 +3,10 @@
 An assistive custom keyboard for **iPhone and iPad** (iOS / iPadOS 18). It pairs
 a literacy font, optional colour themes, a prediction bar that learns on the
 device, and an optional "Fix" that can correct the current text field through a
-hosted proxy. The keyboard still types with Full Access off and with no network.
-Fix sends text only when the user taps Fix, and only after they allow it when
-consent is required.
+hosted proxy. Using the keyboard requires a subscription or Apple’s introductory
+offer. Without that, the system keyboard shows a locked message, a button that
+opens this app, and a globe key. Fix sends text only when the user taps Fix,
+and only after they allow it when consent is required.
 
 ## Feature flags
 
@@ -18,6 +19,22 @@ Change the constant and ship a new build. It is not a Settings toggle.
 | `FeatureFlags.fixConsentRequired` | `true` | The first Fix call shows Allow / Not now before any text is sent to OpenAI. Allow is remembered in the App Group and can be turned off under Settings → Allow Fix to send text. `false` sends on Fix without that step. |
 
 Beth mode stays in the Settings colour list under the name Beth. The colours are `BethColorMap`.
+
+## Subscription
+
+One subscription covers the whole keyboard, including Fix. It is sold only in the containing app. The keyboard reads a record in the App Group and never shows a purchase screen. Configuration, including the product IDs Mike must create, is `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift`.
+
+| Value | Default |
+| --- | --- |
+| `SubscriptionConfig.monthlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.monthly` |
+| `SubscriptionConfig.yearlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.yearly` |
+| `SubscriptionConfig.subscriptionGroupName` | `access: keyboard` |
+| `SubscriptionConfig.monetization` | `.allFeaturesSubscribed` (the keyboard and Fix need an active subscription or introductory offer) |
+| `KeyboardMonetization.allSubscribed` | available, same gates as `.allFeaturesSubscribed` |
+| `KeyboardMonetization.coreKeyboardFreeFixSubscribed` | available, not the default (typing stays usable; Fix needs a subscription) |
+| `SubscriptionConfig.showTrialHeadlineDefault` | `true` |
+
+`showTrialHeadline` only controls whether the paywall may show introductory-offer wording. The optional file `https://access-keyboard.vercel.app/config.json` (source `proxy/public/config.json`) may set that boolean. It cannot grant a subscription and it cannot set the trial length. The length is an introductory offer in App Store Connect (14 days). Prices on the paywall come from StoreKit. `AccessKeyboard/AccessKeyboard.storekit` is the local simulator catalogue (£1.99 / £19.99, with a 14-day free trial stand-in) and is selected on the AccessKeyboard scheme. The URL scheme `accesskeyboard://subscribe` opens the containing app on the paywall.
 
 ## Device support
 

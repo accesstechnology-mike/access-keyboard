@@ -20,6 +20,9 @@ public final class KeyboardView: UIView {
     private var sharesPredictionMemory: Bool
     /// The host updates its height constraint when Fix shows a hint or the consent step.
     public var onPreferredHeightChange: (() -> Void)?
+    /// The keyboard extension sets this to open the containing app. There is no purchase UI here.
+    public var onOpenContainingApp: (() -> Void)?
+    private let lockedPanel = KeyboardLockedPanel()
 
     /// `sharesPredictionMemory` is false in the keyboard extension until Allow Full
     /// Access is on. That path keeps learned words in the extension's own defaults
@@ -86,6 +89,14 @@ public final class KeyboardView: UIView {
             self?.engine.declineFixConsent()
         }
         addSubview(predictionBar)
+        lockedPanel.isHidden = true
+        lockedPanel.onOpenApp = { [weak self] in
+            self?.onOpenContainingApp?()
+        }
+        lockedPanel.onNextKeyboard = { [weak self] in
+            self?.engine.handle(.nextKeyboard)
+        }
+        addSubview(lockedPanel)
         updateAppearance()
         preferenceObservation = KeyboardPreferences.observe { [weak self] in
             self?.applyCurrentPreferences()
@@ -103,6 +114,13 @@ public final class KeyboardView: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
+        if engine.keyboardIsLocked {
+            showLockedPanel()
+            return
+        }
+        lockedPanel.isHidden = true
+        predictionBar.isHidden = false
+        keyButtons.forEach { $0.isHidden = false }
         let layout = engine.layout(for: bounds.size, idiom: idiom)
         let metrics = metricsForCurrentNotice(
             LayoutMetrics.metrics(
@@ -181,6 +199,21 @@ public final class KeyboardView: UIView {
         backgroundColor = appearance.backgroundColor
     }
 
+    private func showLockedPanel() {
+        predictionBar.isHidden = true
+        keyButtons.forEach { $0.isHidden = true }
+        callout?.isHidden = true
+        lockedPanel.isHidden = false
+        lockedPanel.frame = bounds
+        lockedPanel.apply(
+            message: KeyboardLock.message(canReadEntitlement: engine.sharedPreferencesAvailable),
+            appearance: appearance,
+            showsOpenButton: KeyboardLock.canOpenContainingApp
+        )
+        lockedPanel.layoutIfNeeded()
+        bringSubviewToFront(lockedPanel)
+    }
+
     private func reloadKeys() {
         contentDirty = true
         setNeedsLayout()
@@ -195,7 +228,7 @@ public final class KeyboardView: UIView {
         switch engine.fixNotice {
         case .consent:
             metrics.predictionBarHeight = max(metrics.predictionBarHeight, 112)
-        case .fullAccess, .offline, .secureField, .unavailable:
+        case .fullAccess, .offline, .secureField, .unavailable, .subscribe:
             metrics.predictionBarHeight = max(metrics.predictionBarHeight, 72)
         case .none:
             break

@@ -39,6 +39,22 @@ public final class KeyboardEngine {
     public var fixConsentRequired: Bool = FeatureFlags.fixConsentRequired
     public var fixConsentIsGranted: () -> Bool = { KeyboardPreferences.fixConsentGranted }
     public var recordFixConsent: (Bool) -> Void = { KeyboardPreferences.fixConsentGranted = $0 }
+    /// From `SubscriptionConfig.monetization`. Tests can override the split.
+    public var keyboardRequiresSubscription: Bool = SubscriptionConfig.keyboardRequiresSubscription
+    public var fixRequiresSubscription: Bool = SubscriptionConfig.fixRequiresSubscription
+    /// Reads the App Group record written by the containing app. The extension never purchases.
+    public var subscriptionIsActive: () -> Bool = {
+        SubscriptionEntitlementStore.readShared().isActive(at: Date())
+    }
+
+    /// True when this build locks the keyboard and the extension cannot see an active subscription.
+    public var keyboardIsLocked: Bool {
+        KeyboardLock.isLocked(
+            requiresSubscription: keyboardRequiresSubscription,
+            canReadEntitlement: sharedPreferencesAvailable,
+            entitled: sharedPreferencesAvailable && subscriptionIsActive()
+        )
+    }
 
     private var undoStack: [UndoRecord] = []
     private var redoStack: [UndoRecord] = []
@@ -63,6 +79,12 @@ public final class KeyboardEngine {
     }
 
     public func handle(_ action: KeyAction) {
+        if keyboardIsLocked {
+            if case .nextKeyboard = action {
+                host?.advanceToNextInputMode()
+            }
+            return
+        }
         dismissTransientFixNotice()
         switch action {
         case .character(let text):
@@ -112,6 +134,7 @@ public final class KeyboardEngine {
     }
 
     public func continueBackspace(byWord: Bool) {
+        guard !keyboardIsLocked else { return }
         if byWord {
             deleteBackwardWord()
         } else {
@@ -122,6 +145,7 @@ public final class KeyboardEngine {
     }
 
     public func moveCursor(horizontal: Int, vertical: Int) {
+        guard !keyboardIsLocked else { return }
         let before = document?.documentContextBeforeInput ?? ""
         let after = document?.documentContextAfterInput ?? ""
         let offset = EditingShortcuts.cursorOffset(
@@ -159,6 +183,18 @@ public final class KeyboardEngine {
         let original = currentDocumentText()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
+        }
+        // Entitlement before consent. Without the App Group the extension cannot
+        // see the record the app wrote, and Fix cannot use the network either.
+        if fixRequiresSubscription {
+            guard sharedPreferencesAvailable else {
+                presentFixNotice(.fullAccess)
+                return
+            }
+            guard subscriptionIsActive() else {
+                presentFixNotice(.subscribe)
+                return
+            }
         }
         // Full Access is what lets the extension open a network connection.
         // Without it, Fix must not pretend to run and must not block typing.
@@ -206,6 +242,7 @@ public final class KeyboardEngine {
     }
 
     public func applyPrediction(_ prediction: Prediction) {
+        guard !keyboardIsLocked else { return }
         dismissTransientFixNotice()
         let before = document?.documentContextBeforeInput
         let prefix = currentWordPrefix()
