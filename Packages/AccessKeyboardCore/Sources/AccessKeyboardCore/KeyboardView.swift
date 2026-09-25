@@ -207,7 +207,8 @@ public final class KeyboardView: UIView {
         lockedPanel.frame = bounds
         lockedPanel.apply(
             message: KeyboardLock.message(canReadEntitlement: engine.sharedPreferencesAvailable),
-            appearance: appearance
+            appearance: appearance,
+            showsOpenButton: KeyboardLock.canOpenContainingApp
         )
         lockedPanel.layoutIfNeeded()
         bringSubviewToFront(lockedPanel)

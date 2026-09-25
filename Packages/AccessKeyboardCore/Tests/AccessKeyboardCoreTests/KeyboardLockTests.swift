@@ -4,10 +4,17 @@ import XCTest
 @MainActor
 final class KeyboardLockTests: XCTestCase {
     func testDefaultModeLocksTheWholeKeyboard() {
-        XCTAssertEqual(SubscriptionConfig.monetization, .allSubscribed)
+        XCTAssertEqual(SubscriptionConfig.monetization, .allFeaturesSubscribed)
         XCTAssertTrue(SubscriptionConfig.keyboardRequiresSubscription)
         XCTAssertTrue(SubscriptionConfig.fixRequiresSubscription)
-        XCTAssertEqual(KeyboardMonetization.coreKeyboardFreeFixSubscribed.rawValue, "coreKeyboardFreeFixSubscribed")
+        XCTAssertTrue(KeyboardMonetization.allSubscribed.keyboardRequiresSubscription)
+        XCTAssertFalse(KeyboardMonetization.coreKeyboardFreeFixSubscribed.keyboardRequiresSubscription)
+        XCTAssertTrue(KeyboardMonetization.coreKeyboardFreeFixSubscribed.fixRequiresSubscription)
+        XCTAssertEqual(
+            KeyboardLock.trialMessage,
+            "Open access: keyboard to start your free trial or subscribe."
+        )
+        XCTAssertNotNil(SubscriptionConfig.paywallURL)
     }
 
     func testMissingEntitlementLocksAndKeepsNextKeyboard() {
@@ -43,16 +50,36 @@ final class KeyboardLockTests: XCTestCase {
         XCTAssertEqual(message?.text, KeyboardLock.trialMessage)
         XCTAssertFalse(message?.isHidden ?? true)
         XCTAssertNotNil(openApp)
+        XCTAssertFalse(openApp?.isHidden ?? true)
         XCTAssertGreaterThanOrEqual(openApp?.bounds.height ?? 0, 44)
         XCTAssertEqual(nextKeyboard?.accessibilityLabel, KeyboardLock.nextKeyboardTitle)
         XCTAssertGreaterThanOrEqual(nextKeyboard?.bounds.height ?? 0, 44)
         XCTAssertFalse(nextKeyboard?.isHidden ?? true)
     }
 
-    func testUnreadableEntitlementMentionsFullAccess() {
+    func testLockedPanelWithoutAURLShowsTheMessageAndGlobeOnly() {
+        let panel = KeyboardLockedPanel(frame: CGRect(x: 0, y: 0, width: 390, height: 280))
+        panel.apply(
+            message: KeyboardLock.trialMessage,
+            appearance: .system(for: .light),
+            showsOpenButton: false
+        )
+        panel.layoutIfNeeded()
+        let message = panel.descendant(identified: "keyboard.lock.message") as? UILabel
+        let openApp = panel.descendant(identified: "keyboard.lock.openApp")
+        let nextKeyboard = panel.descendant(identified: "keyboard.lock.nextKeyboard")
+        XCTAssertEqual(message?.text, KeyboardLock.trialMessage)
+        XCTAssertFalse(message?.isHidden ?? true)
+        XCTAssertTrue(openApp?.isHidden ?? false)
+        XCTAssertEqual(nextKeyboard?.accessibilityLabel, KeyboardLock.nextKeyboardTitle)
+        XCTAssertGreaterThanOrEqual(nextKeyboard?.bounds.height ?? 0, 44)
+        XCTAssertFalse(nextKeyboard?.isHidden ?? true)
+    }
+
+    func testUnreadableEntitlementStaysLockedWithTheSameMessage() {
         XCTAssertEqual(
             KeyboardLock.message(canReadEntitlement: false),
-            KeyboardLock.trialMessage + " " + KeyboardLock.fullAccessMessage
+            "Open access: keyboard to start your free trial or subscribe."
         )
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
         engine.keyboardRequiresSubscription = true

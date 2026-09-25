@@ -29,7 +29,8 @@ One subscription covers the whole keyboard, including Fix. It is sold only in th
 | `SubscriptionConfig.monthlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.monthly` |
 | `SubscriptionConfig.yearlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.yearly` |
 | `SubscriptionConfig.subscriptionGroupName` | `access: keyboard` |
-| `SubscriptionConfig.monetization` | `.allSubscribed` (the keyboard, including Fix, needs an active subscription or introductory offer) |
+| `SubscriptionConfig.monetization` | `.allFeaturesSubscribed` (the keyboard and Fix need an active subscription or introductory offer) |
+| `KeyboardMonetization.allSubscribed` | available, same gates as `.allFeaturesSubscribed` |
 | `KeyboardMonetization.coreKeyboardFreeFixSubscribed` | available, not the default (typing stays usable; Fix needs a subscription) |
 | `SubscriptionConfig.showTrialHeadlineDefault` | `true` |
 

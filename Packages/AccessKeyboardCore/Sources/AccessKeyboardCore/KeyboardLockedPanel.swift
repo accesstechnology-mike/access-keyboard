@@ -44,11 +44,13 @@ final class KeyboardLockedPanel: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func apply(message: String, appearance: KeyboardAppearance) {
+    func apply(message: String, appearance: KeyboardAppearance, showsOpenButton: Bool) {
         backgroundColor = appearance.backgroundColor
         messageLabel.text = message
         messageLabel.textColor = appearance.textColor
         messageLabel.accessibilityLabel = message
+        openAppButton.isHidden = !showsOpenButton
+        openAppButton.isAccessibilityElement = showsOpenButton
         openAppButton.backgroundColor = appearance.primaryFill
         openAppButton.setTitleColor(appearance.primaryTextColor, for: .normal)
         nextKeyboardButton.tintColor = appearance.modifierTextColor
@@ -63,8 +65,12 @@ final class KeyboardLockedPanel: UIView {
         let messageHeight = messageLabel.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
         messageLabel.frame = CGRect(x: margin, y: margin, width: width, height: messageHeight)
         let buttonY = messageLabel.frame.maxY + 12
-        let openHeight = max(44, openAppButton.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height + 12)
-        openAppButton.frame = CGRect(x: margin, y: buttonY, width: width, height: openHeight)
+        if openAppButton.isHidden {
+            openAppButton.frame = .zero
+        } else {
+            let openHeight = max(44, openAppButton.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height + 12)
+            openAppButton.frame = CGRect(x: margin, y: buttonY, width: width, height: openHeight)
+        }
         let globeSize: CGFloat = 44
         nextKeyboardButton.frame = CGRect(
             x: margin,

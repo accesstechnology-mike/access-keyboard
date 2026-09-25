@@ -17,28 +17,27 @@ public enum SubscriptionConfig {
 
     public static let productIDs: Set<String> = [monthlyProductID, yearlyProductID]
 
-    /// What the subscription covers. The default locks the whole keyboard, including Fix.
-    public static let monetization: KeyboardMonetization = .allSubscribed
+    /// What the subscription covers. Change this case to switch the split; the
+    /// gates below stay in place.
+    public static let monetization: KeyboardMonetization = .allFeaturesSubscribed
 
     public static var keyboardRequiresSubscription: Bool {
-        switch monetization {
-        case .allSubscribed:
-            return true
-        case .coreKeyboardFreeFixSubscribed:
-            return false
-        }
+        monetization.keyboardRequiresSubscription
     }
 
     public static var fixRequiresSubscription: Bool {
-        switch monetization {
-        case .allSubscribed, .coreKeyboardFreeFixSubscribed:
-            return true
-        }
+        monetization.fixRequiresSubscription
     }
 
-    /// Opens the containing app on the paywall. The keyboard extension has no purchase UI.
+    /// Opens the containing app on the paywall. Empty means the locked keyboard
+    /// shows the message only. The keyboard extension has no purchase UI.
     public static let urlScheme = "accesskeyboard"
-    public static let paywallURL = URL(string: "\(urlScheme)://subscribe")!
+
+    public static var paywallURL: URL? {
+        let scheme = urlScheme.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !scheme.isEmpty else { return nil }
+        return URL(string: "\(scheme)://subscribe")
+    }
 
     /// Paywall presentation only. `true` lets the paywall show a trial headline
     /// when StoreKit reports an introductory offer the user is eligible for.
@@ -54,17 +53,38 @@ public enum SubscriptionConfig {
 }
 
 public enum KeyboardMonetization: String, Sendable {
-    /// The keyboard, including Fix, requires an active subscription or introductory offer.
+    /// The keyboard and Fix both require an active subscription or introductory offer.
+    case allFeaturesSubscribed
+    /// Same split as `.allFeaturesSubscribed`. Kept so the default can move without new gates.
     case allSubscribed
     /// Typing stays free. Fix requires an active subscription.
     case coreKeyboardFreeFixSubscribed
+
+    public var keyboardRequiresSubscription: Bool {
+        switch self {
+        case .allFeaturesSubscribed, .allSubscribed:
+            return true
+        case .coreKeyboardFreeFixSubscribed:
+            return false
+        }
+    }
+
+    public var fixRequiresSubscription: Bool {
+        switch self {
+        case .allFeaturesSubscribed, .allSubscribed, .coreKeyboardFreeFixSubscribed:
+            return true
+        }
+    }
 }
 
 public enum KeyboardLock {
-    public static let trialMessage = "Start your free trial in the access: keyboard app to use this keyboard."
-    public static let fullAccessMessage = "Turn on Allow Full Access so this keyboard can see your subscription."
+    public static let trialMessage = "Open access: keyboard to start your free trial or subscribe."
     public static let openAppButtonTitle = "Open access: keyboard"
     public static let nextKeyboardTitle = "Next Keyboard"
+
+    public static var canOpenContainingApp: Bool {
+        SubscriptionConfig.paywallURL != nil
+    }
 
     public static func isLocked(requiresSubscription: Bool, canReadEntitlement: Bool, entitled: Bool) -> Bool {
         guard requiresSubscription else { return false }
@@ -72,11 +92,8 @@ public enum KeyboardLock {
         return !entitled
     }
 
-    public static func message(canReadEntitlement: Bool) -> String {
-        if canReadEntitlement {
-            return trialMessage
-        }
-        return trialMessage + " " + fullAccessMessage
+    public static func message(canReadEntitlement _: Bool) -> String {
+        trialMessage
     }
 }
 

@@ -114,7 +114,7 @@ final class SubscriptionEntitlementTests: XCTestCase {
     }
 
     func testProductIDsUseTheAppBundlePrefix() {
-        XCTAssertEqual(SubscriptionConfig.monetization, .allSubscribed)
+        XCTAssertEqual(SubscriptionConfig.monetization, .allFeaturesSubscribed)
         XCTAssertTrue(SubscriptionConfig.keyboardRequiresSubscription)
         XCTAssertTrue(SubscriptionConfig.fixRequiresSubscription)
         XCTAssertFalse(

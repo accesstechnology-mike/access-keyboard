@@ -58,7 +58,7 @@ The suggestion bar can learn words you type. That learning stays on the device (
 
 Using the keyboard requires a subscription. Monthly and yearly are two prices for the same keyboard, including Fix, purchased in this app through Apple. A free trial is the introductory offer Apple shows when your account is eligible. Tapping Fix can correct the text in the current field. Nothing is sent until you tap Fix, and this version asks you to Allow it once before the first send. You can turn that off in Settings. Only that field is sent, to OpenAI through access: keyboard’s server, so it can be corrected. The server does not keep the text. Ordinary keystrokes are not sent. Password fields are skipped. With no network, Fix does not send anything.
 
-Without an active subscription the keyboard in other apps shows a short locked message, a button that opens this app, and a globe key that switches to another keyboard. It does not show a purchase screen. Allow Full Access has to be on so that keyboard can read the subscription. The app includes a Type screen once you are subscribed.
+Without an active subscription the keyboard in other apps shows “Open access: keyboard to start your free trial or subscribe.”, a button that opens this app, and a globe key that switches to another keyboard. The letter keys are not shown. It does not show a purchase screen. Allow Full Access has to be on so that keyboard can read the subscription. The app includes a Type screen once you are subscribed.
 
 To use it in other apps: Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
 ```
@@ -131,7 +131,7 @@ Paste this into App Review. The app requires a subscription. Full Access is requ
 ```
 This is an assistive keyboard for iPhone and iPad. There is no account or login. There is no free tier.
 
-The app requires one auto-renewing subscription to use the keyboard, including Fix. Monthly and yearly are two prices for that same product. A 14-day free trial is the introductory offer configured in App Store Connect. The app shows trial wording only when StoreKit reports an offer and the Sandbox account is eligible. Config cannot grant access and cannot change the trial length.
+The whole app requires a subscription after the 14-day free trial. The keyboard and Fix are one product. Monthly and yearly are two prices in the same subscription group. The 14-day free trial is the introductory offer configured in App Store Connect. The paywall shows trial wording only when StoreKit reports an introductory offer and the Sandbox account is eligible. Config cannot grant access and cannot change the trial length.
 
 On first launch, with no subscription, the app opens on the paywall. It is titled access: keyboard. It lists both plans with the price, period, and renewal terms from StoreKit, plus auto-renew wording, Manage Subscriptions, Restore Purchases, the Privacy Policy (https://access-keyboard.vercel.app/privacy.html), and Terms of Use (https://www.apple.com/legal/internet-services/itunes/dev/stdeula/).
 
@@ -144,7 +144,7 @@ The keyboard will not appear in other apps until the reviewer adds it:
 Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
 Then open that keyboard and turn on Allow Full Access.
 
-Without a subscription, or with Allow Full Access off, the system keyboard does not show a blank view and does not show a purchase screen. It shows: “Start your free trial in the access: keyboard app to use this keyboard.”, a button that opens this app (accesskeyboard://subscribe), and a globe (Next Keyboard) key that switches to another keyboard. That globe key stays available so the reviewer is not trapped. With Full Access off, the same panel also asks the reviewer to turn on Allow Full Access so the keyboard can see the subscription.
+Without a subscription, or with Allow Full Access off, the system keyboard does not show a blank view, typing keys, or a purchase screen. It shows: “Open access: keyboard to start your free trial or subscribe.” Because the app registers the accesskeyboard URL scheme, it also shows a button that opens this app (accesskeyboard://subscribe). A globe (Next Keyboard) key always switches to another keyboard, so the reviewer is not trapped.
 
 Full Access is used for three things:
 1. Let the keyboard extension read the subscription record in App Group group.6M3Z27M69P.app.access.keyboard.
@@ -176,7 +176,7 @@ Demo: open the app, start the sandbox trial or subscribe, type on the Type scree
 | Flag | Default | Where |
 | --- | --- | --- |
 | `FeatureFlags.fixConsentRequired` | on | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/FeatureFlags.swift` |
-| `SubscriptionConfig.monetization` | `.allSubscribed` | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift` |
+| `SubscriptionConfig.monetization` | `.allFeaturesSubscribed` | `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift` |
 | `SubscriptionConfig.showTrialHeadlineDefault` | on | same file; remote `config.json` can hide the headline only |
 
 Beth mode is listed in Settings under the name Beth. `BethColorMap` supplies the colours.

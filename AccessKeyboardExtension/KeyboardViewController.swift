@@ -51,7 +51,7 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
     /// Opens the containing app on the paywall. Tries the extension context first,
     /// then the responder chain. The keyboard never presents a purchase sheet.
     private func openContainingApp() {
-        let url = SubscriptionConfig.paywallURL
+        guard let url = SubscriptionConfig.paywallURL else { return }
         guard let context = extensionContext else {
             openURLThroughResponderChain(url)
             return
