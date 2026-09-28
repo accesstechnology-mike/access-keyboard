@@ -320,7 +320,9 @@ final class AccessOptionsTests: XCTestCase {
             bounds: CGSize(width: 320, height: 400),
             safeBottom: 0
         )
-        XCTAssertEqual(compact.keyHeight, 58)
+        XCTAssertEqual(compact.keyHeight, 52)
+        XCTAssertEqual(compact.predictionBarHeight, 46)
+        XCTAssertEqual(iPad.predictionBarHeight, 0)
     }
 
     private func compact(_ letterLayout: LetterLayout) -> KeyboardLayout {

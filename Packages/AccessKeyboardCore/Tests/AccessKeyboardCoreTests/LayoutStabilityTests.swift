@@ -348,34 +348,23 @@ final class LayoutStabilityTests: XCTestCase {
                                 safeBottom: safeBottom,
                                 rowCount: board.rows.count
                             )
-                            let arrangement = PredictionColumnGeometry.arrangement(
-                                texts: predictionTexts,
-                                keyboardSize: CGSize(width: width, height: metrics.preferredHeight),
-                                metrics: metrics,
-                                layout: board,
-                                showsPredictions: !predictionTexts.isEmpty
-                            )
-                            let reserved = PredictionColumnGeometry.reservedLeading(
-                                for: arrangement,
-                                metrics: metrics
-                            )
+                            let reservedTop = predictionTexts.isEmpty ? CGFloat(0) : metrics.predictionBarHeight
                             let rows = KeyboardGeometry.frames(
                                 for: board,
                                 metrics: metrics,
                                 boundsWidth: width,
-                                reservedLeading: reserved
+                                reservedLeading: 0,
+                                reservedTop: reservedTop
                             )
                             let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(predictionTexts.count) safe=\(safeBottom)"
-                            let leftLimit = metrics.sideInset + reserved
+                            let leftLimit = metrics.sideInset
                             let rightLimit = width - metrics.sideInset
-                            if reserved > 0 {
-                                XCTAssertGreaterThanOrEqual(
-                                    arrangement.columnFrame.minX, metrics.sideInset - 0.5,
-                                    "prediction column must sit on the left: \(context)"
-                                )
-                                XCTAssertLessThanOrEqual(
-                                    arrangement.columnFrame.maxX + metrics.keySpacing, leftLimit + 0.5,
-                                    "keys must start clear of the prediction column: \(context)"
+                            if let first = rows.first?.first {
+                                XCTAssertEqual(
+                                    first.minY,
+                                    metrics.topInset + reservedTop,
+                                    accuracy: 0.5,
+                                    "keys should start below the prediction bar: \(context)"
                                 )
                             }
                             for frames in rows {
@@ -413,31 +402,20 @@ final class LayoutStabilityTests: XCTestCase {
                     safeBottom: 0,
                     rowCount: board.rows.count
                 )
-                let arrangement = PredictionColumnGeometry.arrangement(
-                    texts: Self.shortPredictions,
-                    keyboardSize: CGSize(width: width, height: metrics.preferredHeight),
-                    metrics: metrics,
-                    layout: board,
-                    showsPredictions: true
-                )
-                let reserved = PredictionColumnGeometry.reservedLeading(for: arrangement, metrics: metrics)
                 let rows = KeyboardGeometry.frames(
                     for: board,
                     metrics: metrics,
                     boundsWidth: width,
-                    reservedLeading: reserved
+                    reservedLeading: 0,
+                    reservedTop: metrics.predictionBarHeight
                 )
                 let context = "mode=\(mode) letters=\(letterLayout)"
                 let leftEdge = rows.compactMap { $0.first?.minX }.min() ?? 0
                 let rightEdge = rows.compactMap { $0.last?.maxX }.max() ?? 0
-                XCTAssertEqual(arrangement.columnFrame.minX, metrics.sideInset, accuracy: 0.5, "column not flush left: \(context)")
-                XCTAssertLessThanOrEqual(
-                    leftEdge, metrics.sideInset + reserved + 0.5,
-                    "keys should start just after the prediction column: \(context)"
-                )
-                XCTAssertGreaterThanOrEqual(
-                    leftEdge, metrics.sideInset + reserved - 0.5,
-                    "keys overlap the prediction column: \(context)"
+                XCTAssertEqual(
+                    leftEdge, metrics.sideInset,
+                    accuracy: 0.5,
+                    "iPhone keys start at the side inset, with no prediction column: \(context)"
                 )
                 // The widest row should reach close to the right inset — allow a
                 // little slack for centring and inter-key gaps.

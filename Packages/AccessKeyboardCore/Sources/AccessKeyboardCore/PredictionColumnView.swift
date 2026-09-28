@@ -1,7 +1,7 @@
 import UIKit
 
-/// Vertical prediction list on the left of the keyboard, with Fix anchored at
-/// the bottom of the same column.
+/// Vertical prediction list on the left of the iPad keyboard, with Fix anchored
+/// at the bottom of the same column. iPhone uses `PredictionBarView` instead.
 final class PredictionColumnView: UIView {
     var onSelect: ((Prediction) -> Void)?
     var onFix: (() -> Void)?

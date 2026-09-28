@@ -144,7 +144,7 @@ Paste this into the TestFlight group:
 iPhone or iPad on iOS/iPadOS 18. The keyboard adapts: a compact single-column board on iPhone, the larger multi-column board on iPad.
 
 1. Open access: keyboard. Type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
-2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix at the bottom of the prediction list on the left. Undo should restore the original. Password fields must not send text.
+2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix (left of the prediction bar on iPhone, bottom of the prediction list on iPad). Undo should restore the original. Password fields must not send text.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
 4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too.
 5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on).

@@ -80,7 +80,7 @@ public enum KeyboardGeometry {
             flexWidth = 0
             let rowWidth = fixed * unit + gaps
             if leftDocked {
-                // Flush to the left of the key area (to the right of the
+                // Flush to the left of the key area (to the right of the iPad
                 // prediction column, when that column is showing).
                 leading = contentLeading + row.leadingInsetUnits * unit
             } else {
@@ -106,20 +106,21 @@ public enum KeyboardGeometry {
     /// Lays out an entire board, returning one frame array per row. Mirrors the
     /// order `KeyboardView.layoutKeys` places its buttons in.
     ///
-    /// `reservedLeading` is the width of the prediction column plus the gap
-    /// before the first key. Predictions used to sit in a bar above the keys;
-    /// they now occupy this strip on the left, so the key grid starts lower
-    /// in x and at `topInset` in y.
+    /// `reservedLeading` is the iPad prediction column plus the gap before the
+    /// first key. `reservedTop` is the iPhone prediction bar: keys start below
+    /// it. Compact boards pass a top reserve and no leading reserve; iPad
+    /// boards do the opposite.
     public static func frames(
         for layout: KeyboardLayout,
         metrics: LayoutMetrics,
         boundsWidth: CGFloat,
-        reservedLeading: CGFloat = 0
+        reservedLeading: CGFloat = 0,
+        reservedTop: CGFloat = 0
     ) -> [[CGRect]] {
         let contentLeading = metrics.sideInset + max(0, reservedLeading)
         let usableWidth = boundsWidth - contentLeading - metrics.sideInset
         let unit = unitWidth(in: layout, usableWidth: usableWidth, metrics: metrics)
-        var y = metrics.topInset
+        var y = metrics.topInset + max(0, reservedTop)
         var rows: [[CGRect]] = []
         for row in layout.rows {
             rows.append(

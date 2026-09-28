@@ -1,8 +1,9 @@
 import UIKit
 
-/// How the left-hand prediction column is carved out of the keyboard.
+/// How the left-hand prediction column is carved out of an iPad keyboard.
 ///
-/// The column is the standard home for predictions on every layout. Its width
+/// iPhone keeps the horizontal bar. On iPad and iPad Pro, portrait and
+/// landscape, the column is the home for predictions. Its width
 /// stays put while someone is typing ordinary words, so the keys beside it do
 /// not resize on each keystroke. A very long word may widen the column, up to
 /// a cap that still leaves tappable keys. Inside the column, row heights and
@@ -25,6 +26,12 @@ public struct PredictionColumnArrangement: Equatable {
 
 public enum PredictionColumnGeometry {
     public static let textInsets = UIEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
+
+    /// iPhone (and a narrow iPad that falls back to the compact board) uses the
+    /// top bar. Every larger iPad board uses the left column.
+    public static func usesVerticalColumn(_ layoutClass: LayoutClass) -> Bool {
+        layoutClass != .compact
+    }
 
     public static func arrangement(
         texts: [String],

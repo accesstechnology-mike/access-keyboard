@@ -4,8 +4,8 @@ import UIKit
 
 final class PredictionColumnTests: XCTestCase {
     func testShortPredictionsFillTheLeftColumnAndKeepFixAtTheBottom() {
-        let board = qwertyCompact()
-        let metrics = compactMetrics(width: 390)
+        let board = qwertyPad()
+        let metrics = padMetrics(width: 834, height: 1194)
         let texts = ["the", "to", "and", "of", "a", "in"]
         let plan = PredictionColumnGeometry.arrangement(
             texts: texts,
@@ -25,8 +25,8 @@ final class PredictionColumnTests: XCTestCase {
     }
 
     func testLongWordIsShownInFullAndGetsATallerRow() {
-        let board = qwertyCompact()
-        let metrics = compactMetrics(width: 390)
+        let board = qwertyPad()
+        let metrics = padMetrics(width: 834, height: 1194)
         let word = "internationalization"
         let texts = [word, "the", "to", "and", "a", "of"]
         let plan = PredictionColumnGeometry.arrangement(
@@ -60,7 +60,7 @@ final class PredictionColumnTests: XCTestCase {
         let rows = KeyboardGeometry.frames(
             for: board,
             metrics: metrics,
-            boundsWidth: 390,
+            boundsWidth: 834,
             reservedLeading: reserved
         )
         let leftmost = rows.flatMap { $0 }.map(\.minX).min() ?? 0
@@ -68,15 +68,15 @@ final class PredictionColumnTests: XCTestCase {
     }
 
     func testVeryLongWordsDropRowsInsteadOfTruncating() {
-        let board = qwertyCompact()
-        let metrics = compactMetrics(width: 320)
+        let board = qwertyPad()
+        let metrics = padMetrics(width: 834, height: 1194)
         let word = "supercalifragilisticexpialidocious"
         let texts = Array(repeating: word, count: 6)
         // Short on purpose: six wrapped copies cannot fit, so the column must
         // show fewer complete words rather than clip them.
         let plan = PredictionColumnGeometry.arrangement(
             texts: texts,
-            keyboardSize: CGSize(width: 320, height: 150),
+            keyboardSize: CGSize(width: 834, height: 280),
             metrics: metrics,
             layout: board,
             showsPredictions: true
@@ -89,8 +89,8 @@ final class PredictionColumnTests: XCTestCase {
     }
 
     func testHiddenPredictionsLeaveTheFullWidthForKeys() {
-        let board = qwertyCompact()
-        let metrics = compactMetrics(width: 390)
+        let board = qwertyPad()
+        let metrics = padMetrics(width: 834, height: 1194)
         let plan = PredictionColumnGeometry.arrangement(
             texts: ["the"],
             keyboardSize: CGSize(width: 390, height: metrics.preferredHeight),
@@ -103,11 +103,20 @@ final class PredictionColumnTests: XCTestCase {
         XCTAssertTrue(plan.fixFrame.isEmpty)
     }
 
+    func testColumnIsIPadOnly() {
+        XCTAssertFalse(PredictionColumnGeometry.usesVerticalColumn(.compact))
+        XCTAssertTrue(PredictionColumnGeometry.usesVerticalColumn(.iPad))
+        XCTAssertTrue(PredictionColumnGeometry.usesVerticalColumn(.iPadPro))
+    }
+
     func testColumnIsOnTheLeftForPadLayoutsToo() {
-        for layoutClass in [LayoutClass.iPad, .iPadPro] {
-            let bounds = layoutClass == .iPad
-                ? CGSize(width: 834, height: 1194)
-                : CGSize(width: 1024, height: 1366)
+        let cases: [(LayoutClass, CGSize)] = [
+            (.iPad, CGSize(width: 820, height: 1180)),
+            (.iPad, CGSize(width: 1180, height: 820)),
+            (.iPadPro, CGSize(width: 1024, height: 1366)),
+            (.iPadPro, CGSize(width: 1366, height: 1024))
+        ]
+        for (layoutClass, bounds) in cases {
             let board = LayoutFactory.layout(
                 mode: .alphabetic,
                 shift: .off,
@@ -155,21 +164,21 @@ final class PredictionColumnTests: XCTestCase {
         }
     }
 
-    private func qwertyCompact() -> KeyboardLayout {
+    private func qwertyPad() -> KeyboardLayout {
         LayoutFactory.layout(
             mode: .alphabetic,
             shift: .off,
-            layoutClass: .compact,
+            layoutClass: .iPad,
             needsInputModeSwitchKey: true,
             returnKeyType: .default,
             letterLayout: .qwerty
         )
     }
 
-    private func compactMetrics(width: CGFloat) -> LayoutMetrics {
+    private func padMetrics(width: CGFloat, height: CGFloat) -> LayoutMetrics {
         LayoutMetrics.metrics(
-            for: .compact,
-            bounds: CGSize(width: width, height: 320),
+            for: .iPad,
+            bounds: CGSize(width: width, height: height),
             safeBottom: 0,
             rowCount: 4
         )
