@@ -402,11 +402,16 @@ public enum LayoutFactory {
         for row in 0..<firstColumnCount {
             grid[row * columns] = functions[row]
         }
-        // Any remaining function keys fill from the bottom-right corner back.
-        var tail = total - 1
-        for index in rowCount..<functions.count {
-            grid[tail] = functions[index]
-            tail -= 1
+        // Any function keys that don't fit in that column fill from the
+        // bottom-right corner back. When there are fewer function keys than
+        // rows (no globe, for example) this range is empty — building
+        // `rowCount..<functions.count` would trap.
+        if functions.count > rowCount {
+            var tail = total - 1
+            for index in rowCount..<functions.count {
+                grid[tail] = functions[index]
+                tail -= 1
+            }
         }
         // Punctuation fills every still-empty cell in reading order.
         var symbolIndex = 0

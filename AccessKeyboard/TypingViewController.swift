@@ -21,7 +21,7 @@ final class TypingTextView: UITextView {
     }
 }
 
-final class TypingViewController: UIViewController, KeyboardHost {
+final class TypingViewController: UIViewController, KeyboardHost, UITextViewDelegate {
     private let textView: TypingTextView
     private let keyboardView = KeyboardView()
     private let document: TextViewDocument
@@ -51,9 +51,14 @@ final class TypingViewController: UIViewController, KeyboardHost {
         textView.autocorrectionType = .no
         textView.spellCheckingType = .no
         textView.smartQuotesType = .no
+        textView.inlinePredictionType = .no
+        textView.writingToolsBehavior = .none
+        textView.textContentType = nil
         textView.inputAssistantItem.leadingBarButtonGroups = []
         textView.inputAssistantItem.trailingBarButtonGroups = []
         textView.inputView = UIView(frame: .zero)
+        textView.inputAccessoryView = UIView(frame: .zero)
+        textView.delegate = self
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.accessibilityLabel = "Document"
 
@@ -112,6 +117,14 @@ final class TypingViewController: UIViewController, KeyboardHost {
         super.viewDidLayoutSubviews()
         keyboardView.extraBottomInset = view.safeAreaInsets.bottom
         keyboardHeightConstraint?.constant = keyboardView.preferredHeight
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+        keyboardView.engine.documentDidChange()
+    }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        keyboardView.engine.documentDidChange()
     }
 
     func advanceToNextInputMode() {

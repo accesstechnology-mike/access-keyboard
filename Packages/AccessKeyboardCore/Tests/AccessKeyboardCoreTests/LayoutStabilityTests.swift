@@ -335,7 +335,7 @@ final class LayoutStabilityTests: XCTestCase {
             for safeBottom in safeBottoms {
                 for mode in modes {
                     for letterLayout in letterLayouts {
-                        for showsPredictions in [true, false] {
+                        for predictionTexts in [Self.shortPredictions, [], Self.longPredictions] {
                             let board = layout(
                                 mode: mode,
                                 shift: .off,
@@ -348,21 +348,31 @@ final class LayoutStabilityTests: XCTestCase {
                                 safeBottom: safeBottom,
                                 rowCount: board.rows.count
                             )
+                            let reservedTop = predictionTexts.isEmpty ? CGFloat(0) : metrics.predictionBarHeight
                             let rows = KeyboardGeometry.frames(
                                 for: board,
                                 metrics: metrics,
                                 boundsWidth: width,
-                                showsPredictions: showsPredictions
+                                reservedLeading: 0,
+                                reservedTop: reservedTop
                             )
-                            let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(showsPredictions) safe=\(safeBottom)"
+                            let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(predictionTexts.count) safe=\(safeBottom)"
                             let leftLimit = metrics.sideInset
                             let rightLimit = width - metrics.sideInset
+                            if let first = rows.first?.first {
+                                XCTAssertEqual(
+                                    first.minY,
+                                    metrics.topInset + reservedTop,
+                                    accuracy: 0.5,
+                                    "keys should start below the prediction bar: \(context)"
+                                )
+                            }
                             for frames in rows {
                                 for frame in frames {
                                     XCTAssertGreaterThan(frame.width, 0, "zero/negative key width: \(context)")
                                     XCTAssertGreaterThanOrEqual(
                                         frame.minX, leftLimit - 0.5,
-                                        "key starts left of the side inset: \(context)"
+                                        "key starts left of the key area: \(context)"
                                     )
                                     XCTAssertLessThanOrEqual(
                                         frame.maxX, rightLimit + 0.5,
@@ -396,12 +406,17 @@ final class LayoutStabilityTests: XCTestCase {
                     for: board,
                     metrics: metrics,
                     boundsWidth: width,
-                    showsPredictions: true
+                    reservedLeading: 0,
+                    reservedTop: metrics.predictionBarHeight
                 )
                 let context = "mode=\(mode) letters=\(letterLayout)"
                 let leftEdge = rows.compactMap { $0.first?.minX }.min() ?? 0
                 let rightEdge = rows.compactMap { $0.last?.maxX }.max() ?? 0
-                XCTAssertLessThanOrEqual(leftEdge, metrics.sideInset + 0.5, "board not flush left: \(context)")
+                XCTAssertEqual(
+                    leftEdge, metrics.sideInset,
+                    accuracy: 0.5,
+                    "iPhone keys start at the side inset, with no prediction column: \(context)"
+                )
                 // The widest row should reach close to the right inset — allow a
                 // little slack for centring and inter-key gaps.
                 XCTAssertGreaterThan(
@@ -413,6 +428,11 @@ final class LayoutStabilityTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    private static let shortPredictions = ["the", "to", "and", "of", "a", "in"]
+    private static let longPredictions = [
+        "extraordinarily", "internationalization", "the", "and", "to", "of"
+    ]
 
     private func layout(
         mode: KeyboardMode,

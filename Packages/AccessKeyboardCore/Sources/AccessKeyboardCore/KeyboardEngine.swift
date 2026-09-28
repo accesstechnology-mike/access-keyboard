@@ -35,6 +35,12 @@ public final class KeyboardEngine {
     private var redoStack: [UndoRecord] = []
     private var lastShiftTap: TimeInterval = 0
     private let memory: PredictionMemory
+    /// True when the character before the cursor is a space this keyboard just
+    /// inserted (prediction, space bar, or the space moved after punctuation),
+    /// and `automaticSpaceContext` is the document context that space belongs
+    /// to. A space that was already in the field is left alone.
+    private var trailingSpaceIsAutomatic = false
+    private var automaticSpaceContext: String?
 
     public convenience init() {
         self.init(memory: .shared)
@@ -45,6 +51,7 @@ public final class KeyboardEngine {
     }
 
     public func documentDidChange() {
+        reconcileAutomaticTrailingSpace()
         if fixStatus == .failed {
             fixStatus = .idle
         }
@@ -59,7 +66,7 @@ public final class KeyboardEngine {
             if text.contains(where: { $0.isPunctuation || $0.isNewline }) {
                 learnCurrentWord()
             }
-            insert(text)
+            insertCharacter(text)
             consumeOneShotShift()
             applyAutocapitalization()
         case .space:
@@ -75,6 +82,7 @@ public final class KeyboardEngine {
             applyAutocapitalization()
         case .backspace:
             deleteBackward()
+            clearAutomaticTrailingSpace()
             applyAutocapitalization()
         case .shift:
             toggleShift()
@@ -107,6 +115,7 @@ public final class KeyboardEngine {
         } else {
             deleteBackward()
         }
+        clearAutomaticTrailingSpace()
         applyAutocapitalization()
         notify()
     }
@@ -122,6 +131,7 @@ public final class KeyboardEngine {
         )
         guard offset != 0 else { return }
         document?.adjustTextPosition(byCharacterOffset: offset)
+        clearAutomaticTrailingSpace()
         let previousShift = shift
         applyAutocapitalization()
         if previousShift != shift {
@@ -181,6 +191,9 @@ public final class KeyboardEngine {
         insert(prediction.insertion)
         if prediction.insertion.last?.isWhitespace != true {
             insert(" ")
+            noteAutomaticTrailingSpace()
+        } else {
+            clearAutomaticTrailingSpace()
         }
         consumeOneShotShift()
         applyAutocapitalization()
@@ -215,10 +228,33 @@ public final class KeyboardEngine {
         redoStack.removeAll()
     }
 
+    private func insertCharacter(_ text: String) {
+        let before = document?.documentContextBeforeInput ?? ""
+        if let replacement = EditingShortcuts.replacementByMovingAutomaticSpace(
+            punctuation: text,
+            before: before,
+            spaceIsAutomatic: trailingSpaceIsAutomatic
+        ) {
+            document?.deleteBackward()
+            if case .insert(" ") = undoStack.last {
+                undoStack.removeLast()
+            }
+            insert(replacement)
+            noteAutomaticTrailingSpace()
+        } else {
+            insert(text)
+            clearAutomaticTrailingSpace()
+        }
+        if mode != .alphabetic, EditingShortcuts.returnsToAlphabetic(text) {
+            mode = .alphabetic
+        }
+    }
+
     private func insertSpaceOrPeriod() {
         let before = document?.documentContextBeforeInput ?? ""
         guard EditingShortcuts.shouldConvertDoubleSpace(before) else {
             insert(" ")
+            noteAutomaticTrailingSpace()
             return
         }
         document?.deleteBackward()
@@ -226,6 +262,32 @@ public final class KeyboardEngine {
             undoStack.removeLast()
         }
         insert(". ")
+        noteAutomaticTrailingSpace()
+    }
+
+    private func noteAutomaticTrailingSpace() {
+        let before = document?.documentContextBeforeInput ?? ""
+        guard before.hasSuffix(" ") else {
+            clearAutomaticTrailingSpace()
+            return
+        }
+        trailingSpaceIsAutomatic = true
+        automaticSpaceContext = before
+    }
+
+    private func clearAutomaticTrailingSpace() {
+        trailingSpaceIsAutomatic = false
+        automaticSpaceContext = nil
+    }
+
+    /// Drops the automatic-space flag when the field changed out from under the
+    /// space we inserted (cursor moved elsewhere, or another edit landed).
+    private func reconcileAutomaticTrailingSpace() {
+        guard trailingSpaceIsAutomatic else { return }
+        let before = document?.documentContextBeforeInput ?? ""
+        if before != automaticSpaceContext {
+            clearAutomaticTrailingSpace()
+        }
     }
 
     private func deleteBackward() {
@@ -286,6 +348,7 @@ public final class KeyboardEngine {
             replaceDocument(from: inserted, to: deleted)
             redoStack.append(record)
         }
+        clearAutomaticTrailingSpace()
     }
 
     private func performRedo() {
@@ -301,9 +364,11 @@ public final class KeyboardEngine {
             replaceDocument(from: deleted, to: inserted)
             undoStack.append(record)
         }
+        clearAutomaticTrailingSpace()
     }
 
     private func applyFixedText(original: String, fixed: String) {
+        clearAutomaticTrailingSpace()
         if original != fixed {
             if document?.replaceEntireText(fixed) == true {
                 undoStack.append(.replace(deleted: original, inserted: fixed))
