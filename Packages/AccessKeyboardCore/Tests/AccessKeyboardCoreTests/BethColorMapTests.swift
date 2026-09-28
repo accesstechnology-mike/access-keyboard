@@ -44,8 +44,8 @@ final class BethColorMapTests: XCTestCase {
     }
 
     func testAppearancePaintsLettersFromTheMap() {
-        var appearance = KeyboardAppearance.system(for: .light)
-        appearance.usesBethLetterColors = true
+        let appearance = KeyboardAppearance.resolved(colour: .beth, style: .light)
+        XCTAssertTrue(appearance.usesBethLetterColors)
         let fill = appearance.fill(for: .letter, character: "A", pressed: false, highlightedModifier: false)
         XCTAssertEqual(fill, color("a"))
         XCTAssertEqual(

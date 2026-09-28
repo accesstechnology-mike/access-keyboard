@@ -22,11 +22,10 @@ import sys
 
 # --- LayoutMetrics.metrics(for: .compact) -------------------------------------
 SIDE_INSET = 3
-TOP_INSET = 8
-KEY_SPACING = 7
-ROW_SPACING = 12
-KEY_HEIGHT = 52
-PRED_BAR = 46
+TOP_INSET = 6
+KEY_SPACING = 6
+ROW_SPACING = 8
+KEY_HEIGHT = 58
 CORNER = 6
 
 # LayoutFactory.frameReference(for: .compact)
@@ -165,17 +164,38 @@ def unit_width(rows, left_docked, reference, usable):
     return (usable - gaps) / max(fixed_weight(ref), 1)
 
 
-def frames_for_row(row, y, usable, unit, left_docked):
+def column_width(board_width, reference):
+    """Standard left-column width. Mirrors PredictionColumnGeometry for a
+    compact board with ordinary (short) predictions."""
+    ref_weight, ref_count = reference if reference else (10.0, 10)
+    per_key = board_width / max(ref_count, 1)
+    floor = min(KEY_HEIGHT * 0.42, max(16, per_key * 0.55))
+    gaps = max(ref_count - 1, 0) * KEY_SPACING
+    min_keys = floor * max(ref_weight, 1) + gaps
+    chrome = SIDE_INSET * 2 + KEY_SPACING
+    cap = board_width - chrome - min_keys
+    maximum = max(0, min(board_width * 0.34, cap))
+    proposed = round(board_width * 0.19)
+    if board_width < 360:
+        minimum = 58
+    elif board_width < 700:
+        minimum = 74
+    else:
+        minimum = 132
+    return min(maximum, max(minimum, proposed))
+
+
+def frames_for_row(row, y, usable, unit, left_docked, content_leading):
     gaps = max(len(row) - 1, 0) * KEY_SPACING
     flex_count = sum(1 for k in row if k["w"] == "flex")
     fixed = sum(weight(k) for k in row if k["w"] != "flex")
     if flex_count > 0:
         flex_w = max(unit, (usable - fixed * unit - gaps) / flex_count)
-        leading = SIDE_INSET
+        leading = content_leading
     else:
         flex_w = 0
         row_w = fixed * unit + gaps
-        leading = SIDE_INSET if left_docked else SIDE_INSET + max(0, (usable - row_w) / 2)
+        leading = content_leading if left_docked else content_leading + max(0, (usable - row_w) / 2)
     cursor = leading
     out = []
     for k in row:
@@ -185,15 +205,18 @@ def frames_for_row(row, y, usable, unit, left_docked):
     return out
 
 
-def board_frames(rows, left_docked, reference, board_width):
-    usable = board_width - 2 * SIDE_INSET
+def board_frames(rows, left_docked, reference, board_width, predictions=True):
+    col = column_width(board_width, reference) if predictions else 0
+    reserved = (col + KEY_SPACING) if col > 0 else 0
+    content_leading = SIDE_INSET + reserved
+    usable = board_width - content_leading - SIDE_INSET
     unit = unit_width(rows, left_docked, reference, usable)
-    y = TOP_INSET + PRED_BAR
+    y = TOP_INSET
     out = []
     for row in rows:
-        out.append(frames_for_row(row, y, usable, unit, left_docked))
+        out.append(frames_for_row(row, y, usable, unit, left_docked, content_leading))
         y += KEY_HEIGHT + ROW_SPACING
-    return out
+    return out, content_leading, col
 
 
 # --- verification -------------------------------------------------------------
@@ -210,17 +233,25 @@ def verify():
         for mode in MODES:
             for letter_layout in LETTER_LAYOUTS:
                 rows, left_docked, reference = compact_board(mode, letter_layout)
-                frames = board_frames(rows, left_docked, reference, width)
-                for r, row in enumerate(frames):
-                    for (x, y, w, h, k) in row:
-                        checked += 1
-                        ctx = f"w={width} mode={mode} letters={letter_layout} row={r} key={k['t']!r}"
-                        if w <= 0:
-                            failures.append(f"zero/negative width: {ctx}")
-                        if x < SIDE_INSET - 0.5:
-                            failures.append(f"starts left of inset (x={x:.2f}): {ctx}")
-                        if x + w > right_limit + 0.5:
-                            failures.append(f"overflows right (maxX={x + w:.2f} > {right_limit}): {ctx}")
+                for predictions in (True, False):
+                    frames, content_leading, col = board_frames(
+                        rows, left_docked, reference, width, predictions=predictions
+                    )
+                    for r, row in enumerate(frames):
+                        for (x, y, w, h, k) in row:
+                            checked += 1
+                            ctx = (
+                                f"w={width} mode={mode} letters={letter_layout} "
+                                f"row={r} key={k['t']!r} pred={predictions}"
+                            )
+                            if w <= 0:
+                                failures.append(f"zero/negative width: {ctx}")
+                            if x < content_leading - 0.5:
+                                failures.append(f"starts left of the key area (x={x:.2f}): {ctx}")
+                            if predictions and x < SIDE_INSET + col - 0.5:
+                                failures.append(f"overlaps the prediction column (x={x:.2f}): {ctx}")
+                            if x + w > right_limit + 0.5:
+                                failures.append(f"overflows right (maxX={x + w:.2f} > {right_limit}): {ctx}")
     print(f"verify: checked {checked} key frames across {len(IPHONE_WIDTHS)} widths x {len(MODES)} modes x {len(LETTER_LAYOUTS)} layouts")
     if failures:
         print(f"FAIL ({len(failures)}):")
@@ -255,9 +286,9 @@ def _font(size):
 def render(mode, letter_layout, title, subtitle, path, board_width=390, scale=3):
     from PIL import Image, ImageDraw
     rows, left_docked, reference = compact_board(mode, letter_layout)
-    frames = board_frames(rows, left_docked, reference, board_width)
+    frames, content_leading, col = board_frames(rows, left_docked, reference, board_width)
     title_h = 74
-    board_h = TOP_INSET + PRED_BAR + len(rows) * KEY_HEIGHT + (len(rows) - 1) * ROW_SPACING + 10
+    board_h = TOP_INSET + len(rows) * KEY_HEIGHT + (len(rows) - 1) * ROW_SPACING + 6
     W, H = board_width, title_h + board_h
     img = Image.new("RGB", (W * scale, H * scale), (245, 246, 248))
     d = ImageDraw.Draw(img)
@@ -278,8 +309,13 @@ def render(mode, letter_layout, title, subtitle, path, board_width=390, scale=3)
 
     top = title_h
     rr(0, top, W, board_h, 0, BG)
-    rr(SIDE_INSET, top + 4, W - 2 * SIDE_INSET, PRED_BAR - 10, 6, (232, 234, 238))
-    text_center(SIDE_INSET, top + 4, W - 2 * SIDE_INSET, PRED_BAR - 10, "predictions", _font(16), (120, 124, 132))
+    col_top = top + TOP_INSET
+    col_h = board_h - TOP_INSET - 6
+    rr(SIDE_INSET, col_top, col, col_h - KEY_HEIGHT - ROW_SPACING, 6, (232, 234, 238))
+    text_center(SIDE_INSET, col_top, col, col_h - KEY_HEIGHT - ROW_SPACING, "words", _font(14), (80, 84, 92))
+    fix_y = col_top + col_h - KEY_HEIGHT
+    rr(SIDE_INSET, fix_y, col, KEY_HEIGHT, CORNER, (10, 132, 255))
+    text_center(SIDE_INSET, fix_y, col, KEY_HEIGHT, "Fix", _font(14), (255, 255, 255))
 
     key_font = _font(22)
     mod_font = _font(14)

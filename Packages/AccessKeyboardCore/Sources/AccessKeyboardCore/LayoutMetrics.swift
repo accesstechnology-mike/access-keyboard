@@ -7,7 +7,6 @@ public struct LayoutMetrics: Equatable {
     public var keySpacing: CGFloat
     public var rowSpacing: CGFloat
     public var keyHeight: CGFloat
-    public var predictionBarHeight: CGFloat
     public var cornerRadius: CGFloat
     public var letterFontSize: CGFloat
     public var modifierFontSize: CGFloat
@@ -16,8 +15,7 @@ public struct LayoutMetrics: Equatable {
     public var rowCount: Int
 
     public var preferredHeight: CGFloat {
-        predictionBarHeight
-            + topInset
+        topInset
             + CGFloat(rowCount) * keyHeight
             + CGFloat(max(rowCount - 1, 0)) * rowSpacing
             + bottomInset
@@ -34,30 +32,31 @@ public struct LayoutMetrics: Equatable {
         case .compact:
             metrics = LayoutMetrics(
                 sideInset: 3,
-                topInset: 8,
+                topInset: 6,
                 // Reserve the home-indicator safe area so the bottom toolbar row
                 // never sits under it; falls back to a small pad when absent.
                 bottomInset: max(6, safeBottom),
-                keySpacing: 7,
-                rowSpacing: 12,
-                keyHeight: 52,
-                predictionBarHeight: 46,
+                keySpacing: 6,
+                rowSpacing: 8,
+                // The prediction list now sits beside the keys, so the height
+                // that used to be a bar above them is given to the keys. The
+                // board ends up a little shorter, with taller touch targets.
+                keyHeight: 58,
                 cornerRadius: 6,
                 letterFontSize: 24,
-                modifierFontSize: 17,
-                symbolPointSize: 19,
+                modifierFontSize: 16,
+                symbolPointSize: 18,
                 rowCount: 4
             )
         case .iPad:
             let landscape = bounds.width > bounds.height
             metrics = LayoutMetrics(
                 sideInset: 8,
-                topInset: 10,
+                topInset: 8,
                 bottomInset: max(10, safeBottom),
-                keySpacing: 9,
-                rowSpacing: 10,
-                keyHeight: landscape ? 72 : 80,
-                predictionBarHeight: 52,
+                keySpacing: 8,
+                rowSpacing: 8,
+                keyHeight: landscape ? 76 : 86,
                 cornerRadius: 9,
                 letterFontSize: 28,
                 modifierFontSize: 17,
@@ -68,12 +67,11 @@ public struct LayoutMetrics: Equatable {
             let landscape = bounds.width > bounds.height
             metrics = LayoutMetrics(
                 sideInset: 6,
-                topInset: 10,
+                topInset: 8,
                 bottomInset: max(10, safeBottom),
-                keySpacing: 9,
-                rowSpacing: 10,
-                keyHeight: landscape ? 72 : 78,
-                predictionBarHeight: 54,
+                keySpacing: 8,
+                rowSpacing: 8,
+                keyHeight: landscape ? 74 : 82,
                 cornerRadius: 9,
                 letterFontSize: 30,
                 modifierFontSize: 17,

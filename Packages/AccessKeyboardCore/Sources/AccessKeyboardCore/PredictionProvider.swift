@@ -14,8 +14,8 @@ public struct Prediction: Equatable {
 }
 
 enum PredictionProvider {
-    /// Number of predicted words shown in the bar. Kept in one place so the
-    /// provider and `PredictionBarView` agree on how many slots to fill.
+    /// Number of predicted words the column can show. Kept in one place so the
+    /// provider and `PredictionColumnGeometry` agree on how many rows to fill.
     static let maxSuggestions = 6
 
     static func suggestions(

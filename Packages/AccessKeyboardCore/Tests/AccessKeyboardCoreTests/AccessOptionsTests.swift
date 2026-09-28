@@ -299,28 +299,28 @@ final class AccessOptionsTests: XCTestCase {
             bounds: CGSize(width: 834, height: 1194),
             safeBottom: 0
         )
-        XCTAssertEqual(iPad.keyHeight, 80)
+        XCTAssertEqual(iPad.keyHeight, 86)
 
         let iPadLandscape = LayoutMetrics.metrics(
             for: .iPad,
             bounds: CGSize(width: 1194, height: 834),
             safeBottom: 0
         )
-        XCTAssertEqual(iPadLandscape.keyHeight, 72)
+        XCTAssertEqual(iPadLandscape.keyHeight, 76)
 
         let pro = LayoutMetrics.metrics(
             for: .iPadPro,
             bounds: CGSize(width: 1024, height: 1366),
             safeBottom: 0
         )
-        XCTAssertEqual(pro.keyHeight, 78)
+        XCTAssertEqual(pro.keyHeight, 82)
 
         let compact = LayoutMetrics.metrics(
             for: .compact,
             bounds: CGSize(width: 320, height: 400),
             safeBottom: 0
         )
-        XCTAssertEqual(compact.keyHeight, 52)
+        XCTAssertEqual(compact.keyHeight, 58)
     }
 
     private func compact(_ letterLayout: LetterLayout) -> KeyboardLayout {

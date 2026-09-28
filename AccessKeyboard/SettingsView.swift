@@ -44,7 +44,7 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("Fix sits on the suggestion bar. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
+                Text("Fix sits at the bottom of the prediction list, on the left of the keyboard. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent.")
