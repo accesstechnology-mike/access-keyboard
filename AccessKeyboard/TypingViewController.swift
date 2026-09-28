@@ -51,9 +51,13 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
         textView.autocorrectionType = .no
         textView.spellCheckingType = .no
         textView.smartQuotesType = .no
+        textView.inlinePredictionType = .no
+        textView.writingToolsBehavior = .none
+        textView.textContentType = nil
         textView.inputAssistantItem.leadingBarButtonGroups = []
         textView.inputAssistantItem.trailingBarButtonGroups = []
         textView.inputView = UIView(frame: .zero)
+        textView.inputAccessoryView = UIView(frame: .zero)
         textView.delegate = self
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.accessibilityLabel = "Document"
