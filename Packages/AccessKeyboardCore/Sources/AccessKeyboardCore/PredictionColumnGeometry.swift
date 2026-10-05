@@ -140,15 +140,23 @@ public enum PredictionColumnGeometry {
 
     // MARK: - Width
 
+    /// Share of the keyboard width used by the resting left column, before a
+    /// very long word is allowed to grow it. 0.15 is about 21% narrower than
+    /// the 0.19 column from the first vertical layout, so a landscape iPad
+    /// gives that space to the QWERTY keys.
+    static let standardWidthFraction: CGFloat = 0.15
+
     static func standardColumnWidth(boundsWidth: CGFloat, maximum: CGFloat) -> CGFloat {
-        let proposed = (boundsWidth * 0.19).rounded()
+        let proposed = (boundsWidth * standardWidthFraction).rounded()
         let minimum: CGFloat
         if boundsWidth < 360 {
             minimum = 58
         } else if boundsWidth < 700 {
             minimum = 74
         } else {
-            minimum = 132
+            // Floor at the 700pt breakpoint so the fraction, not an older
+            // wider minimum, sets the column on every iPad size.
+            minimum = (700 * standardWidthFraction).rounded()
         }
         return min(maximum, max(minimum, proposed))
     }

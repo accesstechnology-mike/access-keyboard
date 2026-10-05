@@ -103,6 +103,33 @@ final class PredictionColumnTests: XCTestCase {
         XCTAssertTrue(plan.fixFrame.isEmpty)
     }
 
+    func testLandscapeColumnIsModestlyNarrowerThanTheFirstVerticalLayout() {
+        // Point widths of iPad portrait and landscape boards, including
+        // iPad Air 11-inch landscape (1180).
+        let widths: [CGFloat] = [744, 820, 1024, 1133, 1180, 1366]
+        for width in widths {
+            let metrics = padMetrics(width: width, height: 820)
+            let maximum = PredictionColumnGeometry.maximumColumnWidth(
+                boundsWidth: width,
+                metrics: metrics,
+                layout: qwertyPad()
+            )
+            let standard = PredictionColumnGeometry.standardColumnWidth(
+                boundsWidth: width,
+                maximum: maximum
+            )
+            let previous = (width * 0.19).rounded()
+            let reduction = (previous - standard) / previous
+            XCTAssertEqual(
+                standard,
+                (width * PredictionColumnGeometry.standardWidthFraction).rounded(),
+                "width \(width) should follow the resting fraction"
+            )
+            XCTAssertGreaterThan(reduction, 0.15, "width \(width) reduced by \(reduction)")
+            XCTAssertLessThan(reduction, 0.25, "width \(width) reduced by \(reduction)")
+        }
+    }
+
     func testColumnIsIPadOnly() {
         XCTAssertFalse(PredictionColumnGeometry.usesVerticalColumn(.compact))
         XCTAssertTrue(PredictionColumnGeometry.usesVerticalColumn(.iPad))
