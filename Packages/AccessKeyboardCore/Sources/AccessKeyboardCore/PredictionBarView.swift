@@ -1,18 +1,25 @@
 import UIKit
 
+/// Horizontal prediction bar across the top of the iPhone keyboard.
+///
+/// Fix stays on the left, as it did before the column experiment. Suggestion
+/// cells are not equal width: each one is as wide as its word, so a long
+/// suggestion is shown in full.
 final class PredictionBarView: UIView {
     var onSelect: ((Prediction) -> Void)?
     var onFix: (() -> Void)?
 
-    /// Number of prediction slots. Matches `PredictionProvider.maxSuggestions`
-    /// so every returned suggestion has a slot to land in.
     private static let slotCount = PredictionProvider.maxSuggestions
 
     private var predictions: [Prediction] = []
+    private var arrangement = PredictionBarArrangement(
+        fixFrame: .zero,
+        cellFrames: [],
+        visibleTexts: [],
+        fontSize: 17
+    )
     private let fixButton = UIButton(type: .system)
     private let spinner = UIActivityIndicatorView(style: .medium)
-    // One button per prediction slot, plus one separator per slot: separators[0]
-    // divides Fix from the first slot and the rest sit between adjacent slots.
     private let buttons = (0..<PredictionBarView.slotCount).map { _ in UIButton(type: .system) }
     private let separators = (0..<PredictionBarView.slotCount).map { _ in UIView() }
 
@@ -26,17 +33,15 @@ final class PredictionBarView: UIView {
         spinner.isUserInteractionEnabled = false
         addSubview(spinner)
         buttons.enumerated().forEach { index, button in
-            button.titleLabel?.adjustsFontSizeToFitWidth = true
-            button.titleLabel?.minimumScaleFactor = 0.7
-            button.titleLabel?.lineBreakMode = .byTruncatingTail
+            button.titleLabel?.adjustsFontSizeToFitWidth = false
+            button.titleLabel?.lineBreakMode = .byClipping
+            button.titleLabel?.numberOfLines = 1
             button.addTarget(self, action: #selector(tap(_:)), for: .touchUpInside)
             button.tag = index
             button.isAccessibilityElement = true
             addSubview(button)
         }
-        separators.forEach { separator in
-            addSubview(separator)
-        }
+        separators.forEach { addSubview($0) }
     }
 
     @available(*, unavailable)
@@ -46,17 +51,18 @@ final class PredictionBarView: UIView {
 
     func update(
         predictions: [Prediction],
+        arrangement: PredictionBarArrangement,
         fixStatus: FixStatus,
-        appearance: KeyboardAppearance,
-        fontSize: CGFloat
+        appearance: KeyboardAppearance
     ) {
         self.predictions = predictions
+        self.arrangement = arrangement
         let running = fixStatus == .running
         fixButton.setTitle(running ? "" : "Fix", for: .normal)
         fixButton.isEnabled = !running
         fixButton.backgroundColor = appearance.primaryFill
         fixButton.setTitleColor(appearance.primaryTextColor, for: .normal)
-        fixButton.titleLabel?.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        fixButton.titleLabel?.font = .systemFont(ofSize: arrangement.fontSize, weight: .semibold)
         fixButton.accessibilityLabel = running
             ? "Fix in progress"
             : (fixStatus == .failed ? "Fix failed, try again" : "Fix typing errors")
@@ -68,9 +74,10 @@ final class PredictionBarView: UIView {
         }
         spinner.color = appearance.primaryTextColor
 
+        let visible = Array(predictions.prefix(arrangement.visibleTexts.count))
         for (index, button) in buttons.enumerated() {
-            if predictions.indices.contains(index) {
-                let item = predictions[index]
+            if visible.indices.contains(index) {
+                let item = visible[index]
                 button.isHidden = false
                 button.setTitle(item.displayText, for: .normal)
                 button.isEnabled = !running
@@ -78,60 +85,51 @@ final class PredictionBarView: UIView {
                     ? "Use as typed, \(item.insertion)"
                     : "Predicted word, \(item.insertion)"
                 button.accessibilityTraits = .button
-                button.titleLabel?.font = LiteracyFont.uiFont(ofSize: fontSize)
-                    ?? .systemFont(ofSize: fontSize, weight: item.isVerbatim ? .regular : .medium)
+                button.titleLabel?.font = PredictionColumnGeometry.measurementFont(ofSize: arrangement.fontSize)
                 button.setTitleColor(appearance.textColor, for: .normal)
                 button.alpha = running ? 0.45 : 1
             } else {
-                // No suggestion for this slot (e.g. numeric/symbol modes): hide it
-                // entirely rather than showing an empty, divided, tappable slot.
                 button.isHidden = true
-                button.setTitle("", for: .normal)
+                button.setTitle(nil, for: .normal)
                 button.isEnabled = false
                 button.accessibilityLabel = nil
             }
         }
-        let count = min(predictions.count, buttons.count)
         let line = appearance.secondaryTextColor.withAlphaComponent(0.45)
-        for (index, separator) in separators.enumerated() {
-            // separators[0] divides Fix from the first slot; the rest sit between
-            // adjacent slots. Show a divider only where a filled slot follows.
+        for separator in separators {
             separator.backgroundColor = line
-            separator.isHidden = count <= index
         }
         setNeedsLayout()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let fixWidth = min(92, max(72, bounds.width * 0.14))
-        let height = bounds.height
-        fixButton.frame = CGRect(x: 0, y: 2, width: fixWidth, height: height - 4)
-        fixButton.layer.cornerRadius = min(8, (height - 4) / 4)
+        fixButton.frame = arrangement.fixFrame
+        fixButton.layer.cornerRadius = min(8, max(0, arrangement.fixFrame.height) / 4)
         spinner.center = fixButton.center
 
-        let restMinX = fixButton.frame.maxX
-        let restWidth = max(0, bounds.width - restMinX)
-        let slotWidth = restWidth / CGFloat(buttons.count)
-        for (index, button) in buttons.enumerated() {
-            button.frame = CGRect(x: restMinX + CGFloat(index) * slotWidth, y: 0, width: slotWidth, height: height)
-        }
+        let height = bounds.height
         let separatorWidth: CGFloat = 1 / max(traitCollection.displayScale, 1)
-        separators[0].frame = CGRect(
-            x: restMinX,
-            y: height * 0.22,
-            width: separatorWidth,
-            height: height * 0.56
-        )
-        for index in 0..<(buttons.count - 1) {
-            let x = restMinX + slotWidth * CGFloat(index + 1)
-            separators[index + 1].frame = CGRect(x: x, y: height * 0.22, width: separatorWidth, height: height * 0.56)
+        for (index, button) in buttons.enumerated() {
+            if arrangement.cellFrames.indices.contains(index) {
+                button.frame = arrangement.cellFrames[index]
+            }
+        }
+        let count = arrangement.cellFrames.count
+        for (index, separator) in separators.enumerated() {
+            separator.isHidden = count <= index
+            guard count > index else { continue }
+            let x = index == 0
+                ? arrangement.fixFrame.maxX
+                : arrangement.cellFrames[index - 1].maxX
+            separator.frame = CGRect(x: x, y: height * 0.22, width: separatorWidth, height: height * 0.56)
         }
     }
 
     @objc private func tap(_ sender: UIButton) {
-        guard predictions.indices.contains(sender.tag) else { return }
-        onSelect?(predictions[sender.tag])
+        let visible = Array(predictions.prefix(arrangement.visibleTexts.count))
+        guard visible.indices.contains(sender.tag) else { return }
+        onSelect?(visible[sender.tag])
     }
 
     @objc private func tapFix() {

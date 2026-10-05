@@ -59,6 +59,7 @@ public enum KeyboardGeometry {
         usableWidth: CGFloat,
         unit: CGFloat,
         metrics: LayoutMetrics,
+        contentLeading: CGFloat,
         leftDocked: Bool
     ) -> [CGRect] {
         let gap = metrics.keySpacing
@@ -74,15 +75,16 @@ public enum KeyboardGeometry {
         let leading: CGFloat
         if flexibleCount > 0 {
             flexWidth = max(unit, leftover / CGFloat(flexibleCount))
-            leading = metrics.sideInset
+            leading = contentLeading
         } else {
             flexWidth = 0
             let rowWidth = fixed * unit + gaps
             if leftDocked {
-                // Flush left; leaves the right-hand area empty for scanners.
-                leading = metrics.sideInset + row.leadingInsetUnits * unit
+                // Flush to the left of the key area (to the right of the iPad
+                // prediction column, when that column is showing).
+                leading = contentLeading + row.leadingInsetUnits * unit
             } else {
-                leading = metrics.sideInset + max(0, (usableWidth - rowWidth) / 2) + row.leadingInsetUnits * unit
+                leading = contentLeading + max(0, (usableWidth - rowWidth) / 2) + row.leadingInsetUnits * unit
             }
         }
 
@@ -103,15 +105,22 @@ public enum KeyboardGeometry {
 
     /// Lays out an entire board, returning one frame array per row. Mirrors the
     /// order `KeyboardView.layoutKeys` places its buttons in.
+    ///
+    /// `reservedLeading` is the iPad prediction column plus the gap before the
+    /// first key. `reservedTop` is the iPhone prediction bar: keys start below
+    /// it. Compact boards pass a top reserve and no leading reserve; iPad
+    /// boards do the opposite.
     public static func frames(
         for layout: KeyboardLayout,
         metrics: LayoutMetrics,
         boundsWidth: CGFloat,
-        showsPredictions: Bool
+        reservedLeading: CGFloat = 0,
+        reservedTop: CGFloat = 0
     ) -> [[CGRect]] {
-        let usableWidth = boundsWidth - metrics.sideInset * 2
+        let contentLeading = metrics.sideInset + max(0, reservedLeading)
+        let usableWidth = boundsWidth - contentLeading - metrics.sideInset
         let unit = unitWidth(in: layout, usableWidth: usableWidth, metrics: metrics)
-        var y = metrics.topInset + (showsPredictions ? metrics.predictionBarHeight : 0)
+        var y = metrics.topInset + max(0, reservedTop)
         var rows: [[CGRect]] = []
         for row in layout.rows {
             rows.append(
@@ -121,6 +130,7 @@ public enum KeyboardGeometry {
                     usableWidth: usableWidth,
                     unit: unit,
                     metrics: metrics,
+                    contentLeading: contentLeading,
                     leftDocked: layout.leftDocked
                 )
             )
