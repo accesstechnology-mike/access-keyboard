@@ -79,6 +79,7 @@ final class PredictionColumnView: UIView {
                 cell.apply(
                     text: item.displayText,
                     fontSize: fontSize,
+                    minimumFontSize: arrangement.minimumReadableFontSize,
                     insets: arrangement.textInsets,
                     color: appearance.textColor,
                     enabled: !running
@@ -162,8 +163,11 @@ private final class PredictionCell: UIControl {
         isExclusiveTouch = false
         isAccessibilityElement = true
         accessibilityTraits = .button
-        label.numberOfLines = 0
-        label.lineBreakMode = .byCharWrapping
+        label.numberOfLines = 1
+        label.lineBreakMode = .byTruncatingTail
+        label.adjustsFontSizeToFitWidth = true
+        label.allowsDefaultTighteningForTruncation = true
+        label.baselineAdjustment = .alignCenters
         label.textAlignment = .left
         label.isUserInteractionEnabled = false
         addSubview(label)
@@ -174,11 +178,22 @@ private final class PredictionCell: UIControl {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func apply(text: String, fontSize: CGFloat, insets: UIEdgeInsets, color: UIColor, enabled: Bool) {
+    func apply(
+        text: String,
+        fontSize: CGFloat,
+        minimumFontSize: CGFloat,
+        insets: UIEdgeInsets,
+        color: UIColor,
+        enabled: Bool
+    ) {
         self.insets = insets
         label.text = text
         label.textColor = color
         label.font = PredictionColumnGeometry.measurementFont(ofSize: fontSize)
+        // The geometry already picks a size that fits on one line when it can.
+        // This only absorbs measurement slack, and stops at the readable floor
+        // so a word that still overflows is ellipsized rather than wrapped.
+        label.minimumScaleFactor = fontSize > 0 ? min(1, max(minimumFontSize, 1) / fontSize) : 1
         isEnabled = enabled
         alpha = enabled ? 1 : 0.45
         setNeedsLayout()

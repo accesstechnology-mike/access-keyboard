@@ -24,68 +24,70 @@ final class PredictionColumnTests: XCTestCase {
         assertTextsFit(plan, metrics: metrics, minimumFont: plan.minimumReadableFontSize)
     }
 
-    func testLongWordIsShownInFullAndGetsATallerRow() {
+    func testLongWordsStayOnOneLineByShrinking() {
         let board = qwertyPad()
-        let metrics = padMetrics(width: 834, height: 1194)
-        let word = "internationalization"
-        let texts = [word, "the", "to", "and", "a", "of"]
-        let plan = PredictionColumnGeometry.arrangement(
-            texts: texts,
-            keyboardSize: CGSize(width: 390, height: metrics.preferredHeight),
-            metrics: metrics,
-            layout: board,
-            showsPredictions: true
-        )
-
-        XCTAssertEqual(plan.visibleTexts.first, word)
-        XCTAssertFalse(plan.visibleTexts.contains { $0.contains("…") || $0.hasSuffix("...") })
-        let preferred = PredictionColumnGeometry.preferredFontSize(metrics)
-        let singleLine = PredictionColumnGeometry.boundingSize(
-            of: word,
-            font: PredictionColumnGeometry.measurementFont(ofSize: preferred),
-            width: 10_000
-        ).width
-        let inner = plan.predictionFrames[0].width - plan.textInsets.left - plan.textInsets.right
-        if singleLine > inner + 1 {
-            let shorterType = plan.predictionFontSizes[0] + 0.1 < plan.predictionFontSizes[1]
-            let tallerRow = plan.predictionFrames[0].height > plan.predictionFrames[1].height + 0.5
-            XCTAssertTrue(
-                shorterType || tallerRow,
-                "a word that does not fit on one line should use a smaller size or a taller row"
+        let metrics = padMetrics(width: 1180, height: 820)
+        let words = ["Communications", "Responsibilities", "Internationally"]
+        for word in words {
+            let plan = PredictionColumnGeometry.arrangement(
+                texts: [word, "the", "to", "and", "a", "of"],
+                keyboardSize: CGSize(width: 1180, height: metrics.preferredHeight),
+                metrics: metrics,
+                layout: board,
+                showsPredictions: true
             )
-        }
-        assertTextsFit(plan, metrics: metrics, minimumFont: plan.minimumReadableFontSize)
 
-        let reserved = PredictionColumnGeometry.reservedLeading(for: plan, metrics: metrics)
-        let rows = KeyboardGeometry.frames(
-            for: board,
-            metrics: metrics,
-            boundsWidth: 834,
-            reservedLeading: reserved
-        )
-        let leftmost = rows.flatMap { $0 }.map(\.minX).min() ?? 0
-        XCTAssertGreaterThanOrEqual(leftmost, plan.columnFrame.maxX + metrics.keySpacing - 0.5)
+            XCTAssertEqual(plan.visibleTexts.first, word)
+            XCTAssertFalse(plan.visibleTexts.contains { $0.contains("…") || $0.hasSuffix("...") })
+            let inner = plan.predictionFrames[0].width - plan.textInsets.left - plan.textInsets.right
+            let width = PredictionColumnGeometry.singleLineWidth(word, fontSize: plan.predictionFontSizes[0])
+            XCTAssertLessThanOrEqual(width, inner + 1, "\(word) should fit on one line without an ellipsis")
+            XCTAssertLessThanOrEqual(
+                plan.predictionFontSizes[0],
+                plan.predictionFontSizes[1] + 0.01,
+                "\(word) should not be larger than a short neighbour"
+            )
+            XCTAssertLessThanOrEqual(
+                plan.predictionFrames[0].height,
+                plan.predictionFrames[1].height + 1,
+                "\(word) should not take a taller wrapped row"
+            )
+            assertTextsFit(plan, metrics: metrics, minimumFont: plan.minimumReadableFontSize)
+
+            let reserved = PredictionColumnGeometry.reservedLeading(for: plan, metrics: metrics)
+            let rows = KeyboardGeometry.frames(
+                for: board,
+                metrics: metrics,
+                boundsWidth: 1180,
+                reservedLeading: reserved
+            )
+            let leftmost = rows.flatMap { $0 }.map(\.minX).min() ?? 0
+            XCTAssertGreaterThanOrEqual(leftmost, plan.columnFrame.maxX + metrics.keySpacing - 0.5)
+        }
     }
 
-    func testVeryLongWordsDropRowsInsteadOfTruncating() {
+    func testExtremeWordStaysOneLineAndStopsAtTheReadableFloor() {
         let board = qwertyPad()
-        let metrics = padMetrics(width: 834, height: 1194)
+        let metrics = padMetrics(width: 1180, height: 820)
         let word = "supercalifragilisticexpialidocious"
-        let texts = Array(repeating: word, count: 6)
-        // Short on purpose: six wrapped copies cannot fit, so the column must
-        // show fewer complete words rather than clip them.
         let plan = PredictionColumnGeometry.arrangement(
-            texts: texts,
-            keyboardSize: CGSize(width: 834, height: 280),
+            texts: [word, "the", "to", "and", "a", "of"],
+            keyboardSize: CGSize(width: 1180, height: metrics.preferredHeight),
             metrics: metrics,
             layout: board,
             showsPredictions: true
         )
 
-        XCTAssertFalse(plan.visibleTexts.isEmpty)
-        XCTAssertLessThan(plan.visibleTexts.count, texts.count)
-        XCTAssertTrue(plan.visibleTexts.allSatisfy { $0 == word })
-        assertTextsFit(plan, metrics: metrics, minimumFont: 9)
+        XCTAssertEqual(plan.visibleTexts.first, word, "the label ellipsizes; the word itself is kept")
+        XCTAssertEqual(plan.predictionFontSizes[0], plan.minimumReadableFontSize, accuracy: 0.6)
+        let inner = plan.predictionFrames[0].width - plan.textInsets.left - plan.textInsets.right
+        let width = PredictionColumnGeometry.singleLineWidth(word, fontSize: plan.predictionFontSizes[0])
+        XCTAssertGreaterThan(width, inner, "this word is the ellipsis case, not a wrap")
+        XCTAssertLessThanOrEqual(
+            plan.predictionFrames[0].height,
+            plan.predictionFrames[1].height + 1
+        )
+        assertTextsFit(plan, metrics: metrics, minimumFont: plan.minimumReadableFontSize)
     }
 
     func testHiddenPredictionsLeaveTheFullWidthForKeys() {
@@ -182,12 +184,23 @@ final class PredictionColumnTests: XCTestCase {
             let frame = plan.predictionFrames[index]
             let fontSize = plan.predictionFontSizes[index]
             XCTAssertGreaterThanOrEqual(fontSize, minimumFont - 0.01, text)
-            let font = PredictionColumnGeometry.measurementFont(ofSize: fontSize)
             let innerWidth = frame.width - plan.textInsets.left - plan.textInsets.right
             let innerHeight = frame.height - plan.textInsets.top - plan.textInsets.bottom
-            let needed = PredictionColumnGeometry.boundingSize(of: text, font: font, width: innerWidth)
-            XCTAssertLessThanOrEqual(needed.width, innerWidth + 1, "\(text) is wider than its row")
-            XCTAssertLessThanOrEqual(needed.height, innerHeight + 1, "\(text) is taller than its row")
+            let lineWidth = PredictionColumnGeometry.singleLineWidth(text, fontSize: fontSize)
+            let font = PredictionColumnGeometry.measurementFont(ofSize: fontSize)
+            let measuredHeight = PredictionColumnGeometry.boundingSize(
+                of: text,
+                font: font,
+                width: 10_000
+            ).height
+            XCTAssertLessThanOrEqual(measuredHeight, innerHeight + 1, "\(text) is taller than its row")
+            if lineWidth > innerWidth + 1 {
+                XCTAssertLessThanOrEqual(
+                    fontSize,
+                    minimumFont + 0.6,
+                    "\(text) should be at the readable floor before an ellipsis"
+                )
+            }
         }
     }
 

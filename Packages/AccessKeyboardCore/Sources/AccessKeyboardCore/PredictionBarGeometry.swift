@@ -2,11 +2,11 @@ import UIKit
 
 /// How the iPhone prediction bar divides its width.
 ///
-/// Cells grow and shrink with the word. A long word gets a wider cell so the
-/// whole spelling is visible, instead of every slot being the same width and
-/// the long ones truncating. Every visible word uses one shared type size. If
-/// the words still cannot fit at a readable size, later suggestions are dropped
-/// rather than cut off with an ellipsis.
+/// Cells grow and shrink with the word. A long word gets a wider cell and the
+/// shared type size shrinks so the whole spelling stays on one line. If the
+/// words still cannot fit at a readable size, later suggestions are dropped.
+/// A word that still overflows its cell tightens, shrinks a little further,
+/// then truncates with an ellipsis instead of wrapping.
 public struct PredictionBarArrangement: Equatable {
     public var fixFrame: CGRect
     public var cellFrames: [CGRect]
