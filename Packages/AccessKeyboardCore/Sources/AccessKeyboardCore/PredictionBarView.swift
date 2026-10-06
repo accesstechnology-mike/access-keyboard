@@ -33,9 +33,12 @@ final class PredictionBarView: UIView {
         spinner.isUserInteractionEnabled = false
         addSubview(spinner)
         buttons.enumerated().forEach { index, button in
-            button.titleLabel?.adjustsFontSizeToFitWidth = false
-            button.titleLabel?.lineBreakMode = .byClipping
+            button.titleLabel?.adjustsFontSizeToFitWidth = true
+            button.titleLabel?.minimumScaleFactor = 0.7
+            button.titleLabel?.allowsDefaultTighteningForTruncation = true
+            button.titleLabel?.lineBreakMode = .byTruncatingTail
             button.titleLabel?.numberOfLines = 1
+            button.titleLabel?.baselineAdjustment = .alignCenters
             button.addTarget(self, action: #selector(tap(_:)), for: .touchUpInside)
             button.tag = index
             button.isAccessibilityElement = true
