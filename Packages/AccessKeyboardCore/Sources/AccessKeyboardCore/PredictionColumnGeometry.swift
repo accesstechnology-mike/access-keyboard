@@ -4,12 +4,11 @@ import UIKit
 ///
 /// iPhone keeps the horizontal bar. On iPad and iPad Pro, portrait and
 /// landscape, the column is the home for predictions. Its width
-/// stays put while someone is typing ordinary words, so the keys beside it do
-/// not resize on each keystroke. A very long word may widen the column, up to
-/// a cap that still leaves tappable keys. Inside the column, row heights and
-/// type size fluctuate with the word so the full spelling is visible: long
-/// words get a taller row and, if needed, a smaller size, and the list shows
-/// fewer rows when that is the only way to keep every visible word complete.
+/// stays put while someone is typing, so the keys beside it do not resize on
+/// each keystroke. Every suggestion is one line: a long word shrinks, down to
+/// a readable minimum, instead of wrapping or breaking. A word that still
+/// cannot fit at that size is truncated with an ellipsis by the label. The
+/// list shows fewer rows only when the single-line rows themselves do not fit.
 public struct PredictionColumnArrangement: Equatable {
     public var columnFrame: CGRect
     public var predictionFrames: [CGRect]
@@ -17,8 +16,8 @@ public struct PredictionColumnArrangement: Equatable {
     public var visibleTexts: [String]
     public var fixFrame: CGRect
     public var textInsets: UIEdgeInsets
-    /// Smallest size treated as comfortably readable. A single extreme word may
-    /// go below this rather than be clipped; ordinary rows do not.
+    /// Smallest size a suggestion uses before the label truncates with an ellipsis.
+    /// Rows do not wrap, and they do not go below this to stay complete.
     public var minimumReadableFontSize: CGFloat
 
     public var isHidden: Bool { columnFrame.width <= 0 }
@@ -58,13 +57,7 @@ public enum PredictionColumnGeometry {
             metrics: metrics,
             layout: layout
         )
-        let standard = standardColumnWidth(boundsWidth: keyboardSize.width, maximum: maximum)
-        let width = widenedWidth(
-            texts: texts,
-            standard: standard,
-            maximum: maximum,
-            metrics: metrics
-        )
+        let width = standardColumnWidth(boundsWidth: keyboardSize.width, maximum: maximum)
 
         let columnX = metrics.sideInset
         let columnY = metrics.topInset
@@ -178,35 +171,9 @@ public enum PredictionColumnGeometry {
         let chrome = metrics.sideInset * 2 + metrics.keySpacing
         let cap = boundsWidth - chrome - minKeys
         let fractionCap = boundsWidth * 0.34
-        // Never wider than the key grid can spare. A narrow phone would rather
-        // keep tappable keys than a roomy column; long words then wrap.
+        // Never wider than the key grid can spare. A long word shrinks onto one
+        // line instead of pushing the keys aside or wrapping.
         return max(0, min(fractionCap, cap))
-    }
-
-    private static func widenedWidth(
-        texts: [String],
-        standard: CGFloat,
-        maximum: CGFloat,
-        metrics: LayoutMetrics
-    ) -> CGFloat {
-        guard maximum > standard + 1 else { return min(standard, maximum) }
-        guard let longest = texts.max(by: { $0.count < $1.count }), longest.count >= 12 else {
-            return min(standard, maximum)
-        }
-        let font = measurementFont(ofSize: minimumReadableFontSize(metrics))
-        if lineCount(longest, font: font, width: innerWidth(standard)) <= 2 {
-            return standard
-        }
-        var width = standard
-        while width < maximum {
-            let next = min(maximum, width + 8)
-            if next <= width { break }
-            width = next
-            if lineCount(longest, font: font, width: innerWidth(width)) <= 2 {
-                return width
-            }
-        }
-        return min(width, maximum)
     }
 
     // MARK: - Rows
@@ -237,19 +204,18 @@ public enum PredictionColumnGeometry {
             }
         }
         let text = candidates[0]
-        let font = fontFitting(
+        let font = fontFittingWidth(
             text,
             columnWidth: columnWidth,
-            maxRowHeight: listHeight,
             preferred: preferredFontSize(metrics),
-            floor: 9
+            floor: minimumReadableFontSize(metrics)
         )
         return [RowPlan(text: text, fontSize: font, height: listHeight)]
     }
 
-    /// Places every word at the largest comfortable size that still shows it in
-    /// full. Tall (long) words shrink first. Returns nil when the words cannot
-    /// all fit at the readable minimum, so the caller can show fewer of them.
+    /// Places every word on one line. Each word uses the largest size that fits
+    /// the column width, down to the readable minimum. Returns nil when those
+    /// single-line rows do not fit vertically, so the caller can show fewer.
     private static func arrange(
         _ texts: [String],
         columnWidth: CGFloat,
@@ -258,42 +224,31 @@ public enum PredictionColumnGeometry {
     ) -> [RowPlan]? {
         let preferred = preferredFontSize(metrics)
         let readable = minimumReadableFontSize(metrics)
-        var fonts = Array(repeating: preferred, count: texts.count)
-        for _ in 0..<400 {
-            let heights = zip(texts, fonts).map { neededHeight($0, fontSize: $1, columnWidth: columnWidth) }
-            let sum = heights.reduce(0, +)
-            if sum <= listHeight + 0.5 {
-                let extra = texts.isEmpty ? 0 : (listHeight - sum) / CGFloat(texts.count)
-                return zip(texts, zip(fonts, heights)).map { text, pair in
-                    RowPlan(text: text, fontSize: pair.0, height: pair.1 + extra)
-                }
-            }
-            var tallest: Int?
-            var tallestHeight: CGFloat = -1
-            for index in fonts.indices where fonts[index] > readable + 0.01 {
-                let height = heights[index]
-                if height > tallestHeight {
-                    tallestHeight = height
-                    tallest = index
-                }
-            }
-            guard let tallest else { return nil }
-            fonts[tallest] = max(readable, fonts[tallest] - 1)
+        let fonts = texts.map {
+            fontFittingWidth($0, columnWidth: columnWidth, preferred: preferred, floor: readable)
         }
-        return nil
+        let heights = fonts.map { singleLineHeight($0) }
+        let sum = heights.reduce(0, +)
+        guard sum <= listHeight + 0.5 else { return nil }
+        let extra = texts.isEmpty ? 0 : (listHeight - sum) / CGFloat(texts.count)
+        return zip(texts, zip(fonts, heights)).map { text, pair in
+            RowPlan(text: text, fontSize: pair.0, height: pair.1 + extra)
+        }
     }
 
-    private static func fontFitting(
+    /// Largest size at or above `floor` whose single line fits `columnWidth`.
+    /// Stays at `floor` when the word is still wider; the label then ellipsizes.
+    static func fontFittingWidth(
         _ text: String,
         columnWidth: CGFloat,
-        maxRowHeight: CGFloat,
         preferred: CGFloat,
         floor: CGFloat
     ) -> CGFloat {
+        let inner = innerWidth(columnWidth)
         var size = preferred
         let lower = min(floor, preferred)
         while size > lower + 0.01 {
-            if neededHeight(text, fontSize: size, columnWidth: columnWidth) <= maxRowHeight + 0.5 {
+            if singleLineWidth(text, fontSize: size) <= inner + 0.5 {
                 return size
             }
             size -= 0.5
@@ -301,21 +256,19 @@ public enum PredictionColumnGeometry {
         return lower
     }
 
-    private static func neededHeight(_ text: String, fontSize: CGFloat, columnWidth: CGFloat) -> CGFloat {
+    static func singleLineWidth(_ text: String, fontSize: CGFloat) -> CGFloat {
+        boundingSize(of: text, font: measurementFont(ofSize: fontSize), width: 10_000).width
+    }
+
+    private static func singleLineHeight(_ fontSize: CGFloat) -> CGFloat {
         let font = measurementFont(ofSize: fontSize)
-        let size = boundingSize(of: text, font: font, width: innerWidth(columnWidth))
         // Two extra points cover UILabel's rounding so a measured word is not
         // clipped when the row is exactly the measured height.
-        return size.height + textInsets.top + textInsets.bottom + 2
+        return ceil(font.lineHeight) + textInsets.top + textInsets.bottom + 2
     }
 
     private static func innerWidth(_ columnWidth: CGFloat) -> CGFloat {
         max(1, columnWidth - textInsets.left - textInsets.right)
     }
 
-    private static func lineCount(_ text: String, font: UIFont, width: CGFloat) -> Int {
-        let height = boundingSize(of: text, font: font, width: width).height
-        let line = max(font.lineHeight, 1)
-        return max(1, Int((height / line).rounded(.up)))
-    }
 }
