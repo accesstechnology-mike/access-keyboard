@@ -146,6 +146,50 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertFalse(asc.ignore_already_exists(real_error))
         self.assertFalse(asc.ignore_already_exists(cannot_assign))
 
+    def test_approved_build_is_not_resubmitted_and_old_builds_expire(self) -> None:
+        latest = {"id": "b20", "number": 20, "expired": False, "processing_state": "VALID",
+                  "external_build_state": "IN_BETA_TESTING", "internal_build_state": "IN_BETA_TESTING"}
+        old = {"id": "b19", "number": 19, "expired": False, "processing_state": "VALID"}
+        groups = [
+            {"id": "alpha", "name": "Alpha", "is_internal": True, "has_access_to_all_builds": True},
+            {"id": "ext", "name": "External Testers", "is_internal": False},
+        ]
+        expired, submitted = [], []
+        patches = {
+            "list_beta_groups": lambda token, identifier: groups,
+            "enable_group_all_builds": lambda token, group: "unchanged",
+            "group_builds": lambda token, group_id: [latest],
+            "submit_beta_review": lambda token, build_id: submitted.append(build_id) or "submitted",
+            "assign_build_to_group": lambda token, group_id, build_id: "assigned",
+            "entitle_every_tester": lambda token, identifier, latest, groups: None,
+            "is_installable": lambda build: True,
+            "list_app_builds": lambda token, identifier: [latest, old],
+            "builds_to_expire": lambda builds, latest: [old],
+            "expire_build": lambda token, build: expired.append(build["number"]) or "expired",
+        }
+        originals = {name: getattr(asc, name) for name in patches}
+        for name, fn in patches.items():
+            setattr(asc, name, fn)
+        try:
+            asc.enforce_latest_only("t", "app", latest)
+        finally:
+            for name, fn in originals.items():
+                setattr(asc, name, fn)
+        self.assertEqual(submitted, [])
+        self.assertEqual(expired, [19])
+
+    def test_beta_review_submission_skipped_for_approved_or_pending_builds(self) -> None:
+        sent = []
+        original = asc.submit_beta_review
+        asc.submit_beta_review = lambda token, build_id: sent.append(build_id) or "submitted"
+        try:
+            for state in ["BETA_APPROVED", "IN_BETA_TESTING", "READY_FOR_BETA_TESTING", "WAITING_FOR_BETA_REVIEW", "IN_BETA_REVIEW"]:
+                self.assertEqual(asc.submit_beta_review_if_needed("t", {"id": state, "external_build_state": state}), "skipped")
+            self.assertEqual(asc.submit_beta_review_if_needed("t", {"id": "new", "external_build_state": "READY_FOR_BETA_SUBMISSION"}), "submitted")
+        finally:
+            asc.submit_beta_review = original
+        self.assertEqual(sent, ["new"])
+
     def test_individual_assignment_skips_testers_that_cannot_be_assigned(self) -> None:
         calls = []
 
