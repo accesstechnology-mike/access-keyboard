@@ -146,6 +146,25 @@ class LatestOnlyTests(unittest.TestCase):
         self.assertFalse(asc.ignore_already_exists(real_error))
         self.assertFalse(asc.ignore_already_exists(cannot_assign))
 
+    def test_individual_assignment_skips_testers_that_cannot_be_assigned(self) -> None:
+        calls = []
+
+        def fake_request(token, path, method="GET", body=None, **kwargs):
+            tester = body["data"][0]["id"]
+            calls.append(tester)
+            if tester == "public":
+                raise asc.ASCHTTPError(409, path, '{"errors":[{"detail":"Tester(s) cannot be assigned"}]}')
+            return {}
+
+        original = asc.asc_request
+        asc.asc_request = fake_request
+        try:
+            added = asc.assign_individual_testers("t", "b", ["public", "mike"])
+        finally:
+            asc.asc_request = original
+        self.assertEqual(added, 1)
+        self.assertEqual(calls, ["public", "mike"])
+
     def test_internal_auto_distribute_group_cannot_be_assigned_a_build(self) -> None:
         alpha = asc.ASCHTTPError(
             422,

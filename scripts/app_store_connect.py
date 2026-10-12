@@ -1025,6 +1025,11 @@ def assign_individual_testers(token: str, build_id: str, tester_ids: list[str]) 
             )
             added += 1
         except ASCHTTPError as exc:
+            if tester_cannot_be_assigned(exc):
+                # Public-link (anonymous) testers cannot be entitled to a
+                # build one by one; their invite state was already checked.
+                print(f"build {build_id}: cannot assign tester {tester_id} individually; skipped", file=sys.stderr)
+                continue
             if ignore_already_exists(exc):
                 continue
             raise
