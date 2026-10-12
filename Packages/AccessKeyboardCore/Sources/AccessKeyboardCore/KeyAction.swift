@@ -143,18 +143,26 @@ public struct KeyboardLayout: Equatable {
     /// the letter block docks left for glide/cursor scanners (mockup v3).
     public var leftDocked: Bool
 
+    /// When set, the board is a strict grid of this many one-unit columns: a
+    /// key `n` units wide also absorbs the `n - 1` gaps it spans, so every row
+    /// lines up column for column and the board's left and right edges form a
+    /// block (iPad Pro class / 11" landscape).
+    public var gridColumns: Int?
+
     public init(
         rows: [KeyboardRow],
         layoutClass: LayoutClass,
         referenceUnitWeight: CGFloat? = nil,
         referenceKeyCount: Int? = nil,
-        leftDocked: Bool = false
+        leftDocked: Bool = false,
+        gridColumns: Int? = nil
     ) {
         self.rows = rows
         self.layoutClass = layoutClass
         self.referenceUnitWeight = referenceUnitWeight
         self.referenceKeyCount = referenceKeyCount
         self.leftDocked = leftDocked
+        self.gridColumns = gridColumns
     }
 
     /// Whether two layouts have the same number of rows and keys per row. When
