@@ -44,6 +44,18 @@ export class UpstashStore {
     const [count] = await this.pipeline([["DECR", key]]);
     return Number(count);
   }
+
+  /** [count, secondsToLive] for diagnostics. TTL is -2 when the key is missing. */
+  async peek(key) {
+    const [count, ttl] = await this.pipeline([["GET", key], ["TTL", key]]);
+    return [count === null ? null : Number(count), Number(ttl)];
+  }
+
+  async remove(keys) {
+    if (!keys.length) return 0;
+    const [removed] = await this.pipeline([["DEL", ...keys]]);
+    return Number(removed);
+  }
 }
 
 export class MemoryStore {
@@ -74,5 +86,17 @@ export class MemoryStore {
     if (!entry) return 0;
     entry.count -= 1;
     return entry.count;
+  }
+
+  async peek(key) {
+    const entry = this.live(key);
+    if (!entry) return [null, -2];
+    return [entry.count, Math.ceil((entry.expiresAt - this.now()) / 1000)];
+  }
+
+  async remove(keys) {
+    let removed = 0;
+    for (const key of keys) removed += this.values.delete(key) ? 1 : 0;
+    return removed;
   }
 }

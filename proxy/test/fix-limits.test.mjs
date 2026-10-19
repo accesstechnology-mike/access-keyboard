@@ -247,3 +247,39 @@ test("Apple's library rejects data that Apple did not sign", async () => {
     await assert.rejects(verifier.appTransaction(jws), EntitlementError);
   }
 });
+
+test("preview test access: acts as a free install, reports and clears its counters", async () => {
+  const token = "t".repeat(32);
+  const { deps } = harness({ config: { freeFixesPerMonth: 2 } });
+  deps.env = { FIX_TEST_TOKEN: token, VERCEL_ENV: "preview" };
+  const call = (extra = {}) => handleFixRequest(fixRequest({ "x-ak-test": `${token}:abc`, ...extra }), deps);
+  const first = await call();
+  assert.equal(first.status, 200);
+  const usage = JSON.parse(first.headers.get("x-ak-test-usage"));
+  assert.deepEqual(usage["fix:free:test-abc:2026-10"], [1, 32 * 24 * 3600]);
+  assert.equal((await call()).status, 200);
+  const third = await call();
+  assert.equal(third.status, 429);
+  assert.equal((await third.json()).error, "free_limit");
+  const reset = await call({ "x-ak-test-reset": "1" });
+  assert.ok(JSON.parse(reset.headers.get("x-ak-test-usage")).removed >= 1);
+  assert.equal((await call()).status, 200);
+});
+
+test("preview test access is off in production, without a token, or with a wrong token", async () => {
+  const token = "t".repeat(32);
+  for (const env of [
+    { FIX_TEST_TOKEN: token, VERCEL_ENV: "production" },
+    {},
+    { FIX_TEST_TOKEN: "short", VERCEL_ENV: "preview" },
+  ]) {
+    const { deps } = harness();
+    deps.env = env;
+    const response = await handleFixRequest(fixRequest({ "x-ak-test": `${token}:abc` }), deps);
+    assert.equal(response.headers.get("x-ak-test-usage"), null);
+  }
+  const { deps } = harness();
+  deps.env = { FIX_TEST_TOKEN: token, VERCEL_ENV: "preview" };
+  const wrong = await handleFixRequest(fixRequest({ "x-ak-test": `${"x".repeat(32)}:abc` }), deps);
+  assert.equal(wrong.headers.get("x-ak-test-usage"), null);
+});

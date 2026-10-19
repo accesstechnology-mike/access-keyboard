@@ -20,6 +20,18 @@ function nextDayStart(now) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toISOString();
 }
 
+/** Every counter key a request can touch, for diagnostics and cleanup. */
+export function usageKeys({ ip, identity }, now = Date.now()) {
+  const minute = Math.floor(now / 60_000);
+  const keys = { ipRate: `fix:rate:ip:${ip}:${minute}` };
+  if (identity) {
+    keys.identityRate = `fix:rate:${identity.tier}:${identity.id}:${minute}`;
+    keys.allowance =
+      identity.tier === "pro" ? `fix:pro:${identity.id}:${utcDay(now)}` : `fix:free:${identity.id}:${utcMonth(now)}`;
+  }
+  return keys;
+}
+
 export function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
@@ -28,13 +40,13 @@ export function clientIp(request) {
 
 /** Per-minute rate limits. Returns null when allowed, or a 429 body. */
 export async function checkRate(store, { ip, identity }, config, now = Date.now()) {
-  const minute = Math.floor(now / 60_000);
-  const ipCount = await store.increment(`fix:rate:ip:${ip}:${minute}`, 120);
+  const keys = usageKeys({ ip, identity }, now);
+  const ipCount = await store.increment(keys.ipRate, 120);
   if (config.perIpPerMinute > 0 && ipCount > config.perIpPerMinute) {
     return { error: "rate_limited", retryAfterSeconds: 60 - Math.floor((now / 1000) % 60) };
   }
   if (identity) {
-    const idCount = await store.increment(`fix:rate:${identity.tier}:${identity.id}:${minute}`, 120);
+    const idCount = await store.increment(keys.identityRate, 120);
     if (config.perIdentityPerMinute > 0 && idCount > config.perIdentityPerMinute) {
       return { error: "rate_limited", retryAfterSeconds: 60 - Math.floor((now / 1000) % 60) };
     }
@@ -48,14 +60,14 @@ export async function checkRate(store, { ip, identity }, config, now = Date.now(
  */
 export async function consumeAllowance(store, identity, config, now = Date.now()) {
   if (identity.tier === "pro") {
-    const key = `fix:pro:${identity.id}:${utcDay(now)}`;
+    const key = usageKeys({ ip: "", identity }, now).allowance;
     const count = await store.increment(key, 2 * 24 * 3600);
     if (count > config.proFixesPerDay) {
       return { error: "daily_limit", limit: config.proFixesPerDay, resetsAt: nextDayStart(now) };
     }
     return { key, used: count, limit: config.proFixesPerDay };
   }
-  const key = `fix:free:${identity.id}:${utcMonth(now)}`;
+  const key = usageKeys({ ip: "", identity }, now).allowance;
   const count = await store.increment(key, 32 * 24 * 3600);
   if (count > config.freeFixesPerMonth) {
     return { error: "free_limit", limit: config.freeFixesPerMonth, resetsAt: nextMonthStart(now) };

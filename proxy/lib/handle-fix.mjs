@@ -2,7 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { loadConfig } from "./config.mjs";
 import { EntitlementError, createAppleVerifier, resolveIdentity } from "./entitlement.mjs";
 import { loadLocalEnv } from "./env.mjs";
-import { checkRate, clientIp, consumeAllowance, refundAllowance } from "./limits.mjs";
+import { checkRate, clientIp, consumeAllowance, refundAllowance, usageKeys } from "./limits.mjs";
+import { TEST_USAGE_HEADER, testAccess } from "./test-hook.mjs";
 import { createUsageStore } from "./usage-store.mjs";
 
 const INSTRUCTIONS = [
@@ -47,10 +48,29 @@ export async function handleFixRequest(request, deps = {}) {
     return json({ error: "unauthorized" }, 401);
   }
 
+  const test = testAccess(request, deps.env ?? process.env);
+  const response = await handleAuthorised(request, config, { verifier, store, fetchImpl, now, test });
+  if (!test || !store) return response;
+  // Preview diagnostics: report (or clear) the counters this request touched.
+  const keys = Object.values(usageKeys({ ip: clientIp(request), identity: test.identity }, now()));
+  const headers = new Headers(response.headers);
+  if (test.reset) {
+    headers.set(TEST_USAGE_HEADER, JSON.stringify({ removed: await store.remove(keys) }));
+  } else {
+    const usage = {};
+    for (const key of keys) usage[key] = await store.peek(key);
+    headers.set(TEST_USAGE_HEADER, JSON.stringify(usage));
+  }
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function handleAuthorised(request, config, { verifier, store, fetchImpl, now, test }) {
+  if (test?.reset) return json({ reset: true }, 200);
+
   // Who is asking: Pro, free, or a build that only knows the shared secret.
   let identity;
   try {
-    identity = await resolveIdentity(request, verifier, config, now());
+    identity = test?.identity ?? (await resolveIdentity(request, verifier, config, now()));
   } catch (error) {
     if (error instanceof EntitlementError) {
       console.error(`fix auth=rejected reason=${error.code}`);
