@@ -333,6 +333,18 @@ def print_status(creator: "Creator", app_id: str) -> None:
     for item in iaps:
         a = item["attributes"]
         print(f"in-app purchase {a.get('productId')} type={a.get('inAppPurchaseType')} state={a.get('state')}")
+        for label, path, params in (
+            ("localizations", f"/v2/inAppPurchases/{item['id']}/inAppPurchaseLocalizations", {"limit": "200"}),
+            ("base price", f"/v1/inAppPurchasePriceSchedules/{item['id']}/manualPrices",
+             {"limit": "200", "include": "inAppPurchasePricePoint,territory"}),
+        ):
+            try:
+                rows, included = creator.collect(creator.token, path, params)
+                prices = [i["attributes"].get("customerPrice") for i in included if i.get("type") == "inAppPurchasePricePoints"]
+                territories = [i["id"] for i in included if i.get("type") == "territories"]
+                print(f"    {label}: {len(rows)} {prices or ''} {territories or ''}".rstrip())
+            except Exception as exc:
+                print(f"    {label}: unavailable ({str(exc)[:80]})")
     groups, _ = creator.collect(creator.token, f"/v1/apps/{app_id}/subscriptionGroups", {"limit": "200"})
     for group in groups:
         print(f"subscription group '{group['attributes'].get('referenceName')}'")
@@ -340,6 +352,12 @@ def print_status(creator: "Creator", app_id: str) -> None:
         for sub in subs:
             a = sub["attributes"]
             print(f"  subscription {a.get('productId')} period={a.get('subscriptionPeriod')} state={a.get('state')}")
+            try:
+                _, inc = creator.collect(creator.token, f"/v1/subscriptions/{sub['id']}/prices",
+                                         {"filter[territory]": "GBR", "include": "subscriptionPricePoint", "limit": "200"})
+                print(f"    GBR price: {[i['attributes'].get('customerPrice') for i in inc if i.get('type') == 'subscriptionPricePoints']}")
+            except Exception as exc:
+                print(f"    GBR price: unavailable ({str(exc)[:80]})")
             for path, label in (("prices", "prices"), ("introductoryOffers", "intro offers"),
                                 ("subscriptionLocalizations", "localizations")):
                 try:
