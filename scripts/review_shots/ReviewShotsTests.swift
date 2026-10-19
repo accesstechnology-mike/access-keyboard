@@ -74,13 +74,29 @@ final class ReviewShotsTests: XCTestCase {
         }
     }
 
+    /// Product.products with a hard timeout. Without the scheme StoreKit config
+    /// it can hang forever on Sandbox; never let that stall CI.
+    private func productsWithin(_ seconds: Double) async throws -> [Product] {
+        try await withThrowingTaskGroup(of: [Product].self) { group in
+            group.addTask {
+                try await Product.products(for: SubscriptionConfig.productIDs)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw CancellationError()
+            }
+            let first = try await group.next()!
+            group.cancelAll()
+            return first
+        }
+    }
+
     /// Loads products until all three catalogue IDs are present, or gives up.
     /// Re-queries Product.products each pass so a partial Sandbox reply can recover.
     private func waitForThreeProducts(manager: SubscriptionManager) async -> [Product] {
-        var lastDirect: [Product] = []
-        for attempt in 0..<40 {
+        for attempt in 0..<24 {
             do {
-                lastDirect = try await Product.products(for: SubscriptionConfig.productIDs)
+                let lastDirect = try await productsWithin(12)
                 print(
                     "REVIEWSHOTS direct products attempt \(attempt):",
                     lastDirect.map { "\($0.id) \($0.displayPrice) \($0.type.rawValue)" }
@@ -88,7 +104,13 @@ final class ReviewShotsTests: XCTestCase {
             } catch {
                 print("REVIEWSHOTS direct products attempt \(attempt) error:", error)
             }
-            await manager.refresh()
+            // refresh() also calls Product.products; bound it the same way.
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await manager.refresh() }
+                group.addTask { await self.pause(15) }
+                _ = await group.next()
+                group.cancelAll()
+            }
             let ids = Set(manager.products.map(\.id))
             if SubscriptionConfig.productIDs.isSubset(of: ids) {
                 return manager.products

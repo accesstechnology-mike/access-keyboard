@@ -3,27 +3,29 @@
 set -euo pipefail
 NAME="$1"; OUT="$2"; mkdir -p "$OUT"
 xcrun simctl shutdown all || true
-# Prefer iOS 26.2 when present: SKTestSession is broken on 26.3–26.5
-# (SKInternalErrorDomain Code=3). Fall back to the newest available runtime.
+# Newest available iOS runtime for this device. (Do not pin 26.2: some runners
+# list that runtime without a bootable device, and bootstatus hangs forever.)
 INFO=$(xcrun simctl list devices available -j | python3 -c "
 import json,sys,re
 d=json.load(sys.stdin)['devices']
-cands=[]
+best=None
 for rt,devs in d.items():
     if 'iOS' not in rt: continue
     v=tuple(int(x) for x in re.findall(r'\d+',rt.split('iOS')[-1]))
     for dev in devs:
-        if dev['name'].startswith(sys.argv[1]):
-            cands.append((v,dev['udid'],dev['name'],rt))
-if not cands:
+        if dev['name'].startswith(sys.argv[1]) and (best is None or v>best[0]):
+            best=(v,dev['udid'],dev['name'],rt)
+if best is None:
     raise SystemExit('no simulator matching '+sys.argv[1])
-pref=[c for c in cands if c[0][:2]==(26,2)]
-best=pref[0] if pref else max(cands, key=lambda c: c[0])
 print(best[1]); print(best[2]+'|'+'.'.join(map(str,best[0]))); print(best, file=sys.stderr)
 " "$NAME")
 UDID=$(echo "$INFO" | sed -n 1p); DEVNAME=$(echo "$INFO" | sed -n 2p | cut -d"|" -f1); DEVOS=$(echo "$INFO" | sed -n 2p | cut -d"|" -f2)
 xcrun simctl boot "$UDID" || true
-xcrun simctl bootstatus "$UDID" -b
+# Cap boot wait so a bad runtime cannot hang the job for the full 60 minutes.
+if ! timeout 180 xcrun simctl bootstatus "$UDID" -b; then
+  echo "simctl bootstatus timed out or failed for $UDID ($DEVNAME OS $DEVOS)" >&2
+  exit 1
+fi
 xcrun simctl ui "$UDID" appearance light || true
 xcrun simctl status_bar "$UDID" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100 || true
 (
