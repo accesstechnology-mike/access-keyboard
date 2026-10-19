@@ -55,8 +55,7 @@ final class BethColorMapTests: XCTestCase {
     }
 
     func testAppearanceLeavesPunctuationOnSystemChrome() {
-        var appearance = KeyboardAppearance.system(for: .light)
-        appearance.usesBethLetterColors = true
+        let appearance = KeyboardAppearance.resolved(colour: .beth, style: .light)
         let fill = appearance.fill(for: .letter, character: ";", pressed: false, highlightedModifier: false)
         XCTAssertEqual(fill, appearance.letterFill)
     }

@@ -6,9 +6,12 @@
   <title>access: keyboard privacy</title>
 </head>
 <body>
-  <p>access: keyboard is an assistive iPad keyboard.</p>
-  <p>Full Access is requested so Beth mode can be shared with the keyboard extension, and so Fix can call the correction proxy. Keystrokes stay on the device. Tapping Fix sends the current field’s text to that proxy and does not store it there.</p>
-  <p>The Release proxy is <code>https://access-keyboard.vercel.app/api/fix</code>. It forwards that field to OpenAI with <code>store</code> disabled. Ordinary keystrokes are not sent. Password fields are skipped.</p>
-  <p>Beth mode and learned predictions stay in the app group on the iPad.</p>
+  <h1>access: keyboard privacy</h1>
+  <p>access: keyboard is an assistive keyboard for iPhone and iPad.</p>
+  <p>Typing stays on your device. The keyboard does not send keystrokes anywhere. It remains usable with Full Access turned off and with no network connection.</p>
+  <p>The keyboard can learn which words you type next, so the suggestion bar can offer them later. That learning is done on the device by PredictionMemory and stored in the shared App Group (<code>group.6M3Z27M69P.app.access.keyboard</code>) when Full Access is on. It is not sent off the device. Without Full Access, the system keyboard still types and can still learn inside the keyboard, but it does not open that shared App Group, so those words stay in the keyboard and are not shared with the access: keyboard app.</p>
+  <p>Fix is optional. Nothing is sent unless you tap Fix. When this build asks for consent, the text is sent only after you tap Allow. You can turn that permission off in the access: keyboard app’s Settings, and the next Fix will ask again. Tapping Fix sends only the current text field to the correction proxy at <code>https://access-keyboard.vercel.app/api/fix</code>. That proxy forwards the field to OpenAI with <code>store</code> disabled and does not keep the text. Ordinary keystrokes are not included. Password fields are skipped. If Full Access is off, or the device has no network, Fix does not send anything.</p>
+  <p>Full Access is requested so colour and layout settings, and the on-device learned predictions, can be shared with the keyboard extension, and so Fix can reach that proxy.</p>
+  <p>Questions: <a href="mailto:mike@accesstechnology.co.uk">mike@accesstechnology.co.uk</a></p>
 </body>
 </html>

@@ -18,17 +18,33 @@ public final class KeyboardView: UIView {
     private let haptics = UIImpactFeedbackGenerator(style: .light)
     private var cursorTrackpad: UIPanGestureRecognizer?
     private var trackpadRemainder = CGPoint.zero
+    private var sharesPredictionMemory: Bool
+    /// The host updates its height constraint when Fix shows a hint or the consent step.
+    public var onPreferredHeightChange: (() -> Void)?
     private var predictionPlacement = KeyboardPreferences.predictionPlacement
 
-    public convenience init() {
-        self.init(engine: KeyboardEngine())
+    /// `sharesPredictionMemory` is false in the keyboard extension until Allow Full
+    /// Access is on. That path keeps learned words in the extension's own defaults
+    /// and does not open the App Group.
+    public convenience init(sharesPredictionMemory: Bool = true) {
+        let engine = KeyboardEngine(memory: PredictionMemory.store(sharedWithApp: sharesPredictionMemory))
+        engine.sharedPreferencesAvailable = sharesPredictionMemory
+        engine.networkAllowed = sharesPredictionMemory
+        self.init(engine: engine, sharesPredictionMemory: sharesPredictionMemory)
     }
 
-    public init(engine: KeyboardEngine) {
+    public init(engine: KeyboardEngine, sharesPredictionMemory: Bool = true) {
         self.engine = engine
+        self.sharesPredictionMemory = sharesPredictionMemory
         self.idiom = UIDevice.current.userInterfaceIdiom
         super.init(frame: .zero)
         commonInit()
+    }
+
+    public func setSharesPredictionMemory(_ shares: Bool) {
+        guard sharesPredictionMemory != shares else { return }
+        sharesPredictionMemory = shares
+        engine.usePredictionStore(sharedWithApp: shares)
     }
 
     @available(*, unavailable)
@@ -64,6 +80,12 @@ public final class KeyboardView: UIView {
             UIDevice.current.playInputClick()
             self?.haptics.impactOccurred(intensity: 0.55)
             self?.engine.requestFix()
+        }
+        predictionBar.onAllowConsent = { [weak self] in
+            self?.engine.allowFixConsentAndSend()
+        }
+        predictionBar.onDeclineConsent = { [weak self] in
+            self?.engine.declineFixConsent()
         }
         predictionColumn.onSelect = selectPrediction
         predictionColumn.onFix = requestFix
@@ -133,11 +155,13 @@ public final class KeyboardView: UIView {
         let usesColumn = PredictionColumnGeometry.usesVerticalColumn(
             layout.layoutClass,
             placement: predictionPlacement,
-            isLandscape: isLandscapeScreen
+            isLandscape: isLandscapeScreen,
+            fixNotice: engine.fixNotice
         )
         if PredictionColumnGeometry.usesVerticalColumn(layout.layoutClass), !usesColumn {
             metrics.predictionBarHeight = PredictionColumnGeometry.topBarHeight(for: metrics)
         }
+        metrics = metricsForCurrentNotice(metrics)
         return Board(layout: layout, metrics: metrics, usesColumn: usesColumn)
     }
 
@@ -179,9 +203,15 @@ public final class KeyboardView: UIView {
 
     private func updateAppearance() {
         LiteracyFont.registerIfNeeded()
-        KeyboardPreferences.persistMigratedColourOptionIfNeeded()
+        let colour: ColourOption
+        if engine.sharedPreferencesAvailable {
+            KeyboardPreferences.persistMigratedColourOptionIfNeeded()
+            colour = KeyboardPreferences.colourOption
+        } else {
+            colour = .system
+        }
         appearance = KeyboardAppearance.resolved(
-            colour: KeyboardPreferences.colourOption,
+            colour: colour,
             style: traitCollection.userInterfaceStyle
         )
         backgroundColor = appearance.backgroundColor
@@ -191,6 +221,22 @@ public final class KeyboardView: UIView {
         contentDirty = true
         setNeedsLayout()
         invalidateIntrinsicContentSize()
+        onPreferredHeightChange?()
+    }
+
+    /// The consent step and the short Fix hints need a taller suggestion bar.
+    /// Keys move down with that bar; they are not covered.
+    private func metricsForCurrentNotice(_ metrics: LayoutMetrics) -> LayoutMetrics {
+        var metrics = metrics
+        switch engine.fixNotice {
+        case .consent:
+            metrics.predictionBarHeight = max(metrics.predictionBarHeight, 112)
+        case .fullAccess, .offline, .secureField, .unavailable:
+            metrics.predictionBarHeight = max(metrics.predictionBarHeight, 72)
+        case .none:
+            break
+        }
+        return metrics
     }
 
     private func refreshPredictions() {
@@ -297,6 +343,7 @@ public final class KeyboardView: UIView {
             predictions: engine.predictions(),
             arrangement: arrangement,
             fixStatus: engine.fixStatus,
+            notice: engine.fixNotice,
             appearance: appearance
         )
         predictionBar.frame = frame

@@ -68,7 +68,10 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
         keyboardView.engine.needsInputModeSwitchKey = true
         keyboardView.engine.traits = KeyboardTraits.from(textView)
         keyboardView.engine.fixClient = URLSessionFixClient.fromBundle()
+        // The containing app can reach the network without the system keyboard's
+        // Full Access switch. Consent, when required, still runs before Fix sends.
         keyboardView.engine.networkAllowed = true
+        keyboardView.engine.sharedPreferencesAvailable = true
 
         let caption = UILabel()
         caption.text = "This is the same keyboard you’ll enable for other apps. Tap below and type."
@@ -83,6 +86,10 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
 
         let height = keyboardView.heightAnchor.constraint(equalToConstant: 320)
         keyboardHeightConstraint = height
+        keyboardView.onPreferredHeightChange = { [weak self] in
+            guard let self else { return }
+            self.keyboardHeightConstraint?.constant = self.keyboardView.preferredHeight
+        }
 
         NSLayoutConstraint.activate([
             caption.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),

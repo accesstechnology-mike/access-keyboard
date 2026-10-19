@@ -45,6 +45,20 @@ public enum PredictionColumnGeometry {
         return !(placement == .preferTop && isLandscape)
     }
 
+    /// The same decision while Fix may be showing a hint or the consent step.
+    /// Those only fit in the top bar, so an iPad board moves its predictions
+    /// to the top bar until the notice goes away. With no notice this is the
+    /// placement decision above, unchanged.
+    public static func usesVerticalColumn(
+        _ layoutClass: LayoutClass,
+        placement: PredictionPlacement,
+        isLandscape: Bool,
+        fixNotice: FixNotice
+    ) -> Bool {
+        guard fixNotice == .none else { return false }
+        return usesVerticalColumn(layoutClass, placement: placement, isLandscape: isLandscape)
+    }
+
     /// Bar height when an iPad board puts predictions on top. The bar view
     /// insets 4pt top and bottom and Fix a further 2pt, so this leaves Fix
     /// exactly one key tall, the same height it has at the foot of the column.

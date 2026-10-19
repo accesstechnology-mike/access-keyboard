@@ -425,13 +425,14 @@ public enum LayoutFactory {
         for row in 0..<firstColumnCount {
             grid[row * columns] = functions[row]
         }
-        // Any function keys that don't fit in that column fill from the
-        // bottom-right corner back. When there are fewer function keys than
-        // rows (no globe, for example) this range is empty — building
-        // `rowCount..<functions.count` would trap.
+        // Extra function keys (more than one column's worth) fill from the
+        // bottom-right corner back. A compact board with no globe has fewer
+        // function keys than rows, and `rowCount..<count` traps when the
+        // upper bound is smaller, so only build that range when there is overflow.
         if functions.count > rowCount {
             var tail = total - 1
             for index in rowCount..<functions.count {
+                guard tail >= 0 else { break }
                 grid[tail] = functions[index]
                 tail -= 1
             }

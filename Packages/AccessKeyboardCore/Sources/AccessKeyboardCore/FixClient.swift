@@ -6,6 +6,43 @@ public enum FixStatus: Equatable {
     case failed
 }
 
+/// A short, non-blocking explanation on the suggestion bar. Typing stays available.
+public enum FixNotice: Equatable {
+    case none
+    case fullAccess
+    case offline
+    case secureField
+    case unavailable
+    case consent
+
+    public var message: String {
+        switch self {
+        case .none:
+            return ""
+        case .fullAccess:
+            return "Turn on Allow Full Access to use Fix. Typing still works."
+        case .offline:
+            return "Fix needs a network connection. Typing stays on this device."
+        case .secureField:
+            return "Passwords are not sent."
+        case .unavailable:
+            return "Fix isn’t set up in this build. Typing still works."
+        case .consent:
+            return "Fix sends this field’s text to OpenAI to correct it. Nothing is sent until you tap Allow. You can turn this off in the app’s Settings."
+        }
+    }
+
+    /// Hints that should disappear on the next keystroke. Consent stays until Allow or Not now.
+    public var isTransient: Bool {
+        switch self {
+        case .fullAccess, .offline, .secureField, .unavailable:
+            return true
+        case .none, .consent:
+            return false
+        }
+    }
+}
+
 public enum FixError: Error, Equatable {
     case empty
     case secureField
