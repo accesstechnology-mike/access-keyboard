@@ -86,6 +86,7 @@ final class SubscriptionManager: ObservableObject {
     private func refreshEntitlements() async {
         let now = Date()
         var best: SubscriptionEntitlementRecord = .inactive
+        var bestSignedTransaction: String?
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? verified(result) else { continue }
             if let candidate = SubscriptionEntitlementRecord.granted(
@@ -94,10 +95,19 @@ final class SubscriptionManager: ObservableObject {
                 revocationDate: transaction.revocationDate,
                 at: now
             ) {
-                best = SubscriptionEntitlementRecord.preferred(best, candidate, at: now)
+                let preferred = SubscriptionEntitlementRecord.preferred(best, candidate, at: now)
+                if preferred == candidate {
+                    bestSignedTransaction = result.jwsRepresentation
+                }
+                best = preferred
             }
             await transaction.finish()
         }
+        // The Fix proxy verifies these Apple-signed values: the transaction
+        // proves Pro, and the app transaction identifies this purchase of the
+        // app so free Fixes can be counted per Apple Account.
+        let signedAppTransaction = try? await AppTransaction.shared.jwsRepresentation
+        FixCredentials.write(appTransaction: signedAppTransaction, transaction: bestSignedTransaction)
         SubscriptionEntitlementStore.writeShared(best)
         record = SubscriptionEntitlementStore.readShared(at: now)
     }

@@ -292,6 +292,82 @@ final class FixEngineTests: XCTestCase {
         XCTAssertEqual(document.text, "Title\nteh schol")
     }
 
+    // MARK: Server allowance
+
+    func testFreeLimitFromTheServerShowsAHintAndKeepsTyping() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.entitleForTests()
+        engine.fixConsentRequired = false
+        engine.fixClient = MockFixClient { _ in throw FixError.freeLimitReached }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(engine.fixNotice, .freeLimit)
+        XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertTrue(FixNotice.freeLimit.message.contains("30"))
+        engine.handle(.character("x"))
+        XCTAssertEqual(document.text, "tehx")
+        XCTAssertEqual(engine.fixNotice, .none, "The hint goes on the next keystroke")
+    }
+
+    func testDailyLimitAndRateLimitShowTheirOwnHints() async {
+        for (error, notice) in [(FixError.dailyLimitReached, FixNotice.dailyLimit), (.rateLimited, .busy)] {
+            let (engine, _) = makeEngine(text: "teh")
+            engine.entitleForTests()
+            engine.fixConsentRequired = false
+            engine.fixClient = MockFixClient { _ in throw error }
+            engine.requestFix()
+            await waitUntilIdle(engine)
+            XCTAssertEqual(engine.fixNotice, notice)
+        }
+    }
+
+    func testFixRunsWithoutProInTheDefaultMode() async {
+        let (engine, document) = makeEngine(text: "teh")
+        // The shipped defaults, not the test helper's subscription gate.
+        engine.fixRequiresSubscription = SubscriptionConfig.fixRequiresSubscription
+        engine.keyboardRequiresSubscription = SubscriptionConfig.keyboardRequiresSubscription
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { false }
+        engine.fixConsentRequired = false
+        engine.fixClient = MockFixClient { _ in "the" }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(document.text, "the")
+        XCTAssertFalse(engine.keyboardIsLocked)
+    }
+
+    func testProxyErrorsMapToLimits() {
+        let body: (String) -> Data = { Data("{\"error\":\"\($0)\"}".utf8) }
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("free_limit")), .freeLimitReached)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("daily_limit")), .dailyLimitReached)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("rate_limited")), .rateLimited)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: nil), .rateLimited)
+        XCTAssertEqual(FixError.fromProxy(status: 502, body: body("upstream_failed")), .requestFailed)
+        XCTAssertEqual(FixError.fromProxy(status: 401, body: nil), .requestFailed)
+    }
+
+    func testFixCredentialsBecomeHeadersAndSkipEmptyValues() {
+        let suite = "test.access.keyboard.fixcredentials.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertEqual(FixCredentials.headers(from: defaults), [:])
+        FixCredentials.write(appTransaction: "app.jws", transaction: nil, to: defaults)
+        XCTAssertEqual(FixCredentials.headers(from: defaults), ["X-AK-App-Transaction": "app.jws"])
+        FixCredentials.write(appTransaction: "app.jws", transaction: "txn.jws", to: defaults)
+        XCTAssertEqual(
+            FixCredentials.headers(from: defaults),
+            ["X-AK-App-Transaction": "app.jws", "X-AK-Transaction": "txn.jws"]
+        )
+        FixCredentials.write(appTransaction: "", transaction: "", to: defaults)
+        XCTAssertEqual(FixCredentials.headers(from: defaults), [:])
+    }
+
     private func waitUntilIdle(_ engine: KeyboardEngine) async {
         let deadline = Date().addingTimeInterval(1)
         while engine.fixStatus == .running, Date() < deadline {

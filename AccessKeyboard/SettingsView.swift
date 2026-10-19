@@ -136,7 +136,7 @@ struct SettingsView: View {
         if record.isActive(at: Date()) {
             return "Pro is active."
         }
-        return "You do not have Pro on this Apple Account."
+        return "You are on the free plan: \(SubscriptionConfig.freeFixesPerMonth) Fixes a month. The keyboard and predictions are always free."
     }
 
     private var fullAccessSummary: String {
@@ -161,6 +161,8 @@ struct SettingsView: View {
             text += " The keyboard, including Fix, needs Pro."
         } else if SubscriptionConfig.fixRequiresSubscription {
             text += " Fix needs Pro."
+        } else {
+            text += " Fix is free for \(SubscriptionConfig.freeFixesPerMonth) Fixes a month. Pro gives you up to \(SubscriptionConfig.proFixesPerDay) a day."
         }
         return text
     }

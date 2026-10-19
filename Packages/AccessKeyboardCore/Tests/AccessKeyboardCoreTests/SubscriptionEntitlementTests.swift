@@ -114,9 +114,9 @@ final class SubscriptionEntitlementTests: XCTestCase {
     }
 
     func testProductIDsUseTheAppBundlePrefix() {
-        XCTAssertEqual(SubscriptionConfig.monetization, .allFeaturesSubscribed)
-        XCTAssertTrue(SubscriptionConfig.keyboardRequiresSubscription)
-        XCTAssertTrue(SubscriptionConfig.fixRequiresSubscription)
+        XCTAssertEqual(SubscriptionConfig.monetization, .keyboardFreeFixAllowance)
+        XCTAssertFalse(SubscriptionConfig.keyboardRequiresSubscription)
+        XCTAssertFalse(SubscriptionConfig.fixRequiresSubscription)
         XCTAssertFalse(
             KeyboardLock.isLocked(
                 requiresSubscription: false,

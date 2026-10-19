@@ -232,6 +232,12 @@ public final class KeyboardEngine {
             do {
                 let fixed = try await client.fix(original)
                 self.applyFixedText(original: original, fixed: fixed)
+            } catch FixError.freeLimitReached {
+                self.presentFixNotice(.freeLimit)
+            } catch FixError.dailyLimitReached {
+                self.presentFixNotice(.dailyLimit)
+            } catch FixError.rateLimited {
+                self.presentFixNotice(.busy)
             } catch {
                 self.failFix()
             }

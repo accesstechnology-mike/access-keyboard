@@ -27,7 +27,13 @@ public enum SubscriptionConfig {
 
     /// What the subscription covers. Change this case to switch the split; the
     /// gates below stay in place.
-    public static let monetization: KeyboardMonetization = .allFeaturesSubscribed
+    public static let monetization: KeyboardMonetization = .keyboardFreeFixAllowance
+
+    /// Confirmed by Mike, 19 Oct 2026. Used in copy only. The proxy enforces the
+    /// real limits (`FREE_FIXES_PER_MONTH`, `PRO_FIXES_PER_DAY`), and prices and
+    /// the trial come from StoreKit at runtime.
+    public static let freeFixesPerMonth = 30
+    public static let proFixesPerDay = 100
 
     public static var keyboardRequiresSubscription: Bool {
         monetization.keyboardRequiresSubscription
@@ -61,6 +67,9 @@ public enum SubscriptionConfig {
 }
 
 public enum KeyboardMonetization: String, Sendable {
+    /// The keyboard and predictions are free forever. Fix is free up to a
+    /// monthly allowance, counted by the proxy; Pro lifts it to a daily fair-use cap.
+    case keyboardFreeFixAllowance
     /// The keyboard and Fix both require an active subscription or introductory offer.
     case allFeaturesSubscribed
     /// Same split as `.allFeaturesSubscribed`. Kept so the default can move without new gates.
@@ -72,7 +81,7 @@ public enum KeyboardMonetization: String, Sendable {
         switch self {
         case .allFeaturesSubscribed, .allSubscribed:
             return true
-        case .coreKeyboardFreeFixSubscribed:
+        case .coreKeyboardFreeFixSubscribed, .keyboardFreeFixAllowance:
             return false
         }
     }
@@ -81,6 +90,9 @@ public enum KeyboardMonetization: String, Sendable {
         switch self {
         case .allFeaturesSubscribed, .allSubscribed, .coreKeyboardFreeFixSubscribed:
             return true
+        case .keyboardFreeFixAllowance:
+            // The allowance is enforced by the proxy, not by the device.
+            return false
         }
     }
 }

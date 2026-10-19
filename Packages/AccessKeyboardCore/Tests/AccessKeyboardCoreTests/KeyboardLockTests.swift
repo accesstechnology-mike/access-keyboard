@@ -3,10 +3,21 @@ import XCTest
 
 @MainActor
 final class KeyboardLockTests: XCTestCase {
-    func testDefaultModeLocksTheWholeKeyboard() {
-        XCTAssertEqual(SubscriptionConfig.monetization, .allFeaturesSubscribed)
-        XCTAssertTrue(SubscriptionConfig.keyboardRequiresSubscription)
-        XCTAssertTrue(SubscriptionConfig.fixRequiresSubscription)
+    func testDefaultModeKeepsTheKeyboardFreeAndLeavesFixToTheServerAllowance() {
+        XCTAssertEqual(SubscriptionConfig.monetization, .keyboardFreeFixAllowance)
+        XCTAssertFalse(SubscriptionConfig.keyboardRequiresSubscription)
+        XCTAssertFalse(SubscriptionConfig.fixRequiresSubscription)
+        XCTAssertFalse(
+            KeyboardLock.isLocked(
+                requiresSubscription: SubscriptionConfig.keyboardRequiresSubscription,
+                canReadEntitlement: false,
+                entitled: false
+            ),
+            "Without Pro and without Full Access the keyboard must still type"
+        )
+        XCTAssertEqual(SubscriptionConfig.freeFixesPerMonth, 30)
+        XCTAssertEqual(SubscriptionConfig.proFixesPerDay, 100)
+        XCTAssertTrue(KeyboardMonetization.allFeaturesSubscribed.keyboardRequiresSubscription)
         XCTAssertTrue(KeyboardMonetization.allSubscribed.keyboardRequiresSubscription)
         XCTAssertFalse(KeyboardMonetization.coreKeyboardFreeFixSubscribed.keyboardRequiresSubscription)
         XCTAssertTrue(KeyboardMonetization.coreKeyboardFreeFixSubscribed.fixRequiresSubscription)

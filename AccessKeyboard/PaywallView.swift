@@ -11,7 +11,7 @@ struct PaywallView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("access: keyboard")
+                Text("access: keyboard Pro")
                     .font(.largeTitle.bold())
                     .accessibilityAddTraits(.isHeader)
 
@@ -198,9 +198,9 @@ struct PaywallView: View {
 
 /// Paywall wording in one place, so the copy can be reviewed without reading layout code.
 enum PaywallCopy {
-    static let intro = "Pro unlocks access: keyboard in every app, including Fix. Choose a monthly or yearly plan, or pay once for Lifetime."
+    static let intro = "The keyboard and predictions are free, for good. Fix is free for \(SubscriptionConfig.freeFixesPerMonth) Fixes a month. Pro gives you as many Fixes as you need, up to a fair-use limit of \(SubscriptionConfig.proFixesPerDay) a day."
     static let whyPaid = "When you tap Fix, the paragraph you are typing in is sent to an AI service (OpenAI) to correct it. We pay for every Fix. That is why Pro is paid."
-    static let terms = "Payment is charged to your Apple Account. Monthly and yearly plans renew automatically at the price shown unless you cancel at least 24 hours before the end of the current period. Cancel in Settings or with Manage Subscriptions. Lifetime is one payment and never renews. Any free trial or offer is shown on the plan only when Apple offers it to your account."
+    static let terms = "Payment is charged to your Apple Account. Monthly and yearly plans renew automatically at the price shown unless you cancel at least 24 hours before the end of the current period. Cancel in Settings or with Manage Subscriptions. Lifetime is one payment and never renews. A free trial is shown on a plan only when Apple offers it to your account."
 }
 
 #Preview {
