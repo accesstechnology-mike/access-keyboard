@@ -31,9 +31,10 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_PATH: ${{ github.workspace }}/secrets/AuthKey.p8
           PYTHONUNBUFFERED: "1"
+          ONLY: ${{ contains(github.ref_name, '-only-products') && 'products' || '' }}
         run: |
           if [[ "$GITHUB_REF_NAME" == asc-listing-apply-* ]]; then
-            python3 scripts/asc_listing.py --apply
+            python3 scripts/asc_listing.py --apply ${ONLY:+--only "$ONLY"}
           else
             python3 scripts/asc_listing.py --status
           fi
