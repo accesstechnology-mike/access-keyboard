@@ -1,0 +1,33 @@
+name: Review screenshots
+
+# Tag-triggered: review-shots-*. Renders the real app screens (Pro screen with
+# the StoreKit test products, Type screen with the keyboard, Settings, Setup)
+# on iPhone 17 Pro Max and iPad Pro 13-inch Simulators and uploads the PNGs.
+# Changes nothing in App Store Connect.
+on:
+  push:
+    tags:
+      - "review-shots-*"
+
+jobs:
+  shots:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add the CI-only screenshot test target
+        run: |
+          gem list xcodeproj -i || sudo gem install xcodeproj --no-document
+          ruby scripts/review_shots/add_target.rb
+      - name: Simulators
+        run: xcrun simctl list devices available | grep -E "iPhone 17 Pro Max|iPad Pro 13" || true
+      - name: iPhone 17 Pro Max
+        run: scripts/review_shots/run.sh "iPhone 17 Pro Max" "$RUNNER_TEMP/shots"
+      - name: iPad Pro 13-inch
+        if: always()
+        run: scripts/review_shots/run.sh "iPad Pro 13" "$RUNNER_TEMP/shots"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-shots
+          path: ${{ runner.temp }}/shots/*.png

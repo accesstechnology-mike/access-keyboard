@@ -8,13 +8,13 @@
       "internalID": "PROLIFETIME",
       "localizations": [
         {
-          "description": "access: keyboard Pro, paid once. Never renews.",
-          "displayName": "Lifetime",
+          "description": "Up to 100 Fixes a day. Pay once.",
+          "displayName": "Pro Lifetime",
           "locale": "en_GB"
         }
       ],
       "productID": "app.access.keyboard.6M3Z27M69P.pro.lifetime",
-      "referenceName": "Lifetime",
+      "referenceName": "Pro Lifetime",
       "type": "NonConsumable"
     }
   ],
@@ -77,12 +77,12 @@
       "id": "PRO",
       "localizations": [
         {
-          "description": "access: keyboard Pro.",
-          "displayName": "access: keyboard",
+          "description": "access: keyboard Pro",
+          "displayName": "access: keyboard Pro",
           "locale": "en_GB"
         }
       ],
-      "name": "access: keyboard",
+      "name": "access: keyboard Pro",
       "subscriptions": [
         {
           "adHocOffers": [],
@@ -99,14 +99,14 @@
           },
           "localizations": [
             {
-              "description": "access: keyboard Pro, renewing every month. 14-day free trial.",
-              "displayName": "Monthly",
+              "description": "Up to 100 Fixes a day, billed monthly.",
+              "displayName": "Pro Monthly",
               "locale": "en_GB"
             }
           ],
           "productID": "app.access.keyboard.6M3Z27M69P.pro.monthly",
           "recurringSubscriptionPeriod": "P1M",
-          "referenceName": "Monthly",
+          "referenceName": "Pro Monthly",
           "subscriptionGroupID": "PRO",
           "type": "RecurringSubscription"
         },
@@ -125,14 +125,14 @@
           },
           "localizations": [
             {
-              "description": "access: keyboard Pro, renewing every year. 14-day free trial.",
-              "displayName": "Yearly",
+              "description": "Up to 100 Fixes a day, billed yearly.",
+              "displayName": "Pro Yearly",
               "locale": "en_GB"
             }
           ],
           "productID": "app.access.keyboard.6M3Z27M69P.pro.yearly",
           "recurringSubscriptionPeriod": "P1Y",
-          "referenceName": "Yearly",
+          "referenceName": "Pro Yearly",
           "subscriptionGroupID": "PRO",
           "type": "RecurringSubscription"
         }
