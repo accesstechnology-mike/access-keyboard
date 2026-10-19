@@ -20,8 +20,10 @@ const server = createServer(async (req, res) => {
       const headers = {
         "content-type": req.headers["content-type"] ?? "application/json",
       };
-      if (typeof req.headers.authorization === "string") {
-        headers.authorization = req.headers.authorization;
+      for (const name of ["authorization", "x-ak-transaction", "x-ak-app-transaction", "x-forwarded-for", "x-ak-test", "x-ak-test-reset"]) {
+        if (typeof req.headers[name] === "string") {
+          headers[name] = req.headers[name];
+        }
       }
       const request = new Request(url, {
         method: "POST",

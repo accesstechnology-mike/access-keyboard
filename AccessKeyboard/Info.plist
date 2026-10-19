@@ -6,5 +6,16 @@
 	<string>$(AK_FIX_PROXY_URL)</string>
 	<key>AKFixProxySecret</key>
 	<string>$(AK_FIX_PROXY_SECRET)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.access.keyboard.6M3Z27M69P</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>accesskeyboard</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

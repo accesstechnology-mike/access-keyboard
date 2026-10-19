@@ -22,7 +22,7 @@ TEAM = "A688GUK8XK"
 BUNDLE_ID = "app.access.keyboard.6M3Z27M69P"
 EXTENSION_BUNDLE_ID = "app.access.keyboard.6M3Z27M69P.extension"
 APP_GROUP = "group.6M3Z27M69P.app.access.keyboard"
-MARKETING_VERSION = "0.1.0"
+MARKETING_VERSION = "1.0"
 
 
 def error(message: str) -> None:
@@ -246,6 +246,18 @@ def check_privacy_page() -> None:
         error("proxy/public/privacy.html does not name the live Fix URL")
     else:
         note("privacy page names the live Fix URL")
+    if "iPhone" not in text or "iPad" not in text:
+        error("privacy page must describe an iPhone and iPad keyboard")
+    if "assistive iPad keyboard" in text:
+        error("privacy page still says it is only an iPad keyboard")
+    if "learning happens on your device" not in text:
+        error("privacy page does not say predictions are learned on the device")
+    if "OpenAI" not in text:
+        error("privacy page does not say Fix forwards the field to OpenAI")
+    if "mike@accesstechnology.co.uk" not in text:
+        error("privacy page is missing the contact address")
+    if "Purchases are handled by Apple" not in text:
+        error("privacy page does not say purchases are handled by Apple")
 
 
 def check_live_proxy() -> None:

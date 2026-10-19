@@ -6,9 +6,20 @@
   <title>access: keyboard privacy</title>
 </head>
 <body>
-  <p>access: keyboard is an assistive iPad keyboard.</p>
-  <p>Full Access is requested so Beth mode can be shared with the keyboard extension, and so Fix can call the correction proxy. Keystrokes stay on the device. Tapping Fix sends the current field’s text to that proxy and does not store it there.</p>
-  <p>The Release proxy is <code>https://access-keyboard.vercel.app/api/fix</code>. It forwards that field to OpenAI with <code>store</code> disabled. Ordinary keystrokes are not sent. Password fields are skipped.</p>
-  <p>Beth mode and learned predictions stay in the app group on the iPad.</p>
+  <h1>access: keyboard privacy</h1>
+  <p>access: keyboard is an assistive keyboard for iPhone and iPad.</p>
+  <p>Typing stays on your device. The keyboard does not send keystrokes anywhere.</p>
+  <p>The keyboard and word predictions are free. They work without Full Access and without a network. Fix, which corrects the paragraph you are typing in, is free for 30 Fixes a month. Pro (monthly, yearly or a one-off Lifetime purchase) allows up to 100 Fixes a day.</p>
+  <h2>Predictions</h2>
+  <p>The keyboard learns which words you type next, so it can suggest them later. This learning happens on your device and is not sent anywhere. With Full Access on, it is shared between the keyboard and the access: keyboard app on the same device.</p>
+  <h2>Fix</h2>
+  <p>Nothing is sent unless you tap Fix. The first time, the keyboard asks first, and nothing is sent until you tap Allow. You can turn that permission off in the app’s Settings.</p>
+  <p>When you tap Fix, the paragraph you are typing in is sent to our correction service at <code>https://access-keyboard.vercel.app/api/fix</code>. It passes the text to OpenAI, an AI service, to correct it, with storage at OpenAI turned off. Our service does not keep the text. Ordinary keystrokes are not sent. Password fields are skipped. Each Fix costs us money, which is why Fix has limits and Pro is paid.</p>
+  <p>To count Fixes, each Fix also sends information Apple signs for this app: the app’s install record from the App Store (its app transaction) and, if you have Pro, your Pro purchase record. Our service checks Apple’s signature and keeps a count against an ID from that record, the app transaction ID or the original transaction ID. Counts are kept for up to 32 days and are not linked to the text. Your IP address is used for a short-term rate limit and kept for no more than a few minutes. We do not receive your name, email address, payment card or Apple Account password.</p>
+  <h2>Full Access</h2>
+  <p>Full Access lets the keyboard share colour, layout and learned predictions with the app, and lets Fix reach our correction service. Without Full Access, Fix does not send anything.</p>
+  <h2>Purchases</h2>
+  <p>Purchases are handled by Apple. The app keeps a small record of your Pro status on your device, in the shared App Group, so the app and keyboard agree.</p>
+  <p>Questions: <a href="mailto:mike@accesstechnology.co.uk">mike@accesstechnology.co.uk</a></p>
 </body>
 </html>

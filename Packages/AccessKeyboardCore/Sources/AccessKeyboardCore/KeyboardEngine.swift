@@ -28,13 +28,38 @@ public final class KeyboardEngine {
     public var onChange: (() -> Void)?
     public var onPredictionsChange: (() -> Void)?
     public var fixClient: (any FixClient)?
+    /// False in the keyboard extension until the user turns on Allow Full Access.
+    /// The extension also has no general network entitlement without that switch.
     public var networkAllowed: Bool = false
+    /// When false, the engine does not read the shared App Group (no Full Access).
+    public var sharedPreferencesAvailable: Bool = true
     public private(set) var fixStatus: FixStatus = .idle
+    public private(set) var fixNotice: FixNotice = .none
+    /// Build-time switch. Tests can override this without editing `FeatureFlags`.
+    public var fixConsentRequired: Bool = FeatureFlags.fixConsentRequired
+    public var fixConsentIsGranted: () -> Bool = { KeyboardPreferences.fixConsentGranted }
+    public var recordFixConsent: (Bool) -> Void = { KeyboardPreferences.fixConsentGranted = $0 }
+    /// From `SubscriptionConfig.monetization`. Tests can override the split.
+    public var keyboardRequiresSubscription: Bool = SubscriptionConfig.keyboardRequiresSubscription
+    public var fixRequiresSubscription: Bool = SubscriptionConfig.fixRequiresSubscription
+    /// Reads the App Group record written by the containing app. The extension never purchases.
+    public var subscriptionIsActive: () -> Bool = {
+        SubscriptionEntitlementStore.readShared().isActive(at: Date())
+    }
+
+    /// True when this build locks the keyboard and the extension cannot see an active subscription.
+    public var keyboardIsLocked: Bool {
+        KeyboardLock.isLocked(
+            requiresSubscription: keyboardRequiresSubscription,
+            canReadEntitlement: sharedPreferencesAvailable,
+            entitled: sharedPreferencesAvailable && subscriptionIsActive()
+        )
+    }
 
     private var undoStack: [UndoRecord] = []
     private var redoStack: [UndoRecord] = []
     private var lastShiftTap: TimeInterval = 0
-    private let memory: PredictionMemory
+    private var memory: PredictionMemory
     /// True when the character before the cursor is a space this keyboard just
     /// inserted (prediction, space bar, or the space moved after punctuation),
     /// and `automaticSpaceContext` is the document context that space belongs
@@ -61,6 +86,13 @@ public final class KeyboardEngine {
     }
 
     public func handle(_ action: KeyAction) {
+        if keyboardIsLocked {
+            if case .nextKeyboard = action {
+                host?.advanceToNextInputMode()
+            }
+            return
+        }
+        dismissTransientFixNotice()
         switch action {
         case .character(let text):
             if text.contains(where: { $0.isPunctuation || $0.isNewline }) {
@@ -110,6 +142,7 @@ public final class KeyboardEngine {
     }
 
     public func continueBackspace(byWord: Bool) {
+        guard !keyboardIsLocked else { return }
         if byWord {
             deleteBackwardWord()
         } else {
@@ -121,6 +154,7 @@ public final class KeyboardEngine {
     }
 
     public func moveCursor(horizontal: Int, vertical: Int) {
+        guard !keyboardIsLocked else { return }
         let before = document?.documentContextBeforeInput ?? ""
         let after = document?.documentContextAfterInput ?? ""
         let offset = EditingShortcuts.cursorOffset(
@@ -153,19 +187,43 @@ public final class KeyboardEngine {
     public func requestFix() {
         guard fixStatus != .running else { return }
         guard !traits.isSecureTextEntry else {
-            failFix()
+            presentFixNotice(.secureField)
             return
         }
-        guard networkAllowed, let client = fixClient else {
-            failFix()
-            return
-        }
-
+        // Only the paragraph around the cursor is sent and replaced, so Fix
+        // never deletes back across a line break (Notes title / heading style).
         let original = fixTarget()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
+        // Entitlement before consent. Without the App Group the extension cannot
+        // see the record the app wrote, and Fix cannot use the network either.
+        if fixRequiresSubscription {
+            guard sharedPreferencesAvailable else {
+                presentFixNotice(.fullAccess)
+                return
+            }
+            guard subscriptionIsActive() else {
+                presentFixNotice(.subscribe)
+                return
+            }
+        }
+        // Full Access is what lets the extension open a network connection.
+        // Without it, Fix must not pretend to run and must not block typing.
+        guard networkAllowed else {
+            presentFixNotice(.fullAccess)
+            return
+        }
+        guard let client = fixClient else {
+            presentFixNotice(.unavailable)
+            return
+        }
+        if fixConsentRequired && !fixConsentIsGranted() {
+            presentFixNotice(.consent)
+            return
+        }
 
+        fixNotice = .none
         fixStatus = .running
         notify()
 
@@ -174,13 +232,36 @@ public final class KeyboardEngine {
             do {
                 let fixed = try await client.fix(original)
                 self.applyFixedText(original: original, fixed: fixed)
+            } catch FixError.freeLimitReached {
+                self.presentFixNotice(.freeLimit)
+            } catch FixError.dailyLimitReached {
+                self.presentFixNotice(.dailyLimit)
+            } catch FixError.rateLimited {
+                self.presentFixNotice(.busy)
             } catch {
                 self.failFix()
             }
         }
     }
 
+    public func allowFixConsentAndSend() {
+        recordFixConsent(true)
+        fixNotice = .none
+        requestFix()
+    }
+
+    public func declineFixConsent() {
+        fixNotice = .none
+        notify()
+    }
+
+    func usePredictionStore(sharedWithApp: Bool) {
+        memory = PredictionMemory.store(sharedWithApp: sharedWithApp)
+    }
+
     public func applyPrediction(_ prediction: Prediction) {
+        guard !keyboardIsLocked else { return }
+        dismissTransientFixNotice()
         let before = document?.documentContextBeforeInput
         let prefix = currentWordPrefix()
         let previous = PredictionProvider.previousWord(in: before, currentPrefix: prefix)
@@ -208,7 +289,7 @@ public final class KeyboardEngine {
             layoutClass: layoutClass,
             needsInputModeSwitchKey: needsInputModeSwitchKey,
             returnKeyType: traits.returnKeyType,
-            letterLayout: KeyboardPreferences.letterLayout
+            letterLayout: sharedPreferencesAvailable ? KeyboardPreferences.letterLayout : .qwerty
         )
     }
 
@@ -465,10 +546,25 @@ public final class KeyboardEngine {
         return String(leading) + core + trailing
     }
 
+    private func presentFixNotice(_ notice: FixNotice) {
+        fixNotice = notice
+        fixStatus = .idle
+        notify()
+        if !notice.message.isEmpty {
+            UIAccessibility.post(notification: .announcement, argument: notice.message)
+        }
+    }
+
+    private func dismissTransientFixNotice() {
+        guard fixNotice.isTransient else { return }
+        fixNotice = .none
+    }
+
     private func failFix() {
         fixStatus = .failed
+        fixNotice = .offline
         notify()
-        UIAccessibility.post(notification: .announcement, argument: "Fix failed")
+        UIAccessibility.post(notification: .announcement, argument: FixNotice.offline.message)
     }
 
     private func applyAutocapitalization() {

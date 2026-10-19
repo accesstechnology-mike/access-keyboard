@@ -1,0 +1,39 @@
+name: App Store Connect products
+
+# Tag-triggered so it runs from any branch. Status is read-only.
+#   asc-products-status-*  list this app's in-app purchases and subscriptions
+#   asc-products-apply-*   run scripts/asc_create_products.py --apply (creates products;
+#                          product IDs are permanent). Never submits anything for review.
+on:
+  push:
+    tags:
+      - "asc-products-status-*"
+      - "asc-products-apply-*"
+
+jobs:
+  products:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Products
+        working-directory: scripts
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: ${{ github.workspace }}/secrets/AuthKey.p8
+          PYTHONUNBUFFERED: "1"
+        run: |
+          if [[ "$GITHUB_REF_NAME" == asc-products-apply-* ]]; then
+            python3 asc_create_products.py --apply
+          fi
+          python3 asc_create_products.py --status

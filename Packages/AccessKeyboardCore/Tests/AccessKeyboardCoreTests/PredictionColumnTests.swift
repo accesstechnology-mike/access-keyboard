@@ -174,6 +174,33 @@ final class PredictionColumnTests: XCTestCase {
         }
     }
 
+    func testFixNoticeMovesIPadPredictionsToTheTopBar() {
+        for layoutClass in [LayoutClass.iPad, .iPadPro] {
+            for notice in [FixNotice.consent, .offline, .fullAccess, .secureField, .unavailable] {
+                XCTAssertFalse(
+                    PredictionColumnGeometry.usesVerticalColumn(
+                        layoutClass, placement: .preferSide, isLandscape: true, fixNotice: notice
+                    ),
+                    "\(layoutClass) shows \(notice) in the top bar"
+                )
+            }
+            for landscape in [true, false] {
+                for placement in PredictionPlacement.allCases {
+                    XCTAssertEqual(
+                        PredictionColumnGeometry.usesVerticalColumn(
+                            layoutClass, placement: placement, isLandscape: landscape, fixNotice: .none
+                        ),
+                        PredictionColumnGeometry.usesVerticalColumn(layoutClass, placement: placement, isLandscape: landscape),
+                        "No notice keeps the placement preference"
+                    )
+                }
+            }
+        }
+        XCTAssertFalse(
+            PredictionColumnGeometry.usesVerticalColumn(.compact, placement: .preferSide, isLandscape: false, fixNotice: .none)
+        )
+    }
+
     func testPreferTopOnlyMovesLandscapeIPadBoards() {
         for layoutClass in [LayoutClass.iPad, .iPadPro] {
             XCTAssertFalse(

@@ -3,7 +3,7 @@ import os
 import AccessKeyboardCore
 
 final class KeyboardViewController: UIInputViewController, KeyboardHost {
-    private let keyboard = KeyboardView()
+    private var keyboard: KeyboardView!
     private var heightConstraint: NSLayoutConstraint?
 
     /// Subsystem/category so these lines are easy to filter in Console.app and
@@ -14,29 +14,78 @@ final class KeyboardViewController: UIInputViewController, KeyboardHost {
         super.viewDidLoad()
         Self.log.notice("viewDidLoad fullAccess=\(self.hasFullAccess, privacy: .public) mem=\(Self.residentMemoryMB(), privacy: .public)MB")
         view.backgroundColor = .clear
-        keyboard.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(keyboard)
+        // Create the board only once we know Full Access. Without it the
+        // extension must not open the shared App Group.
+        let board = KeyboardView(sharesPredictionMemory: hasFullAccess)
+        keyboard = board
+        board.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(board)
         NSLayoutConstraint.activate([
-            keyboard.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            keyboard.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            keyboard.topAnchor.constraint(equalTo: view.topAnchor),
-            keyboard.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            board.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            board.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            board.topAnchor.constraint(equalTo: view.topAnchor),
+            board.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
-        keyboard.engine.host = self
-        keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
-        keyboard.engine.fixClient = URLSessionFixClient.fromBundle()
+        board.onPreferredHeightChange = { [weak self] in
+            self?.updateHeight()
+        }
+        board.onOpenContainingApp = { [weak self] in
+            self?.openContainingApp()
+        }
+        board.engine.document = DocumentProxyAdapter(textDocumentProxy)
+        board.engine.host = self
+        board.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
+        board.engine.fixClient = URLSessionFixClient.fromBundle()
+        applyAccess()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         keyboard.engine.document = DocumentProxyAdapter(textDocumentProxy)
         keyboard.engine.needsInputModeSwitchKey = needsInputModeSwitchKey
-        keyboard.engine.networkAllowed = hasFullAccess
-        KeyboardPreferences.extensionHasFullAccess = hasFullAccess
-        keyboard.applyCurrentPreferences()
+        applyAccess()
         keyboard.engine.documentDidChange()
         updateHeight()
+    }
+
+    /// Opens the containing app on the paywall. Tries the extension context first,
+    /// then the responder chain. The keyboard never presents a purchase sheet.
+    private func openContainingApp() {
+        guard let url = SubscriptionConfig.paywallURL else { return }
+        guard let context = extensionContext else {
+            openURLThroughResponderChain(url)
+            return
+        }
+        context.open(url) { [weak self] opened in
+            guard !opened else { return }
+            DispatchQueue.main.async {
+                self?.openURLThroughResponderChain(url)
+            }
+        }
+    }
+
+    private func openURLThroughResponderChain(_ url: URL) {
+        var responder: UIResponder? = self
+        let selector = NSSelectorFromString("openURL:")
+        while let current = responder {
+            if current.responds(to: selector) {
+                _ = current.perform(selector, with: url)
+                return
+            }
+            responder = current.next
+        }
+    }
+
+    /// Full Access lets the extension read the subscription record, shared settings,
+    /// and the Fix network call. Without it the board stays on the locked panel.
+    private func applyAccess() {
+        keyboard.engine.sharedPreferencesAvailable = hasFullAccess
+        keyboard.engine.networkAllowed = hasFullAccess
+        keyboard.setSharesPredictionMemory(hasFullAccess)
+        if hasFullAccess {
+            KeyboardPreferences.extensionHasFullAccess = true
+        }
+        keyboard.applyCurrentPreferences()
     }
 
     override func viewDidLayoutSubviews() {

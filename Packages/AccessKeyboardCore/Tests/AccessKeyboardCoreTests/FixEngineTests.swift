@@ -4,10 +4,7 @@ import XCTest
 @MainActor
 final class FixEngineTests: XCTestCase {
     func testFixReplacesTheWholeField() async {
-        let document = FakeDocument(text: "I recieve the mesage")
-        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
-        engine.document = document
-        engine.networkAllowed = true
+        let (engine, document) = makeEngine(text: "I recieve the mesage")
         engine.fixClient = MockFixClient { text in
             XCTAssertEqual(text, "I recieve the mesage")
             return "I receive the message"
@@ -18,13 +15,11 @@ final class FixEngineTests: XCTestCase {
 
         XCTAssertEqual(document.text, "I receive the message")
         XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(engine.fixNotice, .none)
     }
 
     func testFixUndoRestoresTheOriginal() async {
-        let document = FakeDocument(text: "teh schol")
-        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
-        engine.document = document
-        engine.networkAllowed = true
+        let (engine, document) = makeEngine(text: "teh schol")
         engine.fixClient = MockFixClient { _ in "the school" }
 
         engine.requestFix()
@@ -35,10 +30,7 @@ final class FixEngineTests: XCTestCase {
     }
 
     func testFixSkipsSecureFields() async {
-        let document = FakeDocument(text: "secret")
-        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
-        engine.document = document
-        engine.networkAllowed = true
+        let (engine, document) = makeEngine(text: "secret")
         engine.traits.isSecureTextEntry = true
         engine.fixClient = MockFixClient { _ in
             XCTFail("secure fields must not be sent")
@@ -49,21 +41,195 @@ final class FixEngineTests: XCTestCase {
         await waitUntilIdle(engine)
 
         XCTAssertEqual(document.text, "secret")
-        XCTAssertEqual(engine.fixStatus, .failed)
+        XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(engine.fixNotice, .secureField)
     }
 
-    func testFixRequiresNetwork() async {
-        let document = FakeDocument(text: "teh")
-        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
-        engine.document = document
-        engine.networkAllowed = false
-        engine.fixClient = MockFixClient { _ in "the" }
+    func testFixRequiresFullAccessBeforeItSends() async {
+        let (engine, document) = makeEngine(text: "teh", network: false)
+        engine.fixClient = MockFixClient { _ in
+            XCTFail("Fix must not send without Full Access")
+            return "the"
+        }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(engine.fixNotice, .fullAccess)
+        XCTAssertFalse(engine.fixNotice.message.isEmpty)
+    }
+
+    func testTypingStillWorksWhenFixCannotRun() {
+        let (engine, document) = makeEngine(text: "", network: false)
+        engine.keyboardRequiresSubscription = false
+        engine.sharedPreferencesAvailable = false
+        engine.fixClient = MockFixClient { _ in
+            XCTFail("must not send")
+            return ""
+        }
+
+        engine.handleCharacter("a")
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .fullAccess)
+        engine.handleCharacter("b")
+
+        XCTAssertEqual(document.text, "ab")
+        XCTAssertEqual(engine.fixNotice, .none)
+        XCTAssertEqual(engine.fixStatus, .idle)
+    }
+
+    func testFixNetworkFailureLeavesTheFieldAndShowsAHint() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.fixClient = MockFixClient { _ in
+            throw FixError.requestFailed
+        }
 
         engine.requestFix()
         await waitUntilIdle(engine)
 
         XCTAssertEqual(document.text, "teh")
         XCTAssertEqual(engine.fixStatus, .failed)
+        XCTAssertEqual(engine.fixNotice, .offline)
+        engine.handleCharacter("!")
+        XCTAssertEqual(engine.fixNotice, .none)
+        XCTAssertTrue(document.text.hasSuffix("!"))
+    }
+
+    func testFixAsksBeforeTheFirstSendAndCanBeDeclined() async {
+        let document = FakeDocument(text: "teh")
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.networkAllowed = true
+        engine.traits.autocapitalizationType = .none
+        engine.fixConsentRequired = true
+        engine.subscriptionIsActive = { true }
+        let box = ConsentBox()
+        engine.fixConsentIsGranted = { box.granted }
+        engine.recordFixConsent = { box.granted = $0 }
+        engine.fixClient = MockFixClient { _ in
+            box.sent += 1
+            return "the"
+        }
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .consent)
+        XCTAssertEqual(box.sent, 0)
+        XCTAssertFalse(engine.fixNotice.message.isEmpty)
+        XCTAssertEqual(document.text, "teh")
+
+        engine.declineFixConsent()
+        XCTAssertEqual(engine.fixNotice, .none)
+        XCTAssertFalse(box.granted)
+        XCTAssertEqual(box.sent, 0)
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .consent)
+        engine.allowFixConsentAndSend()
+        await waitUntilIdle(engine)
+        XCTAssertTrue(box.granted)
+        XCTAssertEqual(box.sent, 1)
+        XCTAssertEqual(document.text, "the")
+        XCTAssertEqual(engine.fixNotice, .none)
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+        XCTAssertEqual(box.sent, 2)
+    }
+
+    func testRevokingConsentAsksAgain() async {
+        let document = FakeDocument(text: "teh")
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.networkAllowed = true
+        engine.traits.autocapitalizationType = .none
+        engine.fixConsentRequired = true
+        engine.subscriptionIsActive = { true }
+        let box = ConsentBox()
+        box.granted = true
+        engine.fixConsentIsGranted = { box.granted }
+        engine.recordFixConsent = { box.granted = $0 }
+        engine.fixClient = MockFixClient { _ in
+            box.sent += 1
+            return "the"
+        }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+        XCTAssertEqual(box.sent, 1)
+
+        box.granted = false
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .consent)
+        XCTAssertEqual(box.sent, 1)
+        XCTAssertEqual(document.text, "the")
+    }
+
+    func testFixRequiresASubscriptionBeforeItAsksForConsent() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.fixConsentRequired = true
+        engine.fixRequiresSubscription = true
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { false }
+        engine.fixConsentIsGranted = { false }
+        var sent = 0
+        engine.fixClient = MockFixClient { _ in
+            sent += 1
+            return "the"
+        }
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .subscribe)
+        XCTAssertEqual(sent, 0)
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertFalse(engine.fixNotice.message.isEmpty)
+
+        engine.subscriptionIsActive = { true }
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .consent)
+        XCTAssertEqual(sent, 0)
+        XCTAssertEqual(document.text, "teh")
+    }
+
+    func testUnreadableEntitlementAsksForFullAccess() {
+        let (engine, document) = makeEngine(text: "teh", network: false)
+        engine.sharedPreferencesAvailable = false
+        engine.subscriptionIsActive = {
+            XCTFail("the extension must not treat a hidden App Group as a subscription decision")
+            return false
+        }
+        engine.fixClient = MockFixClient { _ in
+            XCTFail("must not send")
+            return "the"
+        }
+
+        engine.requestFix()
+        XCTAssertEqual(engine.fixNotice, .fullAccess)
+        XCTAssertEqual(document.text, "teh")
+    }
+
+    func testWithoutSharedPreferencesTheBoardStaysQWERTY() {
+        let previous = KeyboardPreferences.letterLayout
+        defer { KeyboardPreferences.letterLayout = previous }
+        KeyboardPreferences.letterLayout = .abc
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.sharedPreferencesAvailable = false
+        let layout = engine.layout(for: CGSize(width: 390, height: 400), idiom: .phone)
+        XCTAssertEqual(layout.letterString(inRow: 0), "qwertyuiop")
+    }
+
+    private func makeEngine(text: String, network: Bool = true) -> (KeyboardEngine, FakeDocument) {
+        let document = FakeDocument(text: text)
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.networkAllowed = network
+        engine.traits.autocapitalizationType = .none
+        engine.fixConsentRequired = false
+        engine.fixRequiresSubscription = true
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { true }
+        return (engine, document)
     }
 
     /// Apple Notes: the first line is the title. Fix in the keyboard extension
@@ -75,7 +241,9 @@ final class FixEngineTests: XCTestCase {
         )
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
         engine.document = document
+        engine.entitleForTests()
         engine.networkAllowed = true
+        engine.fixConsentRequired = false
         engine.fixClient = MockFixClient { text in
             XCTAssertEqual(text, "I recieve the mesage")
             return "I receive the message"
@@ -96,7 +264,9 @@ final class FixEngineTests: XCTestCase {
         )
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
         engine.document = document
+        engine.entitleForTests()
         engine.networkAllowed = true
+        engine.fixConsentRequired = false
         // The proxy trims the reply, so the trailing space comes back missing.
         engine.fixClient = MockFixClient { _ in "the cat" }
 
@@ -110,7 +280,9 @@ final class FixEngineTests: XCTestCase {
         let document = FakeDocument(text: "Title\nteh schol", exposesEntireText: false)
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
         engine.document = document
+        engine.entitleForTests()
         engine.networkAllowed = true
+        engine.fixConsentRequired = false
         engine.fixClient = MockFixClient { _ in "the school" }
 
         engine.requestFix()
@@ -120,12 +292,93 @@ final class FixEngineTests: XCTestCase {
         XCTAssertEqual(document.text, "Title\nteh schol")
     }
 
+    // MARK: Server allowance
+
+    func testFreeLimitFromTheServerShowsAHintAndKeepsTyping() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.entitleForTests()
+        engine.fixConsentRequired = false
+        engine.fixClient = MockFixClient { _ in throw FixError.freeLimitReached }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(engine.fixNotice, .freeLimit)
+        XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertTrue(FixNotice.freeLimit.message.contains("30"))
+        engine.handle(.character("x"))
+        XCTAssertEqual(document.text, "tehx")
+        XCTAssertEqual(engine.fixNotice, .none, "The hint goes on the next keystroke")
+    }
+
+    func testDailyLimitAndRateLimitShowTheirOwnHints() async {
+        for (error, notice) in [(FixError.dailyLimitReached, FixNotice.dailyLimit), (.rateLimited, .busy)] {
+            let (engine, _) = makeEngine(text: "teh")
+            engine.entitleForTests()
+            engine.fixConsentRequired = false
+            engine.fixClient = MockFixClient { _ in throw error }
+            engine.requestFix()
+            await waitUntilIdle(engine)
+            XCTAssertEqual(engine.fixNotice, notice)
+        }
+    }
+
+    func testFixRunsWithoutProInTheDefaultMode() async {
+        let (engine, document) = makeEngine(text: "teh")
+        // The shipped defaults, not the test helper's subscription gate.
+        engine.fixRequiresSubscription = SubscriptionConfig.fixRequiresSubscription
+        engine.keyboardRequiresSubscription = SubscriptionConfig.keyboardRequiresSubscription
+        engine.sharedPreferencesAvailable = true
+        engine.subscriptionIsActive = { false }
+        engine.fixConsentRequired = false
+        engine.fixClient = MockFixClient { _ in "the" }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(document.text, "the")
+        XCTAssertFalse(engine.keyboardIsLocked)
+    }
+
+    func testProxyErrorsMapToLimits() {
+        let body: (String) -> Data = { Data("{\"error\":\"\($0)\"}".utf8) }
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("free_limit")), .freeLimitReached)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("daily_limit")), .dailyLimitReached)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: body("rate_limited")), .rateLimited)
+        XCTAssertEqual(FixError.fromProxy(status: 429, body: nil), .rateLimited)
+        XCTAssertEqual(FixError.fromProxy(status: 502, body: body("upstream_failed")), .requestFailed)
+        XCTAssertEqual(FixError.fromProxy(status: 401, body: nil), .requestFailed)
+    }
+
+    func testFixCredentialsBecomeHeadersAndSkipEmptyValues() {
+        let suite = "test.access.keyboard.fixcredentials.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertEqual(FixCredentials.headers(from: defaults), [:])
+        FixCredentials.write(appTransaction: "app.jws", transaction: nil, to: defaults)
+        XCTAssertEqual(FixCredentials.headers(from: defaults), ["X-AK-App-Transaction": "app.jws"])
+        FixCredentials.write(appTransaction: "app.jws", transaction: "txn.jws", to: defaults)
+        XCTAssertEqual(
+            FixCredentials.headers(from: defaults),
+            ["X-AK-App-Transaction": "app.jws", "X-AK-Transaction": "txn.jws"]
+        )
+        FixCredentials.write(appTransaction: "", transaction: "", to: defaults)
+        XCTAssertEqual(FixCredentials.headers(from: defaults), [:])
+    }
+
     private func waitUntilIdle(_ engine: KeyboardEngine) async {
         let deadline = Date().addingTimeInterval(1)
         while engine.fixStatus == .running, Date() < deadline {
             await Task.yield()
         }
     }
+}
+
+private final class ConsentBox: @unchecked Sendable {
+    var granted = false
+    var sent = 0
 }
 
 private struct MockFixClient: FixClient {

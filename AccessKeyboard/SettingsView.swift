@@ -1,7 +1,11 @@
 import SwiftUI
+import StoreKit
 import AccessKeyboardCore
 
 struct SettingsView: View {
+    @EnvironmentObject private var subscriptions: SubscriptionManager
+    @State private var redeemingCode = false
+
     @AppStorage(KeyboardPreferences.letterLayoutKey, store: KeyboardPreferences.suite)
     private var letterLayoutRaw = LetterLayout.qwerty.rawValue
 
@@ -11,6 +15,9 @@ struct SettingsView: View {
     @State private var colourOptionRaw = KeyboardPreferences.colourOption.rawValue
 
     @State private var extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
+
+    @AppStorage(KeyboardPreferences.fixConsentGrantedKey, store: KeyboardPreferences.suite)
+    private var fixConsentGranted = false
 
     var body: some View {
         List {
@@ -57,20 +64,45 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("On iPhone, Fix sits at the left of the prediction bar. On iPad, it sits at the bottom of the prediction list on the left, or at the left of the top bar with Prefer top in landscape. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
+                Text("On iPhone, Fix sits at the left of the prediction bar. On iPad, it sits at the bottom of the prediction list on the left, or at the left of the top bar with Prefer top in landscape. One tap corrects the paragraph you are typing in. Undo puts the original back. Password fields are skipped.")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent.")
+                    Text(fixFooter)
                     if let endpoint = URLSessionFixClient.configuredEndpointString() {
                         Text("This build calls \(endpoint).")
                     }
                 }
             }
 
+            if FeatureFlags.fixConsentRequired {
+                Section {
+                    Toggle("Allow Fix to send text", isOn: $fixConsentGranted)
+                } footer: {
+                    Text("Fix sends the paragraph you are typing in to OpenAI, an AI service, to correct it. Each Fix costs us money. Turn this off to stop sending. The next Fix will ask again. Password fields are never sent.")
+                }
+            }
+
             Section {
-                Text("To use these settings or Fix in other apps, iOS and iPadOS still require Settings → General → Keyboard → Keyboards → access: keyboard → Allow Full Access.")
+                Text(proSummary)
+                Button("Redeem Code") { redeemingCode = true }
+                    .frame(minHeight: 44)
+                    .accessibilityHint("Enter an offer code from access: technology")
+                Button("Restore Purchases") {
+                    Task { await subscriptions.restore() }
+                }
+                .frame(minHeight: 44)
+                .accessibilityHint("Checks your Apple Account for Pro you already bought")
+                if let status = subscriptions.statusMessage {
+                    Text(status)
+                }
+            } header: {
+                Text("Pro")
+            }
+
+            Section {
+                Text(fullAccessSummary)
                 if !extensionHasFullAccess {
-                    Text("The system-wide keyboard has not reported Full Access yet, so it will not see these settings or Fix until that switch is on. The Type screen in this app can Fix without that switch.")
+                    Text(fullAccessWarning)
                 }
             }
         }
@@ -78,6 +110,9 @@ struct SettingsView: View {
             extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
             KeyboardPreferences.persistMigratedColourOptionIfNeeded()
             colourOptionRaw = KeyboardPreferences.colourOption.rawValue
+        }
+        .offerCodeRedemption(isPresented: $redeemingCode) { result in
+            Task { await subscriptions.finishCodeRedemption(result) }
         }
         .onChange(of: letterLayoutRaw) { _, _ in KeyboardPreferences.notify() }
         .onChange(of: predictionPlacementRaw) { _, _ in KeyboardPreferences.notify() }
@@ -88,6 +123,48 @@ struct SettingsView: View {
                 KeyboardPreferences.notify()
             }
         }
+        .onChange(of: fixConsentGranted) { _, _ in
+            KeyboardPreferences.notify()
+        }
+    }
+
+    private var proSummary: String {
+        let record = subscriptions.record
+        if record.isLifetime {
+            return "You have Pro Lifetime."
+        }
+        if record.isActive(at: Date()) {
+            return "Pro is active."
+        }
+        return "You are on the free plan: \(SubscriptionConfig.freeFixesPerMonth) Fixes a month. The keyboard and predictions are always free."
+    }
+
+    private var fullAccessSummary: String {
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            return "In other apps the keyboard stays locked until Allow Full Access is on, so it can see your Pro status. The locked keyboard shows how to open this app and keeps a globe key that switches keyboards. Allow Full Access also shares colour and layout settings and on-device learned predictions, and lets Fix reach the correction service."
+        }
+        return "The keyboard still types in other apps with Full Access off and with no network. Allow Full Access to share colour and layout settings and on-device learned predictions, and to let Fix reach the correction service."
+    }
+
+    private var fullAccessWarning: String {
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            return "The system keyboard has not reported Full Access, so it cannot see your Pro status and stays locked. The Type screen in this app can still be used."
+        }
+        return "The system keyboard has not reported Full Access, so it keeps its own colours and its own learned words. Fix explains that and does not send text. The Type screen in this app can still Fix."
+    }
+
+    private var fixFooter: String {
+        var text = FeatureFlags.fixConsentRequired
+            ? "Tapping Fix sends that paragraph to OpenAI through our correction service, and only after you allow it. Ordinary keystrokes are not sent."
+            : "Tapping Fix sends that paragraph to our correction service. Ordinary keystrokes are not sent."
+        if SubscriptionConfig.keyboardRequiresSubscription {
+            text += " The keyboard, including Fix, needs Pro."
+        } else if SubscriptionConfig.fixRequiresSubscription {
+            text += " Fix needs Pro."
+        } else {
+            text += " Fix is free for \(SubscriptionConfig.freeFixesPerMonth) Fixes a month. Pro gives you up to \(SubscriptionConfig.proFixesPerDay) a day."
+        }
+        return text
     }
 }
 
@@ -95,5 +172,6 @@ struct SettingsView: View {
     NavigationStack {
         SettingsView()
             .navigationTitle("Settings")
+            .environmentObject(SubscriptionManager())
     }
 }
