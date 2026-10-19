@@ -45,14 +45,14 @@ struct AboutView: View {
     private var privacyText: String {
         var text = SubscriptionConfig.keyboardRequiresSubscription
             ? "Using the keyboard needs Pro: a monthly or yearly plan, or a one-off Lifetime purchase. Apple handles payment. A record of your Pro status stays on this device so the keyboard can check it. Without Full Access the keyboard cannot read that record, so it shows how to open this app and keeps a Next Keyboard key."
-            : "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and learned predictions, which stay on this device, be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device. Purchases are handled by Apple. A record of your Pro status stays on this device so the keyboard knows whether Fix is included."
+            : "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and learned predictions, which stay on this device, be shared with the keyboard extension, and lets Fix reach our correction service. Keystrokes stay on this device. Purchases are handled by Apple. To count Fixes, each Fix also sends Apple’s signed record of this app install and, if you have Pro, your Pro purchase. Our service checks Apple’s signature and keeps only a count."
         if FeatureFlags.fixConsentRequired {
-            text += " Tapping Fix asks once before sending the paragraph you are typing in to that proxy. The proxy passes it to OpenAI to correct and does not keep it. You can turn that off in Settings."
+            text += " Tapping Fix asks once before sending the paragraph you are typing in to our correction service. It passes the text to OpenAI, an AI service, to correct it, and does not keep it. Each Fix costs us money. You can take back permission in Settings."
         } else {
-            text += " Tapping Fix sends the paragraph you are typing in to that proxy. The proxy passes it to OpenAI to correct and does not keep it."
+            text += " Tapping Fix sends the paragraph you are typing in to our correction service. It passes the text to OpenAI, an AI service, to correct it, and does not keep it. Each Fix costs us money."
         }
         if let endpoint = URLSessionFixClient.configuredEndpointString() {
-            text += " This build’s proxy is \(endpoint)."
+            text += " This build’s correction service is \(endpoint)."
         }
         return text
     }

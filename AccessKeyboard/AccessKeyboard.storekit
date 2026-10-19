@@ -23,7 +23,6 @@
     "_developerTeamID": "A688GUK8XK",
     "_failTransactionsEnabled": false,
     "_locale": "en_GB",
-    "_storefront": "GBR",
     "_storeKitErrors": [
       {
         "current": null,
@@ -70,7 +69,8 @@
         "enabled": false,
         "name": "Offer Code Redeem Sheet"
       }
-    ]
+    ],
+    "_storefront": "GBR"
   },
   "subscriptionGroups": [
     {
@@ -87,13 +87,19 @@
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "1.99",
+          "displayPrice": "3.99",
           "familyShareable": false,
-          "groupNumber": 1,
+          "groupNumber": 2,
           "internalID": "PROMONTHLY",
+          "introductoryOffer": {
+            "internalID": "PROMONTHLYINTRO",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P14D"
+          },
           "localizations": [
             {
-              "description": "access: keyboard Pro, renewing every month. Local testing price only; the real price is set in App Store Connect.",
+              "description": "access: keyboard Pro, renewing every month. 14-day free trial.",
               "displayName": "Monthly",
               "locale": "en_GB"
             }
@@ -107,13 +113,19 @@
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "19.99",
+          "displayPrice": "29.99",
           "familyShareable": false,
-          "groupNumber": 2,
+          "groupNumber": 1,
           "internalID": "PROYEARLY",
+          "introductoryOffer": {
+            "internalID": "PROYEARLYINTRO",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P14D"
+          },
           "localizations": [
             {
-              "description": "access: keyboard Pro, renewing every year. Local testing price only; the real price is set in App Store Connect.",
+              "description": "access: keyboard Pro, renewing every year. 14-day free trial.",
               "displayName": "Yearly",
               "locale": "en_GB"
             }

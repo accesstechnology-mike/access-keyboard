@@ -146,10 +146,10 @@ iPhone or iPad on iOS/iPadOS 18. The keyboard adapts: a compact single-column bo
 1. Open access: keyboard. Without Pro the paywall is the first screen. Buy monthly, yearly or Lifetime with a Sandbox account, or redeem a sandbox offer code, then type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
 2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix (left of the prediction bar on iPhone, bottom of the prediction list on iPad). The first Fix asks before sending the paragraph; Allow sends it, Not now does not. Undo should restore the original. Password fields must not send text. With Full Access off, typing still works and Fix explains that it needs Full Access.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
-4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too. Without a subscription, or with Allow Full Access off, the keyboard shows a locked message, a button back to the app, and a globe key. It does not show a purchase screen.
-5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on). The locked message and Open access: keyboard button should be spoken too.
+4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too. The keyboard types without Pro and with Allow Full Access off; only Fix needs Full Access and the network.
+5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on). Fix messages in the suggestion bar should be spoken too.
 
-The keyboard, including Fix, requires a subscription or the introductory offer. Full Access lets the system keyboard read that subscription, share colour settings and on-device learned words, and lets Fix reach https://access-keyboard.vercel.app/api/fix. Keystrokes stay on the device. Fix sends only the current field, and only after you tap Allow.
+The keyboard and predictions are free. Fix is free for 30 a month; Pro allows up to 100 a day. Full Access lets the keyboard share colour settings and on-device learned words, read the app's Apple-signed purchase records, and reach https://access-keyboard.vercel.app/api/fix. Keystrokes stay on the device. Fix sends only the current paragraph, and only after you tap Allow.
 ```
 
 ## Beta review notes
@@ -162,14 +162,13 @@ This is an assistive keyboard for iPhone and iPad. There is no account or login.
 The keyboard will not appear in other apps until the reviewer adds it:
 Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard.
 
-The app requires a subscription with a 14-day free trial (introductory offer). See docs/app-store-listing.md for the sandbox path and the locked keyboard state. Without a subscription, or with Allow Full Access off, the system keyboard shows a locked message, a button that opens the app, and a globe key. It does not show a purchase screen.
+The keyboard and predictions are free and never lock. Fix is free for 30 uses a month; Pro (monthly or yearly with a 14-day free trial, or Lifetime) allows up to 100 a day. See docs/app-store-listing.md for products and the sandbox path.
 
-Full Access is used for three things:
-1. Let the keyboard extension read the subscription record in App Group group.6M3Z27M69P.app.access.keyboard.
-2. Share colour and layout settings, and on-device learned predictions (PredictionMemory), through that App Group.
-3. Let the extension call the Fix proxy at https://access-keyboard.vercel.app/api/fix.
+Full Access is used to:
+1. Share colour and layout settings, and on-device learned predictions, through App Group group.6M3Z27M69P.app.access.keyboard.
+2. Let the keyboard read the Apple-signed purchase records the app saves there, and call the Fix service at https://access-keyboard.vercel.app/api/fix.
 
-Keystrokes are not sent off the device. Tapping Fix sends the current field’s text only after the reviewer taps Allow. That choice can be turned off in the app’s Settings. The proxy forwards that field to OpenAI with store disabled and does not keep the text. Password fields are skipped. If there is no network, Fix shows a short hint and does not change the field.
+Keystrokes are not sent off the device. Tapping Fix sends the current paragraph only after the reviewer taps Allow. That choice can be turned off in the app’s Settings. The service forwards that paragraph to OpenAI with store disabled and does not keep the text. Password fields are skipped. If there is no network, Fix shows a short hint and does not change the field.
 
 The in-app Type screen uses the same keyboard, so layout, colours, and Fix can be tried before enabling the system keyboard.
 ```

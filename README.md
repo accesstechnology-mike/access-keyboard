@@ -4,9 +4,10 @@ An assistive custom keyboard for **iPhone and iPad** (iOS / iPadOS 18). It pairs
 a literacy font, an accessible colour scheme (including Beth Moulam's colours), a
 prediction list (a bar across the top on iPhone, a column on the left on iPad)
 that learns on the device, and an optional "Fix" that can correct the current
-paragraph through a hosted proxy. Using the keyboard requires Pro: a monthly or
-yearly subscription, or a one-off Lifetime purchase. Without it, the system
-keyboard shows a locked message, a button that opens this app, and a globe key.
+paragraph through a hosted proxy. The keyboard and predictions are free and never
+lock. Fix is free for 30 Fixes a month; Pro (monthly £3.99 or yearly £29.99, each
+with a 14-day free trial, or Lifetime £79.99) allows up to 100 a day. The proxy
+counts Fixes from Apple-signed StoreKit data (see `proxy/README.md`).
 Fix sends text only when the user taps Fix, and only after they allow it when
 consent is required.
 
@@ -30,13 +31,15 @@ One subscription covers the whole keyboard, including Fix. It is sold only in th
 | --- | --- |
 | `SubscriptionConfig.monthlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.monthly` |
 | `SubscriptionConfig.yearlyProductID` | `app.access.keyboard.6M3Z27M69P.pro.yearly` |
+| `SubscriptionConfig.lifetimeProductID` | `app.access.keyboard.6M3Z27M69P.pro.lifetime` (non-consumable) |
 | `SubscriptionConfig.subscriptionGroupName` | `access: keyboard` |
-| `SubscriptionConfig.monetization` | `.allFeaturesSubscribed` (the keyboard and Fix need an active subscription or introductory offer) |
+| `SubscriptionConfig.monetization` | `.keyboardFreeFixAllowance` (keyboard free; Fix limited by the proxy: `freeFixesPerMonth` 30, `proFixesPerDay` 100) |
+| `KeyboardMonetization.allFeaturesSubscribed` | available, not the default (the keyboard and Fix need Pro) |
 | `KeyboardMonetization.allSubscribed` | available, same gates as `.allFeaturesSubscribed` |
 | `KeyboardMonetization.coreKeyboardFreeFixSubscribed` | available, not the default (typing stays usable; Fix needs a subscription) |
 | `SubscriptionConfig.showTrialHeadlineDefault` | `true` |
 
-`showTrialHeadline` only controls whether the paywall may show introductory-offer wording. The optional file `https://access-keyboard.vercel.app/config.json` (source `proxy/public/config.json`) may set that boolean. It cannot grant a subscription and it cannot set the trial length. The length is an introductory offer in App Store Connect (14 days). Prices on the paywall come from StoreKit. `AccessKeyboard/AccessKeyboard.storekit` is the local simulator catalogue (£1.99 / £19.99, with a 14-day free trial stand-in) and is selected on the AccessKeyboard scheme. The URL scheme `accesskeyboard://subscribe` opens the containing app on the paywall.
+`showTrialHeadline` only controls whether the paywall may show introductory-offer wording. The optional file `https://access-keyboard.vercel.app/config.json` (source `proxy/public/config.json`) may set that boolean. It cannot grant a subscription and it cannot set the trial length. The length is an introductory offer in App Store Connect (14 days). Prices on the paywall come from StoreKit. `AccessKeyboard/AccessKeyboard.storekit` is the local simulator catalogue (£3.99 / £29.99 with a 14-day free trial, and Lifetime £79.99) and is selected on the AccessKeyboard scheme. The URL scheme `accesskeyboard://subscribe` opens the containing app on the Pro screen. Products are created in App Store Connect by `scripts/asc_create_products.py` (dry run unless `--apply`).
 
 ## Device support
 
