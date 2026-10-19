@@ -6,6 +6,7 @@ import StoreKitTest
 import SwiftUI
 import UIKit
 import XCTest
+import AccessKeyboardCore
 @testable import AccessKeyboard
 
 @MainActor
@@ -80,6 +81,14 @@ final class ReviewShotsTests: XCTestCase {
         session.disableDialogs = true
         session.resetToDefaultState()
         session.clearTransactions()
+        session.storefront = "GBR"
+        print("REVIEWSHOTS storekit", storekit.path)
+        do {
+            let direct = try await Product.products(for: SubscriptionConfig.productIDs)
+            print("REVIEWSHOTS direct products:", direct.map { "\($0.id) \($0.displayPrice) \($0.type.rawValue)" })
+        } catch {
+            print("REVIEWSHOTS direct products error:", error)
+        }
 
         let manager = SubscriptionManager()
 
