@@ -273,6 +273,29 @@ class Creator:
         return iid
 
 
+def print_status(creator: "Creator", app_id: str) -> None:
+    iaps, _ = creator.collect(creator.token, f"/v1/apps/{app_id}/inAppPurchasesV2", {"limit": "200"})
+    for item in iaps:
+        a = item["attributes"]
+        print(f"in-app purchase {a.get('productId')} type={a.get('inAppPurchaseType')} state={a.get('state')}")
+    groups, _ = creator.collect(creator.token, f"/v1/apps/{app_id}/subscriptionGroups", {"limit": "200"})
+    for group in groups:
+        print(f"subscription group '{group['attributes'].get('referenceName')}'")
+        subs, _ = creator.collect(creator.token, f"/v1/subscriptionGroups/{group['id']}/subscriptions", {"limit": "200"})
+        for sub in subs:
+            a = sub["attributes"]
+            print(f"  subscription {a.get('productId')} period={a.get('subscriptionPeriod')} state={a.get('state')}")
+            for path, label in (("prices", "prices"), ("introductoryOffers", "intro offers"),
+                                ("subscriptionLocalizations", "localizations")):
+                try:
+                    items, _ = creator.collect(creator.token, f"/v1/subscriptions/{sub['id']}/{path}", {"limit": "200"})
+                    print(f"    {label}: {len(items)}")
+                except Exception as exc:  # status is best effort
+                    print(f"    {label}: unavailable ({str(exc)[:80]})")
+    if not iaps and not groups:
+        print("No in-app purchases or subscription groups.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--apply", action="store_true", help="Really create the products. Default is a dry run.")
@@ -280,7 +303,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--yearly", type=Decimal, default=YEARLY_PRICE_GBP)
     parser.add_argument("--lifetime", type=Decimal, default=LIFETIME_PRICE_GBP)
     parser.add_argument("--no-trial", action="store_true", help="Create the subscriptions without a free trial.")
+    parser.add_argument("--status", action="store_true", help="Read-only: list this app's products and their states.")
     args = parser.parse_args(argv)
+
+    if args.status:
+        import app_store_connect as asc
+
+        token = asc.fresh_token()
+        app_id = asc.app_id(token, BUNDLE_ID)
+        print_status(Creator(asc.asc_request, asc.collect_resources, token), app_id)
+        return 0
 
     items = products(monthly=args.monthly, yearly=args.yearly, lifetime=args.lifetime,
                      trial=None if args.no_trial else TRIAL_DURATION)
