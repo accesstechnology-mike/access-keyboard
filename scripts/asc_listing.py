@@ -370,14 +370,15 @@ def apply(copy: dict, before: dict, only: set[str] | None) -> list[str]:
         if before["availability"]:
             print("  availability exists; counts:", before["availability_counts"])
             return
-        territories = [t["id"] for t in collect("/v1/territories", {"limit": "200"}) if t["id"] not in EXCLUDED_TERRITORIES]
+        territories = [t["id"] for t in collect("/v1/territories", {"limit": "200"})]
         req("/v2/appAvailabilities", method="POST", body={
             "data": {"type": "appAvailabilities", "attributes": {"availableInNewTerritories": True},
                      "relationships": {"app": ref("apps", APP_ID), "territoryAvailabilities": {"data": [
                          {"type": "territoryAvailabilities", "id": f"${{{t}}}"} for t in territories]}}},
             "included": [{"type": "territoryAvailabilities", "id": f"${{{t}}}",
-                          "attributes": {"available": True},
+                          "attributes": {"available": t not in EXCLUDED_TERRITORIES},
                           "relationships": {"territory": ref("territories", t)}} for t in territories]})
+        territories = [t for t in territories if t not in EXCLUDED_TERRITORIES]
         print(f"  available in {len(territories)} territories (not {sorted(EXCLUDED_TERRITORIES)})")
 
     def product_key(product_id: str) -> str:
