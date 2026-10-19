@@ -174,6 +174,72 @@ final class PredictionColumnTests: XCTestCase {
         }
     }
 
+    func testPreferTopOnlyMovesLandscapeIPadBoards() {
+        for layoutClass in [LayoutClass.iPad, .iPadPro] {
+            XCTAssertFalse(
+                PredictionColumnGeometry.usesVerticalColumn(layoutClass, placement: .preferTop, isLandscape: true),
+                "\(layoutClass) landscape should honour Prefer top"
+            )
+            XCTAssertTrue(
+                PredictionColumnGeometry.usesVerticalColumn(layoutClass, placement: .preferTop, isLandscape: false),
+                "\(layoutClass) portrait ignores Prefer top"
+            )
+            XCTAssertTrue(
+                PredictionColumnGeometry.usesVerticalColumn(layoutClass, placement: .preferSide, isLandscape: true),
+                "\(layoutClass) landscape defaults to the side column"
+            )
+        }
+        for landscape in [true, false] {
+            for placement in PredictionPlacement.allCases {
+                XCTAssertFalse(
+                    PredictionColumnGeometry.usesVerticalColumn(.compact, placement: placement, isLandscape: landscape),
+                    "the compact board always keeps its bar"
+                )
+            }
+        }
+    }
+
+    func testTopBarKeepsTheSideColumnFixSize() {
+        // Landscape iPad widths, including iPad Air 11-inch (1180).
+        for width: CGFloat in [1024, 1133, 1180, 1366] {
+            let layoutClass = LayoutClassResolver.resolve(size: CGSize(width: width, height: 400), idiom: .pad)
+            let board = LayoutFactory.layout(
+                mode: .alphabetic,
+                shift: .off,
+                layoutClass: layoutClass,
+                needsInputModeSwitchKey: true,
+                returnKeyType: .default,
+                letterLayout: .qwerty
+            )
+            let metrics = LayoutMetrics.metrics(
+                for: layoutClass,
+                bounds: CGSize(width: width, height: 820),
+                safeBottom: 0,
+                rowCount: board.rows.count
+            )
+            let column = PredictionColumnGeometry.arrangement(
+                texts: ["the", "and"],
+                keyboardSize: CGSize(width: width, height: metrics.preferredHeight),
+                metrics: metrics,
+                layout: board,
+                showsPredictions: true
+            )
+            let barHeight = PredictionColumnGeometry.topBarHeight(for: metrics)
+            let bar = PredictionBarGeometry.arrangement(
+                texts: ["the", "and"],
+                barWidth: width - metrics.sideInset * 2,
+                barHeight: barHeight - 8,
+                preferredFontSize: PredictionColumnGeometry.preferredFontSize(metrics),
+                minimumReadableFontSize: PredictionColumnGeometry.minimumReadableFontSize(metrics),
+                fixWidth: PredictionColumnGeometry.topBarFixWidth(boundsWidth: width, metrics: metrics, layout: board)
+            )
+            XCTAssertEqual(bar.fixFrame.width, column.fixFrame.width, accuracy: 0.5, "width \(width)")
+            XCTAssertEqual(bar.fixFrame.height, column.fixFrame.height, accuracy: 0.5, "width \(width)")
+            XCTAssertEqual(bar.fixFrame.minX, 0, accuracy: 0.5)
+            XCTAssertGreaterThanOrEqual(bar.cellFrames.first?.minX ?? .infinity, bar.fixFrame.maxX - 0.5)
+        }
+    }
+
     private func assertTextsFit(
         _ plan: PredictionColumnArrangement,
         metrics: LayoutMetrics,

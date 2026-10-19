@@ -119,9 +119,10 @@ public enum KeyboardGeometry {
     /// order `KeyboardView.layoutKeys` places its buttons in.
     ///
     /// `reservedLeading` is the iPad prediction column plus the gap before the
-    /// first key. `reservedTop` is the iPhone prediction bar: keys start below
-    /// it. Compact boards pass a top reserve and no leading reserve; iPad
-    /// boards do the opposite.
+    /// first key. `reservedTop` is the prediction bar: keys start below it.
+    /// Compact boards pass a top reserve and no leading reserve; iPad boards
+    /// do the opposite, unless "Prefer top" moves a landscape iPad's
+    /// predictions into a bar.
     public static func frames(
         for layout: KeyboardLayout,
         metrics: LayoutMetrics,

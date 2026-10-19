@@ -32,6 +32,38 @@ public enum PredictionColumnGeometry {
         layoutClass != .compact
     }
 
+    /// The same decision with the user's placement preference applied.
+    /// "Prefer top" only moves predictions to a top bar on a landscape iPad
+    /// board that would otherwise use the column. Portrait iPad, iPhone and
+    /// the compact fallback board ignore it.
+    public static func usesVerticalColumn(
+        _ layoutClass: LayoutClass,
+        placement: PredictionPlacement,
+        isLandscape: Bool
+    ) -> Bool {
+        guard usesVerticalColumn(layoutClass) else { return false }
+        return !(placement == .preferTop && isLandscape)
+    }
+
+    /// Bar height when an iPad board puts predictions on top. The bar view
+    /// insets 4pt top and bottom and Fix a further 2pt, so this leaves Fix
+    /// exactly one key tall, the same height it has at the foot of the column.
+    public static func topBarHeight(for metrics: LayoutMetrics) -> CGFloat {
+        metrics.keyHeight + 12
+    }
+
+    /// Fix width when an iPad board puts predictions on top: the resting
+    /// column width (`standardWidthFraction`), so Fix keeps the size it has
+    /// at the foot of the side column.
+    public static func topBarFixWidth(
+        boundsWidth: CGFloat,
+        metrics: LayoutMetrics,
+        layout: KeyboardLayout
+    ) -> CGFloat {
+        let maximum = maximumColumnWidth(boundsWidth: boundsWidth, metrics: metrics, layout: layout)
+        return standardColumnWidth(boundsWidth: boundsWidth, maximum: maximum)
+    }
+
     public static func arrangement(
         texts: [String],
         keyboardSize: CGSize,

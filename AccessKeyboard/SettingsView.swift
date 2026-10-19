@@ -5,6 +5,9 @@ struct SettingsView: View {
     @AppStorage(KeyboardPreferences.letterLayoutKey, store: KeyboardPreferences.suite)
     private var letterLayoutRaw = LetterLayout.qwerty.rawValue
 
+    @AppStorage(KeyboardPreferences.predictionPlacementKey, store: KeyboardPreferences.suite)
+    private var predictionPlacementRaw = PredictionPlacement.preferSide.rawValue
+
     @State private var colourOptionRaw = KeyboardPreferences.colourOption.rawValue
 
     @State private var extensionHasFullAccess = KeyboardPreferences.extensionHasFullAccess
@@ -44,7 +47,17 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("On iPhone, Fix sits at the left of the prediction bar. On iPad, it sits at the bottom of the prediction list on the left. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
+                Picker("Predictions on landscape iPad", selection: $predictionPlacementRaw) {
+                    ForEach(PredictionPlacement.allCases) { placement in
+                        Text(placement.title).tag(placement.rawValue)
+                    }
+                }
+            } footer: {
+                Text("Only applies to an iPad in landscape. Prefer side keeps predictions and Fix in a column on the left of the keys. Prefer top puts them in a bar above the keys, so your hands do not cover them, and Fix keeps the same size. Portrait iPad, iPhone, and any board too narrow for the side column ignore this and keep their usual layout.")
+            }
+
+            Section {
+                Text("On iPhone, Fix sits at the left of the prediction bar. On iPad, it sits at the bottom of the prediction list on the left, or at the left of the top bar with Prefer top in landscape. One tap corrects the whole field. Undo puts the original back. Password fields are skipped.")
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Tapping Fix sends that field’s text to the correction proxy. Ordinary keystrokes are not sent.")
@@ -67,6 +80,7 @@ struct SettingsView: View {
             colourOptionRaw = KeyboardPreferences.colourOption.rawValue
         }
         .onChange(of: letterLayoutRaw) { _, _ in KeyboardPreferences.notify() }
+        .onChange(of: predictionPlacementRaw) { _, _ in KeyboardPreferences.notify() }
         .onChange(of: colourOptionRaw) { _, newValue in
             if let option = ColourOption(rawValue: newValue) {
                 KeyboardPreferences.colourOption = option
