@@ -250,8 +250,8 @@ def check_privacy_page() -> None:
         error("privacy page must describe an iPhone and iPad keyboard")
     if "assistive iPad keyboard" in text:
         error("privacy page still says it is only an iPad keyboard")
-    if "PredictionMemory" not in text:
-        error("privacy page does not describe on-device PredictionMemory")
+    if "learning happens on your device" not in text:
+        error("privacy page does not say predictions are learned on the device")
     if "OpenAI" not in text:
         error("privacy page does not say Fix forwards the field to OpenAI")
     if "mike@accesstechnology.co.uk" not in text:
