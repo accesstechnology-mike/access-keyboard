@@ -16,6 +16,25 @@ jobs:
       - name: Python unit tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
+  proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm ci
+
+      - name: Fix proxy tests
+        run: npm test
+
   ios:
     runs-on: macos-26
     timeout-minutes: 45
