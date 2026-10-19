@@ -55,6 +55,8 @@ final class KeyButton: UIControl {
         label.textAlignment = .center
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.6
+        label.lineBreakMode = .byClipping
+        label.numberOfLines = 1
         label.isUserInteractionEnabled = false
 
         secondaryLabel.textAlignment = .right
@@ -141,8 +143,31 @@ final class KeyButton: UIControl {
             label.frame = bounds.insetBy(dx: 4, dy: 2)
         }
         symbolView.frame = bounds.insetBy(dx: 8, dy: 8)
+        applyUniformLetterSize()
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: metrics.cornerRadius).cgPath
         layer.shadowColor = appearance.shadowColor.cgColor
+    }
+
+    /// Single-character letters share one size. A wide W must not shrink on
+    /// its own. Multi-character labels (shift, return) may still scale down
+    /// to fit their key.
+    private func applyUniformLetterSize() {
+        guard case .text(let value) = display, spec.style == .letter, value.count == 1 else {
+            label.adjustsFontSizeToFitWidth = true
+            label.minimumScaleFactor = 0.6
+            return
+        }
+        label.adjustsFontSizeToFitWidth = false
+        label.minimumScaleFactor = 1
+        let size = KeyLetterSizing.uniformSize(
+            intended: metrics.letterFontSize,
+            availableWidth: label.bounds.width
+        )
+        if let literacy = LiteracyFont.uiFont(ofSize: size) {
+            label.font = literacy
+        } else {
+            label.font = .systemFont(ofSize: size, weight: .light)
+        }
     }
 
     /// Expands the touchable area into the dead space between keys so imprecise

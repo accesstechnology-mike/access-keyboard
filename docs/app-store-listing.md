@@ -30,8 +30,8 @@ The product IDs are decided. There is no free tier. The whole keyboard, includin
 | Secondary category | Productivity (optional) |
 | Primary language | English (UK), unless the App Store Connect record is already English (US). The keyboard’s `PrimaryLanguage` is `en-US`. |
 | Copyright | Access Technology North Limited |
-| Version | `0.1.0` (marketing version in the Xcode project) |
-| Price | Free to download. Using the keyboard requires one auto-renewing subscription: £1.99 a month or £19.99 a year, entered in App Store Connect, or the 14-day free trial on that subscription. The paywall shows StoreKit’s localized price and trial. |
+| Version | `1.0` (marketing version in the Xcode project; matches the App Store Connect version record) |
+| Price | Free to download. Using the keyboard requires Pro: a monthly or yearly auto-renewing subscription (prices not yet decided), or a one-off Lifetime purchase at £79.99. The paywall shows StoreKit’s localised prices, and an introductory offer only if one is set in App Store Connect and the account is eligible. |
 
 Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotional text is 157 characters (limit 170). Keywords are 79 characters (limit 100).
 

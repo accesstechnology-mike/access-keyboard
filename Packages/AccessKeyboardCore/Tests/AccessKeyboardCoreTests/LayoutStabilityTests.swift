@@ -249,6 +249,14 @@ final class LayoutStabilityTests: XCTestCase {
             XCTAssertEqual(reference.count, expectedCount, "frame count drifted: \(context)")
 
             // Numeric and symbols reuse it, so keys stay the same size on switch.
+            // (iPad Pro class is a fixed 14-column grid instead; see below.)
+            if layoutClass == .iPadPro {
+                for mode in modes {
+                    let page = layout(mode: mode, shift: .off, layoutClass: layoutClass, letterLayout: .qwerty)
+                    XCTAssertEqual(page.gridColumns, LayoutFactory.proGridColumns, "\(mode) grid: \(context)")
+                }
+                continue
+            }
             for mode in [KeyboardMode.numeric, .symbols] {
                 let page = layout(mode: mode, shift: .off, layoutClass: layoutClass, letterLayout: .qwerty)
                 XCTAssertEqual(page.referenceUnitWeight ?? -1, expectedWeight, accuracy: 0.0001, "\(mode) key size: \(context)")
@@ -335,7 +343,7 @@ final class LayoutStabilityTests: XCTestCase {
             for safeBottom in safeBottoms {
                 for mode in modes {
                     for letterLayout in letterLayouts {
-                        for showsPredictions in [true, false] {
+                        for predictionTexts in [Self.shortPredictions, [], Self.longPredictions] {
                             let board = layout(
                                 mode: mode,
                                 shift: .off,
@@ -348,21 +356,31 @@ final class LayoutStabilityTests: XCTestCase {
                                 safeBottom: safeBottom,
                                 rowCount: board.rows.count
                             )
+                            let reservedTop = predictionTexts.isEmpty ? CGFloat(0) : metrics.predictionBarHeight
                             let rows = KeyboardGeometry.frames(
                                 for: board,
                                 metrics: metrics,
                                 boundsWidth: width,
-                                showsPredictions: showsPredictions
+                                reservedLeading: 0,
+                                reservedTop: reservedTop
                             )
-                            let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(showsPredictions) safe=\(safeBottom)"
+                            let context = "w=\(width) mode=\(mode) letters=\(letterLayout) pred=\(predictionTexts.count) safe=\(safeBottom)"
                             let leftLimit = metrics.sideInset
                             let rightLimit = width - metrics.sideInset
+                            if let first = rows.first?.first {
+                                XCTAssertEqual(
+                                    first.minY,
+                                    metrics.topInset + reservedTop,
+                                    accuracy: 0.5,
+                                    "keys should start below the prediction bar: \(context)"
+                                )
+                            }
                             for frames in rows {
                                 for frame in frames {
                                     XCTAssertGreaterThan(frame.width, 0, "zero/negative key width: \(context)")
                                     XCTAssertGreaterThanOrEqual(
                                         frame.minX, leftLimit - 0.5,
-                                        "key starts left of the side inset: \(context)"
+                                        "key starts left of the key area: \(context)"
                                     )
                                     XCTAssertLessThanOrEqual(
                                         frame.maxX, rightLimit + 0.5,
@@ -396,12 +414,17 @@ final class LayoutStabilityTests: XCTestCase {
                     for: board,
                     metrics: metrics,
                     boundsWidth: width,
-                    showsPredictions: true
+                    reservedLeading: 0,
+                    reservedTop: metrics.predictionBarHeight
                 )
                 let context = "mode=\(mode) letters=\(letterLayout)"
                 let leftEdge = rows.compactMap { $0.first?.minX }.min() ?? 0
                 let rightEdge = rows.compactMap { $0.last?.maxX }.max() ?? 0
-                XCTAssertLessThanOrEqual(leftEdge, metrics.sideInset + 0.5, "board not flush left: \(context)")
+                XCTAssertEqual(
+                    leftEdge, metrics.sideInset,
+                    accuracy: 0.5,
+                    "iPhone keys start at the side inset, with no prediction column: \(context)"
+                )
                 // The widest row should reach close to the right inset — allow a
                 // little slack for centring and inter-key gaps.
                 XCTAssertGreaterThan(
@@ -412,7 +435,68 @@ final class LayoutStabilityTests: XCTestCase {
         }
     }
 
+    // MARK: - Motor plan: function keys never move between pages or states
+
+    /// Return, delete, shift (or its page-switch stand-in), tab, caps, space,
+    /// globe, hide and the page keys must occupy exactly the same frames on the
+    /// letters, shift, caps-lock, 123 and #+= pages, for every layout and class.
+    func testFunctionKeysNeverMoveAcrossPagesAndShiftStates() {
+        let widths: [(LayoutClass, CGFloat, CGFloat)] = [
+            (.compact, 390, 320), (.compact, 440, 320),
+            (.iPad, 744, 400), (.iPad, 820, 400),
+            (.iPadPro, 1180, 450), (.iPadPro, 1133, 450), (.iPadPro, 1366, 500)
+        ]
+        for (layoutClass, width, height) in widths {
+            for letterLayout in letterLayouts {
+                var baseline: [CGRect]?
+                for mode in modes {
+                    for shift in shifts {
+                        let board = layout(mode: mode, shift: shift, layoutClass: layoutClass, letterLayout: letterLayout)
+                        let metrics = LayoutMetrics.metrics(
+                            for: layoutClass,
+                            bounds: CGSize(width: width, height: height),
+                            safeBottom: 0,
+                            rowCount: board.rows.count
+                        )
+                        let frames = KeyboardGeometry.frames(for: board, metrics: metrics, boundsWidth: width, reservedLeading: 0)
+                        var fixed: [CGRect] = []
+                        for (row, rowFrames) in zip(board.rows, frames) {
+                            for (spec, frame) in zip(row.keys, rowFrames) where spec.style != .letter {
+                                fixed.append(frame.integral)
+                            }
+                        }
+                        let context = "class=\(layoutClass) w=\(width) letters=\(letterLayout) mode=\(mode) shift=\(shift)"
+                        if let baseline {
+                            XCTAssertEqual(fixed, baseline, "a function key moved: \(context)")
+                        } else {
+                            baseline = fixed
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The iPad Pro / 11" landscape letters board is a block: every row starts
+    /// and ends at the same x.
+    func testIPadProLettersFormABlock() {
+        for letterLayout in [LetterLayout.qwerty, .abc] {
+            let board = layout(mode: .alphabetic, shift: .off, layoutClass: .iPadPro, letterLayout: letterLayout)
+            let metrics = LayoutMetrics.metrics(for: .iPadPro, bounds: CGSize(width: 1180, height: 450), safeBottom: 0, rowCount: board.rows.count)
+            let rows = KeyboardGeometry.frames(for: board, metrics: metrics, boundsWidth: 1180, reservedLeading: 160)
+            let lefts = rows.compactMap { $0.first?.minX }
+            let rights = rows.compactMap { $0.last?.maxX }
+            for value in lefts { XCTAssertEqual(value, lefts[0], accuracy: 0.5, "left edge: \(letterLayout)") }
+            for value in rights { XCTAssertEqual(value, rights[0], accuracy: 0.5, "right edge: \(letterLayout)") }
+        }
+    }
+
     // MARK: - Helpers
+
+    private static let shortPredictions = ["the", "to", "and", "of", "a", "in"]
+    private static let longPredictions = [
+        "extraordinarily", "internationalization", "the", "and", "to", "of"
+    ]
 
     private func layout(
         mode: KeyboardMode,

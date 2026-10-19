@@ -4,10 +4,14 @@
 final class FakeDocument: KeyboardDocument {
     var text: String
     var cursor: Int
+    /// When false, behaves like `UITextDocumentProxy`: no whole-text access,
+    /// so edits must go through deleteBackward / insertText.
+    let exposesEntireText: Bool
 
-    init(text: String, cursor: Int? = nil) {
+    init(text: String, cursor: Int? = nil, exposesEntireText: Bool = true) {
         self.text = text
         self.cursor = cursor ?? text.count
+        self.exposesEntireText = exposesEntireText
     }
 
     func insertText(_ text: String) {
@@ -26,13 +30,14 @@ final class FakeDocument: KeyboardDocument {
     var documentContextBeforeInput: String? { String(text.prefix(cursor)) }
     var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }
     var selectedText: String? { nil }
-    var entireText: String? { text }
+    var entireText: String? { exposesEntireText ? text : nil }
 
     func adjustTextPosition(byCharacterOffset offset: Int) {
         cursor = min(max(0, cursor + offset), text.count)
     }
 
     func replaceEntireText(_ text: String) -> Bool {
+        guard exposesEntireText else { return false }
         self.text = text
         cursor = text.count
         return true

@@ -13,6 +13,7 @@ public final class KeyboardView: UIView {
     private var appearance = KeyboardAppearance.system(for: .light)
     private var callout: AccentCalloutView?
     private var preferenceObservation: KeyboardPreferenceObservation?
+    private let predictionColumn = PredictionColumnView()
     private let predictionBar = PredictionBarView()
     private let haptics = UIImpactFeedbackGenerator(style: .light)
     private var cursorTrackpad: UIPanGestureRecognizer?
@@ -23,6 +24,7 @@ public final class KeyboardView: UIView {
     /// The keyboard extension sets this to open the containing app. There is no purchase UI here.
     public var onOpenContainingApp: (() -> Void)?
     private let lockedPanel = KeyboardLockedPanel()
+    private var predictionPlacement = KeyboardPreferences.predictionPlacement
 
     /// `sharesPredictionMemory` is false in the keyboard extension until Allow Full
     /// Access is on. That path keeps learned words in the extension's own defaults
@@ -72,12 +74,12 @@ public final class KeyboardView: UIView {
         trackpad.delegate = self
         addGestureRecognizer(trackpad)
         cursorTrackpad = trackpad
-        predictionBar.onSelect = { [weak self] prediction in
+        let selectPrediction: (Prediction) -> Void = { [weak self] prediction in
             UIDevice.current.playInputClick()
             self?.haptics.impactOccurred(intensity: 0.55)
             self?.engine.applyPrediction(prediction)
         }
-        predictionBar.onFix = { [weak self] in
+        let requestFix: () -> Void = { [weak self] in
             UIDevice.current.playInputClick()
             self?.haptics.impactOccurred(intensity: 0.55)
             self?.engine.requestFix()
@@ -88,6 +90,11 @@ public final class KeyboardView: UIView {
         predictionBar.onDeclineConsent = { [weak self] in
             self?.engine.declineFixConsent()
         }
+        predictionColumn.onSelect = selectPrediction
+        predictionColumn.onFix = requestFix
+        predictionBar.onSelect = selectPrediction
+        predictionBar.onFix = requestFix
+        addSubview(predictionColumn)
         addSubview(predictionBar)
         lockedPanel.isHidden = true
         lockedPanel.onOpenApp = { [weak self] in
@@ -119,17 +126,10 @@ public final class KeyboardView: UIView {
             return
         }
         lockedPanel.isHidden = true
-        predictionBar.isHidden = false
         keyButtons.forEach { $0.isHidden = false }
-        let layout = engine.layout(for: bounds.size, idiom: idiom)
-        let metrics = metricsForCurrentNotice(
-            LayoutMetrics.metrics(
-                for: layout.layoutClass,
-                bounds: bounds.size,
-                safeBottom: extraBottomInset,
-                rowCount: layout.rows.count
-            )
-        )
+        let current = board(for: bounds.size)
+        let layout = current.layout
+        let metrics = current.metrics
         // Rebuild the view hierarchy only when the board's shape changes (mode,
         // rotation, size class). For ordinary keystrokes the structure is
         // identical, so reuse the existing buttons and just refresh their
@@ -144,21 +144,55 @@ public final class KeyboardView: UIView {
         currentLayout = layout
         currentMetrics = metrics
         contentDirty = false
-        layoutPredictionBar(metrics: metrics)
-        layoutKeys(layout: layout, metrics: metrics)
+        let arrangement = predictionArrangement(layout: layout, metrics: metrics, usesColumn: current.usesColumn)
+        layoutPredictionColumn(arrangement: arrangement, metrics: metrics)
+        layoutPredictionBar(layout: layout, metrics: metrics, usesColumn: current.usesColumn)
+        layoutKeys(layout: layout, metrics: metrics, arrangement: arrangement, usesColumn: current.usesColumn)
+    }
+
+    private struct Board {
+        var layout: KeyboardLayout
+        var metrics: LayoutMetrics
+        /// Predictions in the left column (true) or a bar above the keys.
+        var usesColumn: Bool
+    }
+
+    /// Layout, metrics and prediction placement for a keyboard of `size`.
+    /// iPad boards normally use the side column and have no bar height. When
+    /// the user prefers top and the iPad is in landscape, the board gets a
+    /// bar one key tall above the keys instead; the keys keep their size.
+    private func board(for size: CGSize) -> Board {
+        let layout = engine.layout(for: size, idiom: idiom)
+        var metrics = LayoutMetrics.metrics(
+            for: layout.layoutClass,
+            bounds: size,
+            safeBottom: extraBottomInset,
+            rowCount: layout.rows.count
+        )
+        let usesColumn = PredictionColumnGeometry.usesVerticalColumn(
+            layout.layoutClass,
+            placement: predictionPlacement,
+            isLandscape: isLandscapeScreen,
+            fixNotice: engine.fixNotice
+        )
+        if PredictionColumnGeometry.usesVerticalColumn(layout.layoutClass), !usesColumn {
+            metrics.predictionBarHeight = PredictionColumnGeometry.topBarHeight(for: metrics)
+        }
+        metrics = metricsForCurrentNotice(metrics)
+        return Board(layout: layout, metrics: metrics, usesColumn: usesColumn)
+    }
+
+    /// Interface orientation of the screen the keyboard is on. The keyboard's
+    /// own bounds are always wider than tall, so they cannot tell portrait
+    /// from landscape. Screen bounds follow the interface orientation.
+    private var isLandscapeScreen: Bool {
+        let size = window?.windowScene?.screen.bounds.size ?? UIScreen.main.bounds.size
+        return size.width > size.height
     }
 
     public var preferredHeight: CGFloat {
         let size = bounds.size.width > 0 ? bounds.size : CGSize(width: 1024, height: 300)
-        let layout = engine.layout(for: size, idiom: idiom)
-        let metrics = metricsForCurrentNotice(
-            LayoutMetrics.metrics(
-                for: layout.layoutClass,
-                bounds: size,
-                safeBottom: extraBottomInset,
-                rowCount: layout.rows.count
-            )
-        )
+        let metrics = board(for: size).metrics
         if engine.showsPredictions {
             return metrics.preferredHeight
         }
@@ -170,6 +204,7 @@ public final class KeyboardView: UIView {
     }
 
     public func applyCurrentPreferences() {
+        predictionPlacement = KeyboardPreferences.predictionPlacement
         updateAppearance()
         reloadKeys()
     }
@@ -201,6 +236,7 @@ public final class KeyboardView: UIView {
 
     private func showLockedPanel() {
         predictionBar.isHidden = true
+        predictionColumn.isHidden = true
         keyButtons.forEach { $0.isHidden = true }
         callout?.isHidden = true
         lockedPanel.isHidden = false
@@ -237,11 +273,9 @@ public final class KeyboardView: UIView {
     }
 
     private func refreshPredictions() {
-        guard let metrics = currentMetrics else {
-            reloadKeys()
-            return
-        }
-        layoutPredictionBar(metrics: metrics)
+        // On iPad a long word can widen the column and move the keys. On
+        // iPhone only the bar's cells change width. Either way, lay out again.
+        setNeedsLayout()
     }
 
     private func rebuildKeys(layout: KeyboardLayout, metrics: LayoutMetrics) {
@@ -297,34 +331,88 @@ public final class KeyboardView: UIView {
         }
     }
 
-    private func layoutPredictionBar(metrics: LayoutMetrics) {
-        predictionBar.isHidden = !engine.showsPredictions
-        guard engine.showsPredictions else { return }
-        predictionBar.update(
-            predictions: engine.predictions(),
-            fixStatus: engine.fixStatus,
-            notice: engine.fixNotice,
-            appearance: appearance,
-            fontSize: metrics.modifierFontSize + 2
+    private func predictionArrangement(
+        layout: KeyboardLayout,
+        metrics: LayoutMetrics,
+        usesColumn: Bool
+    ) -> PredictionColumnArrangement {
+        let showsColumn = engine.showsPredictions && usesColumn
+        let texts = showsColumn ? engine.predictions().map(\.displayText) : []
+        return PredictionColumnGeometry.arrangement(
+            texts: texts,
+            keyboardSize: bounds.size,
+            metrics: metrics,
+            layout: layout,
+            showsPredictions: showsColumn
         )
-        predictionBar.frame = CGRect(
+    }
+
+    private func layoutPredictionBar(layout: KeyboardLayout, metrics: LayoutMetrics, usesColumn: Bool) {
+        let showsBar = engine.showsPredictions && !usesColumn
+        predictionBar.isHidden = !showsBar
+        guard showsBar else { return }
+        let frame = CGRect(
             x: metrics.sideInset,
             y: 4,
-            width: bounds.width - metrics.sideInset * 2,
-            height: metrics.predictionBarHeight - 8
+            width: max(0, bounds.width - metrics.sideInset * 2),
+            height: max(0, metrics.predictionBarHeight - 8)
         )
+        // An iPad board on top keeps its side-column Fix size and type size.
+        // iPhone and the compact fallback board keep the original bar.
+        let isPadTopBar = PredictionColumnGeometry.usesVerticalColumn(layout.layoutClass)
+        let arrangement = PredictionBarGeometry.arrangement(
+            texts: engine.predictions().map(\.displayText),
+            barWidth: frame.width,
+            barHeight: frame.height,
+            preferredFontSize: isPadTopBar
+                ? PredictionColumnGeometry.preferredFontSize(metrics)
+                : metrics.modifierFontSize + 2,
+            minimumReadableFontSize: PredictionColumnGeometry.minimumReadableFontSize(metrics),
+            fixWidth: isPadTopBar
+                ? PredictionColumnGeometry.topBarFixWidth(boundsWidth: bounds.width, metrics: metrics, layout: layout)
+                : nil
+        )
+        predictionBar.update(
+            predictions: engine.predictions(),
+            arrangement: arrangement,
+            fixStatus: engine.fixStatus,
+            notice: engine.fixNotice,
+            appearance: appearance
+        )
+        predictionBar.frame = frame
         bringSubviewToFront(predictionBar)
     }
 
-    private func layoutKeys(layout: KeyboardLayout, metrics: LayoutMetrics) {
+    private func layoutPredictionColumn(arrangement: PredictionColumnArrangement, metrics: LayoutMetrics) {
+        predictionColumn.isHidden = arrangement.isHidden
+        guard !arrangement.isHidden else { return }
+        predictionColumn.update(
+            predictions: engine.predictions(),
+            arrangement: arrangement,
+            fixStatus: engine.fixStatus,
+            appearance: appearance,
+            metrics: metrics
+        )
+        predictionColumn.frame = arrangement.columnFrame
+        bringSubviewToFront(predictionColumn)
+    }
+
+    private func layoutKeys(
+        layout: KeyboardLayout,
+        metrics: LayoutMetrics,
+        arrangement: PredictionColumnArrangement,
+        usesColumn: Bool
+    ) {
         // The width math lives in KeyboardGeometry so it can be unit tested
         // (a compact iPhone board must never overflow); the view just positions
         // its buttons from the frames it returns.
+        let showsBar = engine.showsPredictions && !usesColumn
         let rows = KeyboardGeometry.frames(
             for: layout,
             metrics: metrics,
             boundsWidth: bounds.width,
-            showsPredictions: engine.showsPredictions
+            reservedLeading: PredictionColumnGeometry.reservedLeading(for: arrangement, metrics: metrics),
+            reservedTop: showsBar ? metrics.predictionBarHeight : 0
         )
         var buttonIndex = 0
         for frames in rows {

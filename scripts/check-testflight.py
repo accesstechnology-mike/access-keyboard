@@ -22,7 +22,7 @@ TEAM = "A688GUK8XK"
 BUNDLE_ID = "app.access.keyboard.6M3Z27M69P"
 EXTENSION_BUNDLE_ID = "app.access.keyboard.6M3Z27M69P.extension"
 APP_GROUP = "group.6M3Z27M69P.app.access.keyboard"
-MARKETING_VERSION = "0.1.0"
+MARKETING_VERSION = "1.0"
 
 
 def error(message: str) -> None:

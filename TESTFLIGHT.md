@@ -143,8 +143,8 @@ Paste this into the TestFlight group:
 ```
 iPhone or iPad on iOS/iPadOS 18. The keyboard adapts: a compact single-column board on iPhone, the larger multi-column board on iPad.
 
-1. Open access: keyboard. Without a subscription the paywall is the first screen. Start the free trial or subscribe (monthly or yearly are the same keyboard), then type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
-2. Settings → Colours → Coloured vowels. Vowels, consonants, numbers, and punctuation take their colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix on the suggestion bar. The first Fix asks before sending the field; Allow sends it, Not now does not. Undo should restore the original. Password fields must not send text.
+1. Open access: keyboard. Without Pro the paywall is the first screen. Buy monthly, yearly or Lifetime with a Sandbox account, or redeem a sandbox offer code, then type on the Type screen. On iPad the layout matches a normal iPad keyboard, including the globe key, with keys larger than a stock board; on iPhone it is the compact board sized to the phone. Letters should use the literacy font. Double-space should insert a full stop. Hold delete to remove letters, then words. Two fingers on the keyboard should move the cursor.
+2. Settings → Colours → Beth. Letters should take Beth Moulam’s colours. Shift and Caps Lock should show capitals. Type a few misspellings and tap Fix (left of the prediction bar on iPhone, bottom of the prediction list on iPad). The first Fix asks before sending the paragraph; Allow sends it, Not now does not. Undo should restore the original. Password fields must not send text. With Full Access off, typing still works and Fix explains that it needs Full Access.
 3. Settings → General → Keyboard → Keyboards → Add New Keyboard… → access: keyboard. Open that keyboard and enable Allow Full Access.
 4. In Notes or Safari, switch to access: keyboard with the globe key. Colour settings and Fix should now work there too. Without a subscription, or with Allow Full Access off, the keyboard shows a locked message, a button back to the app, and a globe key. It does not show a purchase screen.
 5. VoiceOver: every key should have a spoken label (Shift, Delete, Next Keyboard, and so on). The locked message and Open access: keyboard button should be spoken too.
@@ -199,7 +199,7 @@ git push origin sync-testflight-<short-reason>
 ## After the first build
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
-- Keep `MARKETING_VERSION` at `0.1.0` until you intend a user-visible version change.
+- `MARKETING_VERSION` is `1.0`, matching the App Store Connect version record. Change it only for a user-visible version change, and change the App Store version to match.
 - Testers only ever get the latest build. Uploads and **Run workflow** expire every older one.
 - A tester who still sees an old build and “No TestFlight builds are available” is `REVOKED` or `NOT_INVITED`. Delete them and send a new EMAIL invite. Do not expire older builds until every emailed tester is `INVITED`, `ACCEPTED`, or `INSTALLED`.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.

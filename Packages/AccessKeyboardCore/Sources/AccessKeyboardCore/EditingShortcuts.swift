@@ -3,6 +3,36 @@ import Foundation
 public enum EditingShortcuts {
     public static let noPeriodAfter: Set<Character> = [".", "!", "?", "…", ",", ";", ":"]
 
+    /// Marks that attach to the previous word. When the keyboard itself just
+    /// inserted the space before the cursor, that space moves to after the
+    /// mark, so `word ,` becomes `word, `.
+    public static let spaceHuggingPunctuation: Set<String> = [",", ".", "?", "!", ":", ";", "…"]
+
+    /// Punctuation which, typed from the numbers or symbols page, returns to
+    /// the letters page. Includes the hugging marks plus apostrophes and
+    /// quotes, which live on the numbers page but should not swallow a space
+    /// (a quote often starts the next word).
+    public static let alphabeticReturnPunctuation: Set<String> = spaceHuggingPunctuation.union([
+        "'", "’", "\"", "“", "”"
+    ])
+
+    public static func returnsToAlphabetic(_ text: String) -> Bool {
+        alphabeticReturnPunctuation.contains(text)
+    }
+
+    /// The text to insert instead of `punctuation` when an automatic trailing
+    /// space should hop over the mark. Nil when the space should stay put.
+    public static func replacementByMovingAutomaticSpace(
+        punctuation: String,
+        before: String,
+        spaceIsAutomatic: Bool
+    ) -> String? {
+        guard spaceIsAutomatic,
+              spaceHuggingPunctuation.contains(punctuation),
+              before.hasSuffix(" ") else { return nil }
+        return punctuation + " "
+    }
+
     public static func shouldConvertDoubleSpace(_ before: String) -> Bool {
         guard before.count >= 2, before.last == " " else { return false }
         let prior = before[before.index(before.endIndex, offsetBy: -2)]
