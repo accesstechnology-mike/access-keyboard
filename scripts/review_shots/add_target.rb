@@ -2,6 +2,7 @@
 # the Simulator so the workflow can capture them with `simctl io screenshot`.
 # The project file is modified on the runner only, never committed.
 require 'xcodeproj'
+require 'rexml/document'
 
 project_path = File.expand_path('../../AccessKeyboard.xcodeproj', __dir__)
 project = Xcodeproj::Project.open(project_path)
@@ -32,4 +33,26 @@ scheme.add_build_target(app)
 scheme.add_test_target(target)
 scheme.set_launch_target(app)
 scheme.save_as(project_path, 'ReviewShots', true)
-puts 'ReviewShots target and scheme added'
+
+# xcodebuild test uses TestAction, not LaunchAction. The AccessKeyboard scheme
+# only sets StoreKit on LaunchAction (fine for Run). Wire the same local
+# catalogue onto both actions here so Product.products reads
+# AccessKeyboard.storekit in CI instead of falling through to Sandbox.
+# Same identifier string as AccessKeyboard.xcscheme.
+scheme_path = File.join(project_path, 'xcshareddata/xcschemes/ReviewShots.xcscheme')
+doc = REXML::Document.new(File.read(scheme_path))
+storekit_xml = lambda {
+  el = REXML::Element.new('StoreKitConfigurationFileReference')
+  el.add_attribute('identifier', 'AccessKeyboard/AccessKeyboard.storekit')
+  el
+}
+%w[TestAction LaunchAction].each do |action_name|
+  action = doc.root.elements[action_name]
+  next unless action
+  action.elements.delete('StoreKitConfigurationFileReference') if action.elements['StoreKitConfigurationFileReference']
+  action.add_element(storekit_xml.call)
+end
+formatter = REXML::Formatters::Pretty.new(3)
+formatter.compact = true
+File.open(scheme_path, 'w') { |f| formatter.write(doc, f); f.write("\n") }
+puts 'ReviewShots target and scheme added (StoreKit config on TestAction + LaunchAction)'

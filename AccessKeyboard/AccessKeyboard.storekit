@@ -95,7 +95,7 @@
             "internalID": "PROMONTHLYINTRO",
             "numberOfPeriods": 1,
             "paymentMode": "free",
-            "subscriptionPeriod": "P14D"
+            "subscriptionPeriod": "P2W"
           },
           "localizations": [
             {
@@ -121,7 +121,7 @@
             "internalID": "PROYEARLYINTRO",
             "numberOfPeriods": 1,
             "paymentMode": "free",
-            "subscriptionPeriod": "P14D"
+            "subscriptionPeriod": "P2W"
           },
           "localizations": [
             {

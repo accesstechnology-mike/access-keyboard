@@ -23,6 +23,7 @@ jobs:
         run: |
           gem list xcodeproj -i || sudo gem install xcodeproj --no-document
           ruby scripts/review_shots/add_target.rb
+          grep -A1 StoreKitConfigurationFileReference AccessKeyboard.xcodeproj/xcshareddata/xcschemes/ReviewShots.xcscheme
       - name: Capture
         run: scripts/review_shots/run.sh "${{ matrix.device }}" "$RUNNER_TEMP/shots"
       - uses: actions/upload-artifact@v4

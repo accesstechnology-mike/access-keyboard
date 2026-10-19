@@ -1,6 +1,7 @@
 // CI only (see scripts/review_shots/add_target.rb). Shows the real app screens,
 // one at a time, inside the app process, then waits while the workflow takes a
-// Simulator screenshot. StoreKit uses the repo's AccessKeyboard.storekit file.
+// Simulator screenshot. StoreKit uses the repo's AccessKeyboard.storekit file,
+// selected on the ReviewShots scheme TestAction (and LaunchAction).
 import StoreKit
 import StoreKitTest
 import SwiftUI
@@ -11,6 +12,9 @@ import AccessKeyboardCore
 
 @MainActor
 final class ReviewShotsTests: XCTestCase {
+    /// Kept alive for the whole test so StoreKit Testing stays attached.
+    private var storeKitSession: SKTestSession?
+
     private var shotDir: URL {
         URL(fileURLWithPath: ProcessInfo.processInfo.environment["SHOT_DIR"] ?? NSTemporaryDirectory())
     }
@@ -70,6 +74,30 @@ final class ReviewShotsTests: XCTestCase {
         }
     }
 
+    /// Loads products until all three catalogue IDs are present, or gives up.
+    /// Re-queries Product.products each pass so a partial Sandbox reply can recover.
+    private func waitForThreeProducts(manager: SubscriptionManager) async -> [Product] {
+        var lastDirect: [Product] = []
+        for attempt in 0..<40 {
+            do {
+                lastDirect = try await Product.products(for: SubscriptionConfig.productIDs)
+                print(
+                    "REVIEWSHOTS direct products attempt \(attempt):",
+                    lastDirect.map { "\($0.id) \($0.displayPrice) \($0.type.rawValue)" }
+                )
+            } catch {
+                print("REVIEWSHOTS direct products attempt \(attempt) error:", error)
+            }
+            await manager.refresh()
+            let ids = Set(manager.products.map(\.id))
+            if SubscriptionConfig.productIDs.isSubset(of: ids) {
+                return manager.products
+            }
+            await pause(0.75)
+        }
+        return manager.products
+    }
+
     func testCaptureScreens() async throws {
         try FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
         let storekitPath = ProcessInfo.processInfo.environment["STOREKIT_PATH"] ?? ""
@@ -77,27 +105,39 @@ final class ReviewShotsTests: XCTestCase {
             Bundle.main.url(forResource: "AccessKeyboard", withExtension: "storekit")
                 ?? (storekitPath.isEmpty ? nil : URL(fileURLWithPath: storekitPath))
         )
-        let session = try SKTestSession(contentsOf: storekit)
-        session.disableDialogs = true
-        session.resetToDefaultState()
-        session.clearTransactions()
-        session.storefront = "GBR"
         print("REVIEWSHOTS storekit", storekit.path)
+
+        // Scheme TestAction already selects AccessKeyboard.storekit. SKTestSession
+        // on iOS 26.3–26.5 often fails to save that config (SKInternalErrorDomain
+        // Code=3); calling reset/clear/storefront then is a no-op that logs noise.
+        // Still open a session with disableDialogs when we can, and keep it alive.
         do {
-            let direct = try await Product.products(for: SubscriptionConfig.productIDs)
-            print("REVIEWSHOTS direct products:", direct.map { "\($0.id) \($0.displayPrice) \($0.type.rawValue)" })
+            let session = try SKTestSession(contentsOf: storekit)
+            session.disableDialogs = true
+            storeKitSession = session
+            print("REVIEWSHOTS SKTestSession opened")
         } catch {
-            print("REVIEWSHOTS direct products error:", error)
+            print("REVIEWSHOTS SKTestSession open failed (scheme StoreKit still applies):", error)
         }
 
         let manager = SubscriptionManager()
 
         // Pro screen, as reached from the app's sidebar.
         var window = try show(NavigationStack { PaywallView().navigationTitle("Pro") }, manager: manager)
-        await manager.refresh()
-        for _ in 0..<60 where manager.products.count < 3 {
-            await pause(0.5)
-        }
+        let loaded = await waitForThreeProducts(manager: manager)
+        let loadedIDs = Set(loaded.map(\.id))
+        XCTAssertTrue(
+            loadedIDs.contains(SubscriptionConfig.monthlyProductID),
+            "Monthly missing. Got: \(loaded.map(\.id))"
+        )
+        XCTAssertTrue(
+            loadedIDs.contains(SubscriptionConfig.yearlyProductID),
+            "Yearly missing. Got: \(loaded.map(\.id))"
+        )
+        XCTAssertTrue(
+            loadedIDs.contains(SubscriptionConfig.lifetimeProductID),
+            "Lifetime missing. Got: \(loaded.map(\.id))"
+        )
         XCTAssertEqual(manager.products.count, 3, "StoreKit test products did not load")
         await capture("paywall", window: window)
 

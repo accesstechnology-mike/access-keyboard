@@ -3,16 +3,22 @@
 set -euo pipefail
 NAME="$1"; OUT="$2"; mkdir -p "$OUT"
 xcrun simctl shutdown all || true
+# Prefer iOS 26.2 when present: SKTestSession is broken on 26.3–26.5
+# (SKInternalErrorDomain Code=3). Fall back to the newest available runtime.
 INFO=$(xcrun simctl list devices available -j | python3 -c "
 import json,sys,re
 d=json.load(sys.stdin)['devices']
-best=None
+cands=[]
 for rt,devs in d.items():
     if 'iOS' not in rt: continue
     v=tuple(int(x) for x in re.findall(r'\d+',rt.split('iOS')[-1]))
     for dev in devs:
-        if dev['name'].startswith(sys.argv[1]) and (best is None or v>best[0]):
-            best=(v,dev['udid'],dev['name'],rt)
+        if dev['name'].startswith(sys.argv[1]):
+            cands.append((v,dev['udid'],dev['name'],rt))
+if not cands:
+    raise SystemExit('no simulator matching '+sys.argv[1])
+pref=[c for c in cands if c[0][:2]==(26,2)]
+best=pref[0] if pref else max(cands, key=lambda c: c[0])
 print(best[1]); print(best[2]+'|'+'.'.join(map(str,best[0]))); print(best, file=sys.stderr)
 " "$NAME")
 UDID=$(echo "$INFO" | sed -n 1p); DEVNAME=$(echo "$INFO" | sed -n 2p | cut -d"|" -f1); DEVOS=$(echo "$INFO" | sed -n 2p | cut -d"|" -f2)
@@ -40,7 +46,7 @@ run_tests() {
     -destination "$1" -derivedDataPath "$RUNNER_TEMP/shots-dd" \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO > "$OUT/xcodebuild-$(echo "$NAME" | tr ' ' '-').log" 2>&1
   local rc=$?
-  tail -60 "$OUT/xcodebuild-$(echo "$NAME" | tr ' ' '-').log"
+  tail -80 "$OUT/xcodebuild-$(echo "$NAME" | tr ' ' '-').log"
   return $rc
 }
 run_tests "id=$UDID"; STATUS=$?
