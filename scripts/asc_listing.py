@@ -78,7 +78,8 @@ SCREENSHOT_SETS = {
     "APP_IPHONE_67": "iphone-6.9",
     "APP_IPAD_PRO_3GEN_129": "ipad-13",
 }
-REVIEW_SHOT = COPY / "review" / "paywall.png"
+REVIEW_SHOT_SUBS = COPY / "review" / "subscriptions.png"
+REVIEW_SHOT_LIFETIME = COPY / "review" / "lifetime.png"
 
 TOKEN = {"value": None, "at": 0.0}
 
@@ -416,10 +417,10 @@ def apply(copy: dict, before: dict, only: set[str] | None) -> list[str]:
                             "type": "subscriptionLocalizations",
                             "attributes": {"name": name, "locale": locale, "description": desc},
                             "relationships": {"subscription": ref("subscriptions", s["id"])}}})
-                if REVIEW_SHOT.exists() and not s["reviewScreenshot"]:
+                if REVIEW_SHOT_SUBS.exists() and not s["reviewScreenshot"]:
                     upload_asset("/v1/subscriptionAppStoreReviewScreenshots", "subscriptionAppStoreReviewScreenshots",
-                                 "subscription", "subscriptions", s["id"], REVIEW_SHOT)
-                print(f"  {s['attributes']['productId']}: review note, localisations{', screenshot' if REVIEW_SHOT.exists() else ''}")
+                                 "subscription", "subscriptions", s["id"], REVIEW_SHOT_SUBS)
+                print(f"  {s['attributes']['productId']}: review note, localisations{', screenshot' if REVIEW_SHOT_SUBS.exists() else ''}")
         for i in prods["iaps"]:
             name, desc = PRODUCT_COPY[product_key(i["attributes"]["productId"])]
             req(f"/v2/inAppPurchases/{i['id']}", method="PATCH", body={"data": {
@@ -435,10 +436,10 @@ def apply(copy: dict, before: dict, only: set[str] | None) -> list[str]:
                         "type": "inAppPurchaseLocalizations",
                         "attributes": {"name": name, "locale": locale, "description": desc},
                         "relationships": {"inAppPurchaseV2": ref("inAppPurchases", i["id"])}}})
-            if REVIEW_SHOT.exists() and not i["reviewScreenshot"]:
+            if REVIEW_SHOT_LIFETIME.exists() and not i["reviewScreenshot"]:
                 upload_asset("/v1/inAppPurchaseAppStoreReviewScreenshots", "inAppPurchaseAppStoreReviewScreenshots",
-                             "inAppPurchaseV2", "inAppPurchases", i["id"], REVIEW_SHOT)
-            print(f"  {i['attributes']['productId']}: review note, localisations{', screenshot' if REVIEW_SHOT.exists() else ''}")
+                             "inAppPurchaseV2", "inAppPurchases", i["id"], REVIEW_SHOT_LIFETIME)
+            print(f"  {i['attributes']['productId']}: review note, localisations{', screenshot' if REVIEW_SHOT_LIFETIME.exists() else ''}")
 
     def do_screenshots():
         loc = next(l for l in before["version_localizations"] if l["attributes"]["locale"] == LOCALE)
