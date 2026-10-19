@@ -17,7 +17,10 @@ export const TEST_USAGE_HEADER = "x-ak-test-usage";
 export function testAccess(request, env = process.env) {
   const header = request.headers.get(TEST_HEADER)?.trim() ?? "";
   if (!header) return null;
-  if (env.VERCEL_ENV === "production") return null;
+  if (env.VERCEL_ENV === "production") {
+    console.error("fix test_access=off production");
+    return null;
+  }
   const token = env.FIX_TEST_TOKEN?.trim() ?? "";
   if (token.length < 32) {
     console.error(`fix test_access=off token_length=${token.length}`);
