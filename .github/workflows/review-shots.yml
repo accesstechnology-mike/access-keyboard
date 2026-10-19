@@ -11,6 +11,10 @@ on:
 
 jobs:
   shots:
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ["iPhone 17 Pro Max", "iPad Pro 13"]
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -19,17 +23,12 @@ jobs:
         run: |
           gem list xcodeproj -i || sudo gem install xcodeproj --no-document
           ruby scripts/review_shots/add_target.rb
-      - name: Simulators
-        run: xcrun simctl list devices available | grep -E "iPhone 17 Pro Max|iPad Pro 13" || true
-      - name: iPhone 17 Pro Max
-        run: scripts/review_shots/run.sh "iPhone 17 Pro Max" "$RUNNER_TEMP/shots"
-      - name: iPad Pro 13-inch
-        if: always()
-        run: scripts/review_shots/run.sh "iPad Pro 13" "$RUNNER_TEMP/shots"
+      - name: Capture
+        run: scripts/review_shots/run.sh "${{ matrix.device }}" "$RUNNER_TEMP/shots"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: review-shots
+          name: review-shots-${{ strategy.job-index }}
           path: |
             ${{ runner.temp }}/shots/*.png
             ${{ runner.temp }}/shots/*.log

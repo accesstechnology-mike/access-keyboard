@@ -13,7 +13,7 @@ for rt,devs in d.items():
     for dev in devs:
         if dev['name'].startswith(sys.argv[1]) and (best is None or v>best[0]):
             best=(v,dev['udid'],dev['name'],rt)
-print(best[1]); print(best[2]+"|"+".".join(map(str,best[0]))); print(best, file=sys.stderr)
+print(best[1]); print(best[2]+'|'+'.'.join(map(str,best[0]))); print(best, file=sys.stderr)
 " "$NAME")
 UDID=$(echo "$INFO" | sed -n 1p); DEVNAME=$(echo "$INFO" | sed -n 2p | cut -d"|" -f1); DEVOS=$(echo "$INFO" | sed -n 2p | cut -d"|" -f2)
 xcrun simctl boot "$UDID" || true
