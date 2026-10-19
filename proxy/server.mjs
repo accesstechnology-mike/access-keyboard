@@ -20,7 +20,7 @@ const server = createServer(async (req, res) => {
       const headers = {
         "content-type": req.headers["content-type"] ?? "application/json",
       };
-      for (const name of ["authorization", "x-ak-transaction", "x-ak-app-transaction", "x-forwarded-for"]) {
+      for (const name of ["authorization", "x-ak-transaction", "x-ak-app-transaction", "x-forwarded-for", "x-ak-test", "x-ak-test-reset"]) {
         if (typeof req.headers[name] === "string") {
           headers[name] = req.headers[name];
         }
