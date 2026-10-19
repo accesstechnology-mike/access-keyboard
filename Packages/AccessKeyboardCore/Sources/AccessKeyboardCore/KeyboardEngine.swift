@@ -161,7 +161,7 @@ public final class KeyboardEngine {
             return
         }
 
-        let original = currentDocumentText()
+        let original = fixTarget()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
@@ -367,9 +367,18 @@ public final class KeyboardEngine {
         clearAutomaticTrailingSpace()
     }
 
-    private func applyFixedText(original: String, fixed: String) {
+    private func applyFixedText(original: String, fixed rawFixed: String) {
         clearAutomaticTrailingSpace()
+        // The proxy trims the model's reply, so put back the original's
+        // leading and trailing whitespace (newlines, an automatic space).
+        let fixed = Self.preservingOuterWhitespace(of: original, in: rawFixed)
         if original != fixed {
+            if document?.entireText == nil, fixTarget() != original {
+                // The paragraph changed while Fix was running. Deleting
+                // `original.count` characters now would eat the wrong text.
+                failFix()
+                return
+            }
             if document?.replaceEntireText(fixed) == true {
                 undoStack.append(.replace(deleted: original, inserted: fixed))
                 redoStack.removeAll()
@@ -386,8 +395,10 @@ public final class KeyboardEngine {
     }
 
     private func replaceHarvested(_ original: String, with fixed: String) {
-        let after = document?.documentContextAfterInput ?? ""
-        document?.adjustTextPosition(byCharacterOffset: (after as NSString).length)
+        // Move only to the end of the current paragraph, never past a newline,
+        // then delete exactly the paragraph text Fix harvested.
+        let afterInParagraph = Self.paragraphTail(of: document?.documentContextAfterInput)
+        document?.adjustTextPosition(byCharacterOffset: (afterInParagraph as NSString).length)
         for _ in original {
             document?.deleteBackward()
         }
@@ -406,13 +417,52 @@ public final class KeyboardEngine {
         document?.insertText(next)
     }
 
-    private func currentDocumentText() -> String {
+    /// The text Fix sends and replaces. In the keyboard extension
+    /// (`UITextDocumentProxy`) that is only the paragraph the cursor is in:
+    /// the proxy can only delete backwards and insert, so harvesting across
+    /// newlines meant Fix deleted earlier lines (in Notes, back into the
+    /// title line) and re-inserted everything there, where it picked up the
+    /// title style. The in-app test field can replace its whole text, so it
+    /// keeps whole-field Fix.
+    private func fixTarget() -> String {
         if let entire = document?.entireText {
             return entire
         }
-        return (document?.documentContextBeforeInput ?? "")
-            + (document?.selectedText ?? "")
-            + (document?.documentContextAfterInput ?? "")
+        let selected = document?.selectedText ?? ""
+        guard !selected.contains(where: \.isNewline) else {
+            // A multi-paragraph selection cannot be replaced safely with
+            // deleteBackward; fix nothing rather than merge paragraphs.
+            return ""
+        }
+        return Self.paragraphHead(of: document?.documentContextBeforeInput)
+            + selected
+            + Self.paragraphTail(of: document?.documentContextAfterInput)
+    }
+
+    /// Text before the cursor back to (not including) the previous newline.
+    static func paragraphHead(of before: String?) -> String {
+        guard let before else { return "" }
+        if let newline = before.lastIndex(where: \.isNewline) {
+            return String(before[before.index(after: newline)...])
+        }
+        return before
+    }
+
+    /// Text after the cursor up to (not including) the next newline.
+    static func paragraphTail(of after: String?) -> String {
+        guard let after else { return "" }
+        if let newline = after.firstIndex(where: \.isNewline) {
+            return String(after[..<newline])
+        }
+        return after
+    }
+
+    static func preservingOuterWhitespace(of original: String, in fixed: String) -> String {
+        let core = fixed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !core.isEmpty else { return fixed }
+        let leading = original.prefix(while: \.isWhitespace)
+        let trailing = String(original.reversed().prefix(while: \.isWhitespace).reversed())
+        return String(leading) + core + trailing
     }
 
     private func failFix() {
