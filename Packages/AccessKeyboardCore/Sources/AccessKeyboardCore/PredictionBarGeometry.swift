@@ -25,11 +25,12 @@ public enum PredictionBarGeometry {
         barWidth: CGFloat,
         barHeight: CGFloat,
         preferredFontSize: CGFloat,
-        minimumReadableFontSize: CGFloat
+        minimumReadableFontSize: CGFloat,
+        fixWidth requestedFixWidth: CGFloat? = nil
     ) -> PredictionBarArrangement {
         let height = max(0, barHeight)
         let width = max(0, barWidth)
-        let fixWidth = min(Self.fixWidth(for: width), width)
+        let fixWidth = min(requestedFixWidth ?? Self.fixWidth(for: width), width)
         let fixFrame = CGRect(x: 0, y: 2, width: fixWidth, height: max(0, height - 4))
         let available = max(0, width - fixWidth)
         let preferred = max(preferredFontSize, 1)

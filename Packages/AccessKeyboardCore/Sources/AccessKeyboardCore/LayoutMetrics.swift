@@ -8,7 +8,9 @@ public struct LayoutMetrics: Equatable {
     public var rowSpacing: CGFloat
     public var keyHeight: CGFloat
     /// Height of the horizontal prediction bar. Zero on iPad, where predictions
-    /// sit in a column beside the keys instead of a bar above them.
+    /// sit in a column beside the keys instead of a bar above them. KeyboardView
+    /// sets it on a landscape iPad board when the user prefers top
+    /// (`PredictionColumnGeometry.topBarHeight`).
     public var predictionBarHeight: CGFloat
     public var cornerRadius: CGFloat
     public var letterFontSize: CGFloat

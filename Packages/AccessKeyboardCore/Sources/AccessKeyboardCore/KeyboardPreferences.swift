@@ -10,6 +10,7 @@ public enum KeyboardPreferences {
     public static let letterLayoutKey = "letterLayout"
     public static let colourOptionKey = "colourOption"
     public static let extensionHasFullAccessKey = "extensionHasFullAccess"
+    public static let predictionPlacementKey = "predictionPlacement"
 
     static let legacyKeyColouringKey = "keyColouring"
     static let legacyContrastThemeKey = "contrastTheme"
@@ -23,6 +24,12 @@ public enum KeyboardPreferences {
     public static var letterLayout: LetterLayout {
         get { value(LetterLayout.self, key: letterLayoutKey, default: .qwerty) }
         set { set(newValue.rawValue, forKey: letterLayoutKey) }
+    }
+
+    /// Landscape iPad only; see `PredictionPlacement`.
+    public static var predictionPlacement: PredictionPlacement {
+        get { value(PredictionPlacement.self, key: predictionPlacementKey, default: .preferSide) }
+        set { set(newValue.rawValue, forKey: predictionPlacementKey) }
     }
 
     public static var colourOption: ColourOption {
