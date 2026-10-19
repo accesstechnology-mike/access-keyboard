@@ -29,9 +29,9 @@ public enum FixNotice: Equatable {
         case .unavailable:
             return "Fix isn’t set up in this build. Typing still works."
         case .subscribe:
-            return "Subscribe in the access: keyboard app to use Fix. Typing still works."
+            return "Get Pro in the access: keyboard app to use Fix. Typing still works."
         case .consent:
-            return "Fix sends this field’s text to OpenAI to correct it. Nothing is sent until you tap Allow. You can turn this off in the app’s Settings."
+            return "Fix sends this paragraph to OpenAI, an AI service, to correct it. Each Fix costs us money. Nothing is sent until you tap Allow."
         }
     }
 

@@ -1,11 +1,11 @@
 import Foundation
 
-/// Subscription catalogue and the free/paid split.
+/// Pro catalogue and the free/paid split.
 ///
 /// Product IDs use the app bundle ID `app.access.keyboard.6M3Z27M69P` as their
-/// prefix. Mike creates exactly these IDs in App Store Connect. Prices and the
-/// introductory-offer length are entered there, not here. The paywall reads
-/// localized `Product` values. This file never grants access.
+/// prefix. `scripts/asc_create_products.py` creates exactly these IDs in App
+/// Store Connect. Prices and any introductory offer are set there, not here.
+/// The paywall reads localised `Product` values. This file never grants access.
 public enum SubscriptionConfig {
     public static let bundleID = "app.access.keyboard.6M3Z27M69P"
 
@@ -14,8 +14,16 @@ public enum SubscriptionConfig {
 
     public static let monthlyProductID = "\(bundleID).pro.monthly"
     public static let yearlyProductID = "\(bundleID).pro.yearly"
+    /// Non-consumable. A one-off purchase (or a free offer code) that never expires.
+    public static let lifetimeProductID = "\(bundleID).pro.lifetime"
 
-    public static let productIDs: Set<String> = [monthlyProductID, yearlyProductID]
+    /// Auto-renewing plans. Access lasts until the transaction's expiry date.
+    public static let subscriptionProductIDs: Set<String> = [monthlyProductID, yearlyProductID]
+    /// One-off purchases. Access has no expiry while the purchase is not revoked.
+    public static let lifetimeProductIDs: Set<String> = [lifetimeProductID]
+    public static let productIDs: Set<String> = subscriptionProductIDs.union(lifetimeProductIDs)
+    /// Paywall order: monthly, yearly, then Lifetime.
+    public static let displayOrder: [String] = [monthlyProductID, yearlyProductID, lifetimeProductID]
 
     /// What the subscription covers. Change this case to switch the split; the
     /// gates below stay in place.
@@ -78,7 +86,7 @@ public enum KeyboardMonetization: String, Sendable {
 }
 
 public enum KeyboardLock {
-    public static let trialMessage = "Open access: keyboard to start your free trial or subscribe."
+    public static let trialMessage = "To type with access: keyboard, open the app and get Pro."
     public static let openAppButtonTitle = "Open access: keyboard"
     public static let nextKeyboardTitle = "Next Keyboard"
 
@@ -137,12 +145,56 @@ public struct SubscriptionEntitlementRecord: Codable, Equatable, Sendable {
 
     public func isActive(
         at date: Date,
-        knownProductIDs: Set<String> = SubscriptionConfig.productIDs
+        knownProductIDs: Set<String> = SubscriptionConfig.productIDs,
+        lifetimeProductIDs: Set<String> = SubscriptionConfig.lifetimeProductIDs
     ) -> Bool {
-        guard active, let productID, knownProductIDs.contains(productID), let expiresAt else {
+        guard active, let productID, knownProductIDs.contains(productID) else {
             return false
         }
+        if lifetimeProductIDs.contains(productID) {
+            return true
+        }
+        guard let expiresAt else { return false }
         return expiresAt > date
+    }
+
+    /// True for an active one-off Lifetime purchase.
+    public var isLifetime: Bool {
+        active && productID.map { SubscriptionConfig.lifetimeProductIDs.contains($0) } == true
+    }
+
+    /// The record one verified StoreKit transaction grants, or nil if it grants
+    /// nothing: an unknown product, a revoked purchase, or an expired plan.
+    /// A Lifetime purchase needs no expiry date.
+    public static func granted(
+        productID: String,
+        expirationDate: Date?,
+        revocationDate: Date?,
+        at date: Date
+    ) -> SubscriptionEntitlementRecord? {
+        guard SubscriptionConfig.productIDs.contains(productID), revocationDate == nil else { return nil }
+        if SubscriptionConfig.lifetimeProductIDs.contains(productID) {
+            return SubscriptionEntitlementRecord(active: true, productID: productID, expiresAt: nil)
+        }
+        guard let expirationDate, expirationDate > date else { return nil }
+        return SubscriptionEntitlementRecord(active: true, productID: productID, expiresAt: expirationDate)
+    }
+
+    /// Picks the better of two records: Lifetime beats any plan, and between
+    /// plans the later expiry wins. Inactive records never win.
+    public static func preferred(
+        _ lhs: SubscriptionEntitlementRecord,
+        _ rhs: SubscriptionEntitlementRecord,
+        at date: Date
+    ) -> SubscriptionEntitlementRecord {
+        let lhsActive = lhs.isActive(at: date)
+        let rhsActive = rhs.isActive(at: date)
+        guard lhsActive || rhsActive else { return .inactive }
+        guard lhsActive else { return rhs }
+        guard rhsActive else { return lhs }
+        if lhs.isLifetime { return lhs }
+        if rhs.isLifetime { return rhs }
+        return (rhs.expiresAt ?? .distantPast) > (lhs.expiresAt ?? .distantPast) ? rhs : lhs
     }
 }
 

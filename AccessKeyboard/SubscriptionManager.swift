@@ -35,7 +35,7 @@ final class SubscriptionManager: ObservableObject {
                 let transaction = try verified(verification)
                 await transaction.finish()
                 await refreshEntitlements()
-                statusMessage = record.isActive(at: Date()) ? "Your subscription is active." : nil
+                statusMessage = record.isActive(at: Date()) ? "Pro is active." : nil
             case .userCancelled:
                 break
             case .pending:
@@ -58,8 +58,8 @@ final class SubscriptionManager: ObservableObject {
         }
         await refreshEntitlements()
         statusMessage = record.isActive(at: Date())
-            ? "Your subscription is active."
-            : "No active subscription was found."
+            ? "Pro is active."
+            : "No Pro purchase was found for this Apple Account."
     }
 
     func introductoryOffer(for product: Product) -> Product.SubscriptionOffer? {
@@ -71,15 +71,15 @@ final class SubscriptionManager: ObservableObject {
     private func loadProducts() async {
         do {
             let loaded = try await Product.products(for: SubscriptionConfig.productIDs)
-            products = [SubscriptionConfig.monthlyProductID, SubscriptionConfig.yearlyProductID].compactMap { id in
+            products = SubscriptionConfig.displayOrder.compactMap { id in
                 loaded.first { $0.id == id }
             }
             if products.isEmpty {
-                statusMessage = "Subscriptions are not available right now."
+                statusMessage = "Pro options are not available right now. Check your connection and try again."
             }
         } catch {
             products = []
-            statusMessage = "Subscriptions are not available right now."
+            statusMessage = "Pro options are not available right now. Check your connection and try again."
         }
     }
 
@@ -88,10 +88,13 @@ final class SubscriptionManager: ObservableObject {
         var best: SubscriptionEntitlementRecord = .inactive
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? verified(result) else { continue }
-            if let candidate = record(from: transaction, at: now),
-               let expires = candidate.expiresAt,
-               expires > (best.expiresAt ?? .distantPast) {
-                best = candidate
+            if let candidate = SubscriptionEntitlementRecord.granted(
+                productID: transaction.productID,
+                expirationDate: transaction.expirationDate,
+                revocationDate: transaction.revocationDate,
+                at: now
+            ) {
+                best = SubscriptionEntitlementRecord.preferred(best, candidate, at: now)
             }
             await transaction.finish()
         }
@@ -142,15 +145,18 @@ final class SubscriptionManager: ObservableObject {
         }
     }
 
-    private func record(from transaction: Transaction, at date: Date) -> SubscriptionEntitlementRecord? {
-        guard SubscriptionConfig.productIDs.contains(transaction.productID) else { return nil }
-        guard transaction.revocationDate == nil else { return nil }
-        guard let expiresAt = transaction.expirationDate, expiresAt > date else { return nil }
-        return SubscriptionEntitlementRecord(
-            active: true,
-            productID: transaction.productID,
-            expiresAt: expiresAt
-        )
+    /// Called when the offer code sheet closes. A redeemed code arrives as a
+    /// transaction (also seen by `Transaction.updates`), so refresh either way.
+    func finishCodeRedemption(_ result: Result<Void, Error>) async {
+        statusMessage = nil
+        if case .failure = result {
+            statusMessage = "The code was not redeemed. Check it and try again."
+            return
+        }
+        await refreshEntitlements()
+        if record.isActive(at: Date()) {
+            statusMessage = record.isLifetime ? "Pro Lifetime is active." : "Pro is active."
+        }
     }
 }
 

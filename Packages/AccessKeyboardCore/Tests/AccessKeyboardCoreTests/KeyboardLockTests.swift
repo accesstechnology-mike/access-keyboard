@@ -12,7 +12,7 @@ final class KeyboardLockTests: XCTestCase {
         XCTAssertTrue(KeyboardMonetization.coreKeyboardFreeFixSubscribed.fixRequiresSubscription)
         XCTAssertEqual(
             KeyboardLock.trialMessage,
-            "Open access: keyboard to start your free trial or subscribe."
+            "To type with access: keyboard, open the app and get Pro."
         )
         XCTAssertNotNil(SubscriptionConfig.paywallURL)
     }
@@ -79,7 +79,7 @@ final class KeyboardLockTests: XCTestCase {
     func testUnreadableEntitlementStaysLockedWithTheSameMessage() {
         XCTAssertEqual(
             KeyboardLock.message(canReadEntitlement: false),
-            "Open access: keyboard to start your free trial or subscribe."
+            "To type with access: keyboard, open the app and get Pro."
         )
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
         engine.keyboardRequiresSubscription = true

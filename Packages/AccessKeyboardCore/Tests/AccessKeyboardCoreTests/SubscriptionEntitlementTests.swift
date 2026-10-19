@@ -149,4 +149,113 @@ final class SubscriptionEntitlementTests: XCTestCase {
         let shown = PaywallPresentation.resolved(json: Data("{\"showTrialHeadline\":true}".utf8))
         XCTAssertTrue(shown.showTrialHeadline)
     }
+
+    // MARK: Lifetime
+
+    func testLifetimeHasNoExpiryAndIsActive() {
+        let record = SubscriptionEntitlementRecord(
+            active: true,
+            productID: SubscriptionConfig.lifetimeProductID,
+            expiresAt: nil
+        )
+        XCTAssertTrue(record.isActive(at: Date.distantFuture))
+        XCTAssertTrue(record.isLifetime)
+    }
+
+    func testInactiveLifetimeIsNotSubscribed() {
+        let record = SubscriptionEntitlementRecord(
+            active: false,
+            productID: SubscriptionConfig.lifetimeProductID,
+            expiresAt: nil
+        )
+        XCTAssertFalse(record.isActive(at: Date()))
+        XCTAssertFalse(record.isLifetime)
+    }
+
+    func testLifetimeIsAKnownProductButNotASubscription() {
+        XCTAssertTrue(SubscriptionConfig.productIDs.contains(SubscriptionConfig.lifetimeProductID))
+        XCTAssertFalse(SubscriptionConfig.subscriptionProductIDs.contains(SubscriptionConfig.lifetimeProductID))
+        XCTAssertEqual(SubscriptionConfig.lifetimeProductID, "app.access.keyboard.6M3Z27M69P.pro.lifetime")
+        XCTAssertEqual(SubscriptionConfig.displayOrder.last, SubscriptionConfig.lifetimeProductID)
+        XCTAssertEqual(Set(SubscriptionConfig.displayOrder), SubscriptionConfig.productIDs)
+    }
+
+    func testGrantedLifetimeTransactionNeedsNoExpiry() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let record = SubscriptionEntitlementRecord.granted(
+            productID: SubscriptionConfig.lifetimeProductID,
+            expirationDate: nil,
+            revocationDate: nil,
+            at: now
+        )
+        XCTAssertEqual(record?.isActive(at: now), true)
+        XCTAssertNil(record?.expiresAt)
+    }
+
+    func testGrantedRevokedLifetimeGivesNothing() {
+        XCTAssertNil(SubscriptionEntitlementRecord.granted(
+            productID: SubscriptionConfig.lifetimeProductID,
+            expirationDate: nil,
+            revocationDate: Date(),
+            at: Date()
+        ))
+    }
+
+    func testGrantedPlanStillNeedsAFutureExpiry() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertNil(SubscriptionEntitlementRecord.granted(
+            productID: SubscriptionConfig.monthlyProductID, expirationDate: nil, revocationDate: nil, at: now
+        ))
+        XCTAssertNil(SubscriptionEntitlementRecord.granted(
+            productID: SubscriptionConfig.monthlyProductID, expirationDate: now.addingTimeInterval(-1), revocationDate: nil, at: now
+        ))
+        XCTAssertNil(SubscriptionEntitlementRecord.granted(
+            productID: "other.app.pro.lifetime", expirationDate: nil, revocationDate: nil, at: now
+        ))
+        XCTAssertNotNil(SubscriptionEntitlementRecord.granted(
+            productID: SubscriptionConfig.yearlyProductID, expirationDate: now.addingTimeInterval(60), revocationDate: nil, at: now
+        ))
+    }
+
+    func testPreferredPicksLifetimeOverAnyPlan() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let plan = SubscriptionEntitlementRecord(
+            active: true, productID: SubscriptionConfig.yearlyProductID, expiresAt: now.addingTimeInterval(86_400 * 300)
+        )
+        let lifetime = SubscriptionEntitlementRecord(
+            active: true, productID: SubscriptionConfig.lifetimeProductID, expiresAt: nil
+        )
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(plan, lifetime, at: now), lifetime)
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(lifetime, plan, at: now), lifetime)
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(.inactive, plan, at: now), plan)
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(.inactive, .inactive, at: now), .inactive)
+    }
+
+    func testPreferredPicksTheLaterPlanExpiry() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let soon = SubscriptionEntitlementRecord(
+            active: true, productID: SubscriptionConfig.monthlyProductID, expiresAt: now.addingTimeInterval(60)
+        )
+        let later = SubscriptionEntitlementRecord(
+            active: true, productID: SubscriptionConfig.yearlyProductID, expiresAt: now.addingTimeInterval(6_000)
+        )
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(soon, later, at: now), later)
+        XCTAssertEqual(SubscriptionEntitlementRecord.preferred(later, soon, at: now), later)
+    }
+
+    func testLifetimeRoundTripsThroughTheSharedStore() {
+        let record = SubscriptionEntitlementRecord(
+            active: true, productID: SubscriptionConfig.lifetimeProductID, expiresAt: nil
+        )
+        SubscriptionEntitlementStore.write(record, to: defaults)
+        let read = SubscriptionEntitlementStore.read(from: defaults, at: Date.distantFuture)
+        XCTAssertTrue(read.isActive(at: Date.distantFuture))
+        XCTAssertTrue(read.isLifetime)
+    }
+
+    func testLockedMessageDoesNotPromiseATrial() {
+        XCTAssertFalse(KeyboardLock.trialMessage.localizedCaseInsensitiveContains("trial"))
+        XCTAssertFalse(FixNotice.consent.message.contains("—"))
+        XCTAssertTrue(FixNotice.consent.message.contains("paragraph"))
+    }
 }

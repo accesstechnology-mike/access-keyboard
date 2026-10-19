@@ -6,6 +6,7 @@ import UIKit
 struct PaywallView: View {
     @EnvironmentObject private var subscriptions: SubscriptionManager
     @Environment(\.openURL) private var openURL
+    @State private var redeemingCode = false
 
     var body: some View {
         ScrollView {
@@ -14,7 +15,10 @@ struct PaywallView: View {
                     .font(.largeTitle.bold())
                     .accessibilityAddTraits(.isHeader)
 
-                Text("Subscribe to use the keyboard, including Fix. Monthly and yearly are two prices for the same keyboard. A free trial, when Apple offers one for your account, is shown on the plan.")
+                Text(PaywallCopy.intro)
+                    .font(.body)
+
+                Text(PaywallCopy.whyPaid)
                     .font(.body)
 
                 if let headline = trialHeadline {
@@ -29,7 +33,7 @@ struct PaywallView: View {
                 }
 
                 if subscriptions.products.isEmpty {
-                    Text(subscriptions.statusMessage ?? "Loading subscriptions…")
+                    Text(subscriptions.statusMessage ?? "Loading Pro options…")
                         .font(.body)
                     actionButton("Try again") {
                         Task { await subscriptions.refresh() }
@@ -53,7 +57,12 @@ struct PaywallView: View {
                 actionButton("Restore Purchases") {
                     Task { await subscriptions.restore() }
                 }
-                .accessibilityHint("Checks your Apple ID for an existing subscription")
+                .accessibilityHint("Checks your Apple Account for Pro you already bought")
+
+                actionButton("Redeem Code") {
+                    redeemingCode = true
+                }
+                .accessibilityHint("Enter an offer code from access: technology")
 
                 actionButton("Manage Subscriptions") {
                     Task { await manageSubscriptions() }
@@ -72,6 +81,9 @@ struct PaywallView: View {
             subscriptions.start()
             await subscriptions.refresh()
         }
+        .offerCodeRedemption(isPresented: $redeemingCode) { result in
+            Task { await subscriptions.finishCodeRedemption(result) }
+        }
     }
 
     private var trialHeadline: String? {
@@ -81,20 +93,23 @@ struct PaywallView: View {
     }
 
     private var activeSummary: String {
-        if let expires = subscriptions.record.expiresAt {
-            return "Your subscription is active until \(expires.formatted(date: .abbreviated, time: .shortened))."
+        if subscriptions.record.isLifetime {
+            return "You have Pro Lifetime."
         }
-        return "Your subscription is active."
+        if let expires = subscriptions.record.expiresAt {
+            return "Pro is active. Your plan renews or ends on \(expires.formatted(date: .abbreviated, time: .shortened))."
+        }
+        return "Pro is active."
     }
 
-    private var renewalTerms: String {
-        "Payment is charged to your Apple ID. A subscription renews automatically at the price shown for that plan unless you cancel at least 24 hours before the end of the current period. Cancel in Settings, or with Manage Subscriptions. The trial length, if a plan has one, is the introductory offer Apple shows for that plan."
-    }
+    private var renewalTerms: String { PaywallCopy.terms }
 
     @ViewBuilder
     private func planButton(_ product: Product) -> some View {
         let period = product.subscription.map { Self.periodDescription($0.subscriptionPeriod) }
-        let priceLine = period.map { "\(product.displayPrice) per \($0)" } ?? product.displayPrice
+        let isLifetime = SubscriptionConfig.lifetimeProductIDs.contains(product.id)
+        let priceLine = period.map { "\(product.displayPrice) per \($0)" }
+            ?? (isLifetime ? "\(product.displayPrice), paid once" : product.displayPrice)
         let trial = trialLine(for: product)
         Button {
             Task { await subscriptions.purchase(product) }
@@ -108,7 +123,7 @@ struct PaywallView: View {
                     Text(trial)
                         .font(.subheadline)
                 }
-                Text("Renews automatically until cancelled.")
+                Text(isLifetime ? "One payment. Never renews." : "Renews automatically until you cancel.")
                     .font(.footnote)
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -119,7 +134,11 @@ struct PaywallView: View {
         .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Double tap to subscribe through Apple. Renews automatically.")
+        .accessibilityHint(
+            isLifetime
+                ? "Double tap to buy Pro Lifetime through Apple. One payment."
+                : "Double tap to subscribe through Apple. Renews automatically."
+        )
     }
 
     private func trialLine(for product: Product) -> String? {
@@ -175,6 +194,13 @@ struct PaywallView: View {
         }
         return value == 1 ? unit : "\(value) \(unit)"
     }
+}
+
+/// Paywall wording in one place, so the copy can be reviewed without reading layout code.
+enum PaywallCopy {
+    static let intro = "Pro unlocks access: keyboard in every app, including Fix. Choose a monthly or yearly plan, or pay once for Lifetime."
+    static let whyPaid = "When you tap Fix, the paragraph you are typing in is sent to an AI service (OpenAI) to correct it. We pay for every Fix. That is why Pro is paid."
+    static let terms = "Payment is charged to your Apple Account. Monthly and yearly plans renew automatically at the price shown unless you cancel at least 24 hours before the end of the current period. Cancel in Settings or with Manage Subscriptions. Lifetime is one payment and never renews. Any free trial or offer is shown on the plan only when Apple offers it to your account."
 }
 
 #Preview {

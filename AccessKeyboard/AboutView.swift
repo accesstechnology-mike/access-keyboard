@@ -27,10 +27,10 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
 
                 Group {
-                    labeled("Who it’s for", "People who need a keyboard they can extend — motor, cognitive, vision, or other access needs — without learning a new key map first.")
+                    labeled("Who it’s for", "People with motor, cognitive, vision or other access needs who want a keyboard they can extend, without learning a new key map first.")
                     labeled("Privacy", privacyText)
                     labeled("VoiceOver", "Every key is a keyboard accessibility element with a spoken label (Shift, Delete, Next Keyboard, and so on).")
-                    labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space period, hold-delete that moves from letters to words, two-finger cursor movement anywhere on the keyboard, and the globe key Apple requires.")
+                    labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space full stop, hold-delete that moves from letters to words, two-finger cursor movement anywhere on the keyboard, and the globe key Apple requires.")
                 }
             }
             .padding(24)
@@ -44,12 +44,12 @@ struct AboutView: View {
 
     private var privacyText: String {
         var text = SubscriptionConfig.keyboardRequiresSubscription
-            ? "Using the keyboard requires a subscription. Purchases are handled by Apple. A subscription record stays on this device so the keyboard extension can tell whether it is included. Without Full Access the extension cannot read that record, so it explains how to open this app and keeps a Next Keyboard key."
-            : "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and on-device learned predictions (PredictionMemory in the shared App Group) be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device. Purchases are handled by Apple. The subscription record stays on this device so the keyboard knows whether Fix is included."
+            ? "Using the keyboard needs Pro: a monthly or yearly plan, or a one-off Lifetime purchase. Apple handles payment. A record of your Pro status stays on this device so the keyboard can check it. Without Full Access the keyboard cannot read that record, so it shows how to open this app and keeps a Next Keyboard key."
+            : "The keyboard still types with Full Access off and with no network. Full Access lets layout, colour, and learned predictions, which stay on this device, be shared with the keyboard extension, and lets Fix reach the correction proxy. Keystrokes stay on this device. Purchases are handled by Apple. A record of your Pro status stays on this device so the keyboard knows whether Fix is included."
         if FeatureFlags.fixConsentRequired {
-            text += " Tapping Fix asks once before sending this field’s text to that proxy, which forwards it to OpenAI and does not store it. You can turn that off in Settings."
+            text += " Tapping Fix asks once before sending the paragraph you are typing in to that proxy. The proxy passes it to OpenAI to correct and does not keep it. You can turn that off in Settings."
         } else {
-            text += " Tapping Fix sends the current field’s text to that proxy, which forwards it to OpenAI and does not store it."
+            text += " Tapping Fix sends the paragraph you are typing in to that proxy. The proxy passes it to OpenAI to correct and does not keep it."
         }
         if let endpoint = URLSessionFixClient.configuredEndpointString() {
             text += " This build’s proxy is \(endpoint)."

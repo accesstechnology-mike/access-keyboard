@@ -54,9 +54,9 @@ struct RootView: View {
                 }
                 NavigationLink {
                     PaywallView()
-                        .navigationTitle("Subscription")
+                        .navigationTitle("Pro")
                 } label: {
-                    Label("Subscription", systemImage: "checkmark.seal")
+                    Label("Pro", systemImage: "checkmark.seal")
                 }
                 NavigationLink {
                     SetupView()
