@@ -71,7 +71,11 @@ final class ReviewShotsTests: XCTestCase {
 
     func testCaptureScreens() async throws {
         try FileManager.default.createDirectory(at: shotDir, withIntermediateDirectories: true)
-        let storekit = try XCTUnwrap(Bundle.main.url(forResource: "AccessKeyboard", withExtension: "storekit"))
+        let storekitPath = ProcessInfo.processInfo.environment["STOREKIT_PATH"] ?? ""
+        let storekit = try XCTUnwrap(
+            Bundle.main.url(forResource: "AccessKeyboard", withExtension: "storekit")
+                ?? (storekitPath.isEmpty ? nil : URL(fileURLWithPath: storekitPath))
+        )
         let session = try SKTestSession(contentsOf: storekit)
         session.disableDialogs = true
         session.resetToDefaultState()

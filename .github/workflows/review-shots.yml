@@ -30,4 +30,6 @@ jobs:
         if: always()
         with:
           name: review-shots
-          path: ${{ runner.temp }}/shots/*.png
+          path: |
+            ${{ runner.temp }}/shots/*.png
+            ${{ runner.temp }}/shots/*.log
