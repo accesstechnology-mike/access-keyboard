@@ -149,7 +149,16 @@ class Creator:
         return self._token
 
     def post(self, path: str, body: dict) -> dict:
-        return self.request(self.token, path, method="POST", body=body)["data"]
+        import time
+
+        for attempt in range(10):
+            try:
+                return self.request(self.token, path, method="POST", body=body)["data"]
+            except Exception as exc:  # App Store Connect rate limit: back off and retry
+                if getattr(exc, "code", None) != 429 or attempt == 9:
+                    raise
+                time.sleep(min(60, 2 ** attempt))
+        raise RuntimeError("unreachable")
 
     def existing_product_ids(self, app_id: str) -> set[str]:
         found: set[str] = set()
@@ -189,7 +198,7 @@ class Creator:
         return found
 
     def post_many(self, path: str, bodies: list[dict]) -> None:
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             for _ in pool.map(lambda body: self.post(path, body), bodies):
                 pass
 
