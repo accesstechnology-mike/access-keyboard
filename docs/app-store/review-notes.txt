@@ -1,0 +1,25 @@
+access: keyboard is an assistive keyboard for iPhone and iPad from access: technology. There is no account or login.
+
+The keyboard and predictions are free and never lock. The only paid part is Fix, which sends the paragraph being typed to an AI service (OpenAI) through our server to correct it. Fix is free for 30 Fixes a month. Pro allows up to 100 a day.
+
+In-app purchases (the Pro item in the app's main list, and Settings > Pro):
+- app.access.keyboard.6M3Z27M69P.pro.monthly: auto-renewing, 1 month, GBP 3.99, 14-day free trial
+- app.access.keyboard.6M3Z27M69P.pro.yearly: auto-renewing, 1 year, GBP 29.99, 14-day free trial
+- app.access.keyboard.6M3Z27M69P.pro.lifetime: non-consumable, GBP 79.99 once
+Prices and trial wording come from StoreKit. The Pro screen has Restore Purchases, Redeem Code, Manage Subscriptions, the Privacy Policy and the Terms of Use.
+
+To try it in the app: open the app and use the Type screen. Tap Fix and choose Allow. To buy, open Pro and use a Sandbox account.
+
+To enable the keyboard in other apps:
+1. Settings > General > Keyboard > Keyboards > Add New Keyboard > access: keyboard.
+2. Tap access: keyboard in that list and turn on Allow Full Access if you want Fix and shared settings. The keyboard types normally with Full Access off.
+3. In any text field, hold the globe key and choose access: keyboard.
+
+Why Full Access is requested:
+1. To share colour and layout settings, and on-device learned predictions, between the app and the keyboard through the App Group.
+2. To let the keyboard read the Apple-signed purchase records the app saves there, and to call the Fix service at https://access-keyboard.vercel.app/api/fix.
+Without Full Access the keyboard still types and predicts, and Fix sends nothing.
+
+What leaves the device: keystrokes never do. Fix sends only the current paragraph, only after the user taps Fix and, the first time, Allow. The permission can be turned off in the app's Settings. With each Fix, the keyboard also sends Apple-signed StoreKit records (the app transaction and, for Pro, the purchase transaction). Our server checks Apple's signature and keeps only a count of Fixes against the transaction ID, for up to 32 days. It does not keep the text. Password fields are skipped. If the free Fixes for the month are used up, the keyboard shows a short message and carries on typing. With no network, Fix shows a short hint and does not change the text.
+
+Contact: Mike Thrussell, mike@accesstechnology.co.uk, +44 1765 824971.

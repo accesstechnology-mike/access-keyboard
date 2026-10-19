@@ -1,0 +1,44 @@
+name: App Store Connect listing
+
+# Tag-triggered so it runs from any branch.
+#   asc-listing-status-*  read-only: prints every current value (the backup)
+#   asc-listing-apply-*   scripts/asc_listing.py --apply: listing copy, review
+#                         details, age rating, free price, availability, product
+#                         metadata and review screenshots, version screenshots,
+#                         newest VALID 1.0 build. Never submits for review.
+on:
+  push:
+    tags:
+      - "asc-listing-status-*"
+      - "asc-listing-apply-*"
+
+jobs:
+  listing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+      - name: Listing
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: ${{ github.workspace }}/secrets/AuthKey.p8
+          PYTHONUNBUFFERED: "1"
+        run: |
+          if [[ "$GITHUB_REF_NAME" == asc-listing-apply-* ]]; then
+            python3 scripts/asc_listing.py --apply
+          else
+            python3 scripts/asc_listing.py --status
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asc-listing-status
+          path: asc-listing-status-*.json

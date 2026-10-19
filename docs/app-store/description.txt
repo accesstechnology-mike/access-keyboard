@@ -1,0 +1,28 @@
+access: keyboard is a free assistive keyboard for iPhone and iPad, made by access: technology. It starts from the layout you already know and keeps the keys large and clear.
+
+LAYOUTS AND COLOURS
+QWERTY is the starting layout. ABC order and a frequency layout are optional. Coloured vowels, Beth colours and high-contrast themes are optional. The keys use a clear literacy font. iPhone gets a compact board. iPad and iPad Pro get larger boards.
+
+FAMILIAR TYPING
+Move the cursor with two fingers anywhere on the keyboard. Hold delete to remove letters, then words. Tap space twice for a full stop. Hold a letter for accents. VoiceOver reads each key.
+
+PREDICTIONS
+Word predictions learn the words you use. That learning stays on your device.
+
+FIX
+Fix corrects the spelling and grammar of the paragraph you are typing in, with one tap.
+
+PRICES
+- The keyboard and predictions are free, for good.
+- Fix is free for 30 Fixes a month.
+- Pro gives you up to 100 Fixes a day. Pro is £3.99 a month or £29.99 a year, each with a 14-day free trial, or Pro Lifetime for a single payment of £79.99.
+These are UK prices. The App Store shows your local price before you pay. Monthly and yearly plans renew automatically unless you cancel at least 24 hours before the end of the current period. You can manage or cancel them in your Apple Account settings.
+
+PRIVACY
+Nothing is sent until you tap Fix, and the first time you tap it, the keyboard asks before sending anything. When you tap Fix, that paragraph is sent through our server to an AI service (OpenAI) to be corrected. Our server does not keep your text. Keystrokes are not sent. Password fields are skipped.
+
+SET UP
+Settings > General > Keyboard > Keyboards > Add New Keyboard > access: keyboard. Turn on Allow Full Access to use Fix and to share your settings with the app.
+
+Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://access-keyboard.vercel.app/privacy.html
