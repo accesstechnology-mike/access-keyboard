@@ -71,7 +71,7 @@ AGE_ENUMS = (
 AGE_BOOLS = (
     "advertising", "ageAssurance", "gambling", "healthOrWellnessTopics", "lootBox",
     "messagingAndChat", "parentalControls", "unrestrictedWebAccess",
-    "userGeneratedContent",
+    "userGeneratedContent", "socialMedia", "socialMediaAgeRestricted",
 )
 # display type -> folder in docs/app-store/screenshots
 SCREENSHOT_SETS = {

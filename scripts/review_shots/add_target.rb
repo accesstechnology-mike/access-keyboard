@@ -17,12 +17,14 @@ target.build_configurations.each do |config|
   s['TEST_HOST'] = '$(BUILT_PRODUCTS_DIR)/AccessKeyboard.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AccessKeyboard'
   s['BUNDLE_LOADER'] = '$(TEST_HOST)'
   s['GENERATE_INFOPLIST_FILE'] = 'YES'
+  s['PRODUCT_NAME'] = 'ReviewShots'
   s['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.access.keyboard.reviewshots'
   s['SWIFT_VERSION'] = '5.0'
   s['TARGETED_DEVICE_FAMILY'] = '1,2'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '18.0'
   s['CODE_SIGNING_ALLOWED'] = 'NO'
 end
+target.product_reference.path = 'ReviewShots.xctest' if target.product_reference
 project.save
 
 scheme = Xcodeproj::XCScheme.new
