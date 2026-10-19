@@ -1,11 +1,12 @@
 # access: keyboard
 
 An assistive custom keyboard for **iPhone and iPad** (iOS / iPadOS 18). It pairs
-a literacy font, optional colour themes, a prediction bar that learns on the
-device, and an optional "Fix" that can correct the current text field through a
-hosted proxy. The keyboard still types with Full Access off and with no network.
-Fix sends text only when the user taps Fix, and only after they allow it when
-consent is required.
+a literacy font, an accessible colour scheme (including Beth Moulam's colours), a
+prediction list (a bar across the top on iPhone, a column on the left on iPad)
+that learns on the device, and an optional "Fix" that can correct the current
+paragraph through a hosted proxy. The keyboard still types with Full Access off
+and with no network. Fix sends text only when the user taps Fix, and only after
+they allow it when consent is required.
 
 ## Feature flags
 
@@ -25,9 +26,10 @@ Universal (`TARGETED_DEVICE_FAMILY = "1,2"`). The keyboard adapts to the device
 by size class:
 
 - **iPhone** — a compact, single-column board sized to the phone width (portrait
-  and landscape). QWERTY, ABC, and the Frequency (Grid) board all fit without
-  overflowing or leaving broken empty bands.
-- **iPad / iPad Pro** — the larger multi-column boards, unchanged.
+  and landscape), with the prediction bar across the top. QWERTY, ABC, and the
+  Frequency (Grid) board all fit without overflowing or leaving broken empty bands.
+- **iPad / iPad Pro** — the larger multi-column boards, portrait and landscape,
+  with the prediction list in a column on the left.
 
 Layout resolution lives in `LayoutClassResolver`; the pure width math is in
 `KeyboardGeometry` (unit-tested in `LayoutStabilityTests`). `scripts/render_iphone_layout.py`

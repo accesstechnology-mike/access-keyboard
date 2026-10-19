@@ -24,7 +24,7 @@ Source for the review notes and privacy answers: `TESTFLIGHT.md`.
 | Secondary category | Productivity (optional) |
 | Primary language | English (UK), unless the App Store Connect record is already English (US). The keyboard’s `PrimaryLanguage` is `en-US`. |
 | Copyright | Access Technology North Limited |
-| Version | `0.1.0` (marketing version in the Xcode project) |
+| Version | `1.0` (marketing version in the Xcode project; matches the App Store Connect version record) |
 | Price | **TODO Mike** |
 
 Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotional text is 170 characters (limit 170). Keywords are 79 characters (limit 100).

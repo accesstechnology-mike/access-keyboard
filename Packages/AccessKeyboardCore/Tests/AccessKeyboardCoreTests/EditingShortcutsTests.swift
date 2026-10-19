@@ -131,6 +131,129 @@ final class KeyboardEditingTests: XCTestCase {
         XCTAssertEqual(engine.shift, .autoShifted, "a normal sentence field still capitalizes the first letter")
     }
 
+    func testPunctuationFromNumbersHugsAnAutomaticSpaceAndReturnsToLetters() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        for character in ["h", "e", "l", "l", "o"] {
+            engine.handle(.character(character))
+        }
+        engine.handle(.space)
+        engine.handle(.setMode(.numeric))
+        XCTAssertEqual(engine.mode, .numeric)
+
+        engine.handle(.character(","))
+
+        XCTAssertEqual(document.text, "hello, ")
+        XCTAssertEqual(engine.mode, .alphabetic)
+        XCTAssertEqual(engine.shift, .off, "a comma does not start a new sentence")
+    }
+
+    func testSentencePunctuationFromSymbolsReturnsToLettersAndCapitalizes() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.handle(.character("a"))
+        engine.handle(.space)
+        engine.handle(.setMode(.symbols))
+
+        engine.handle(.character("?"))
+
+        XCTAssertEqual(document.text, "a? ")
+        XCTAssertEqual(engine.mode, .alphabetic)
+        XCTAssertEqual(engine.shift, .autoShifted)
+    }
+
+    func testPredictionSpaceIsMovedAfterTheMark() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.applyPrediction(Prediction(displayText: "hello", insertion: "hello", isVerbatim: false))
+        XCTAssertEqual(document.text, "hello ")
+        engine.handle(.setMode(.numeric))
+
+        engine.handle(.character("."))
+
+        XCTAssertEqual(document.text, "hello. ")
+        XCTAssertEqual(engine.mode, .alphabetic)
+        XCTAssertEqual(engine.shift, .autoShifted)
+    }
+
+    func testExclamationColonAndSemicolonAlsoHug() {
+        for mark in ["!", ":", ";"] {
+            let document = FakeDocument(text: "")
+            let engine = engine(document)
+            engine.handle(.character("a"))
+            engine.handle(.space)
+            engine.handle(.setMode(.numeric))
+            engine.handle(.character(mark))
+            XCTAssertEqual(document.text, "a\(mark) ", mark)
+            XCTAssertEqual(engine.mode, .alphabetic, mark)
+        }
+    }
+
+    func testExistingSpaceIsNotRemoved() {
+        let document = FakeDocument(text: "hello ")
+        let engine = engine(document)
+        engine.handle(.setMode(.numeric))
+
+        engine.handle(.character(","))
+
+        XCTAssertEqual(document.text, "hello ,")
+        XCTAssertEqual(engine.mode, .alphabetic)
+    }
+
+    func testApostropheReturnsToLettersWithoutEatingTheSpace() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.handle(.character("a"))
+        engine.handle(.space)
+        engine.handle(.setMode(.numeric))
+
+        engine.handle(.character("'"))
+
+        XCTAssertEqual(document.text, "a '")
+        XCTAssertEqual(engine.mode, .alphabetic)
+    }
+
+    func testSymbolsThatAreNotSentencePunctuationStayOnThatPage() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.handle(.character("a"))
+        engine.handle(.space)
+        engine.handle(.setMode(.symbols))
+
+        engine.handle(.character("@"))
+
+        XCTAssertEqual(document.text, "a @")
+        XCTAssertEqual(engine.mode, .symbols)
+    }
+
+    func testDocumentChangeClearsAnAutomaticSpaceThatIsNoLongerThere() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.handle(.character("a"))
+        engine.handle(.space)
+        document.text = "other "
+        document.cursor = document.text.count
+        engine.documentDidChange()
+        engine.handle(.setMode(.numeric))
+
+        engine.handle(.character(","))
+
+        XCTAssertEqual(document.text, "other ,")
+    }
+
+    func testUndoRemovesHuggedPunctuation() {
+        let document = FakeDocument(text: "")
+        let engine = engine(document)
+        engine.handle(.character("a"))
+        engine.handle(.space)
+        engine.handle(.character(","))
+        XCTAssertEqual(document.text, "a, ")
+
+        engine.handle(.undo)
+
+        XCTAssertEqual(document.text, "a")
+    }
+
     func testTwoFingerCursorMovement() {
         let document = FakeDocument(text: "hello\nworld", cursor: 11)
         let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
@@ -141,5 +264,15 @@ final class KeyboardEditingTests: XCTestCase {
         XCTAssertEqual(document.cursor, 10)
         engine.moveCursor(horizontal: 0, vertical: -1)
         XCTAssertEqual(String(document.text.prefix(document.cursor)), "hell")
+    }
+
+    private func engine(_ document: FakeDocument) -> KeyboardEngine {
+        let engine = KeyboardEngine(memory: PredictionMemory(table: [:]))
+        engine.document = document
+        engine.traits = KeyboardTraits(
+            autocapitalizationType: .sentences,
+            keyboardType: .default
+        )
+        return engine
     }
 }

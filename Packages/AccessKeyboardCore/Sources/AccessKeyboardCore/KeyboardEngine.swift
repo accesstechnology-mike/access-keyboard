@@ -44,6 +44,12 @@ public final class KeyboardEngine {
     private var redoStack: [UndoRecord] = []
     private var lastShiftTap: TimeInterval = 0
     private var memory: PredictionMemory
+    /// True when the character before the cursor is a space this keyboard just
+    /// inserted (prediction, space bar, or the space moved after punctuation),
+    /// and `automaticSpaceContext` is the document context that space belongs
+    /// to. A space that was already in the field is left alone.
+    private var trailingSpaceIsAutomatic = false
+    private var automaticSpaceContext: String?
 
     public convenience init() {
         self.init(memory: .shared)
@@ -54,6 +60,7 @@ public final class KeyboardEngine {
     }
 
     public func documentDidChange() {
+        reconcileAutomaticTrailingSpace()
         if fixStatus == .failed {
             fixStatus = .idle
         }
@@ -69,7 +76,7 @@ public final class KeyboardEngine {
             if text.contains(where: { $0.isPunctuation || $0.isNewline }) {
                 learnCurrentWord()
             }
-            insert(text)
+            insertCharacter(text)
             consumeOneShotShift()
             applyAutocapitalization()
         case .space:
@@ -85,6 +92,7 @@ public final class KeyboardEngine {
             applyAutocapitalization()
         case .backspace:
             deleteBackward()
+            clearAutomaticTrailingSpace()
             applyAutocapitalization()
         case .shift:
             toggleShift()
@@ -117,6 +125,7 @@ public final class KeyboardEngine {
         } else {
             deleteBackward()
         }
+        clearAutomaticTrailingSpace()
         applyAutocapitalization()
         notify()
     }
@@ -132,6 +141,7 @@ public final class KeyboardEngine {
         )
         guard offset != 0 else { return }
         document?.adjustTextPosition(byCharacterOffset: offset)
+        clearAutomaticTrailingSpace()
         let previousShift = shift
         applyAutocapitalization()
         if previousShift != shift {
@@ -156,7 +166,9 @@ public final class KeyboardEngine {
             presentFixNotice(.secureField)
             return
         }
-        let original = currentDocumentText()
+        // Only the paragraph around the cursor is sent and replaced, so Fix
+        // never deletes back across a line break (Notes title / heading style).
+        let original = fixTarget()
         guard !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
@@ -217,6 +229,9 @@ public final class KeyboardEngine {
         insert(prediction.insertion)
         if prediction.insertion.last?.isWhitespace != true {
             insert(" ")
+            noteAutomaticTrailingSpace()
+        } else {
+            clearAutomaticTrailingSpace()
         }
         consumeOneShotShift()
         applyAutocapitalization()
@@ -251,10 +266,33 @@ public final class KeyboardEngine {
         redoStack.removeAll()
     }
 
+    private func insertCharacter(_ text: String) {
+        let before = document?.documentContextBeforeInput ?? ""
+        if let replacement = EditingShortcuts.replacementByMovingAutomaticSpace(
+            punctuation: text,
+            before: before,
+            spaceIsAutomatic: trailingSpaceIsAutomatic
+        ) {
+            document?.deleteBackward()
+            if case .insert(" ") = undoStack.last {
+                undoStack.removeLast()
+            }
+            insert(replacement)
+            noteAutomaticTrailingSpace()
+        } else {
+            insert(text)
+            clearAutomaticTrailingSpace()
+        }
+        if mode != .alphabetic, EditingShortcuts.returnsToAlphabetic(text) {
+            mode = .alphabetic
+        }
+    }
+
     private func insertSpaceOrPeriod() {
         let before = document?.documentContextBeforeInput ?? ""
         guard EditingShortcuts.shouldConvertDoubleSpace(before) else {
             insert(" ")
+            noteAutomaticTrailingSpace()
             return
         }
         document?.deleteBackward()
@@ -262,6 +300,32 @@ public final class KeyboardEngine {
             undoStack.removeLast()
         }
         insert(". ")
+        noteAutomaticTrailingSpace()
+    }
+
+    private func noteAutomaticTrailingSpace() {
+        let before = document?.documentContextBeforeInput ?? ""
+        guard before.hasSuffix(" ") else {
+            clearAutomaticTrailingSpace()
+            return
+        }
+        trailingSpaceIsAutomatic = true
+        automaticSpaceContext = before
+    }
+
+    private func clearAutomaticTrailingSpace() {
+        trailingSpaceIsAutomatic = false
+        automaticSpaceContext = nil
+    }
+
+    /// Drops the automatic-space flag when the field changed out from under the
+    /// space we inserted (cursor moved elsewhere, or another edit landed).
+    private func reconcileAutomaticTrailingSpace() {
+        guard trailingSpaceIsAutomatic else { return }
+        let before = document?.documentContextBeforeInput ?? ""
+        if before != automaticSpaceContext {
+            clearAutomaticTrailingSpace()
+        }
     }
 
     private func deleteBackward() {
@@ -322,6 +386,7 @@ public final class KeyboardEngine {
             replaceDocument(from: inserted, to: deleted)
             redoStack.append(record)
         }
+        clearAutomaticTrailingSpace()
     }
 
     private func performRedo() {
@@ -337,10 +402,21 @@ public final class KeyboardEngine {
             replaceDocument(from: deleted, to: inserted)
             undoStack.append(record)
         }
+        clearAutomaticTrailingSpace()
     }
 
-    private func applyFixedText(original: String, fixed: String) {
+    private func applyFixedText(original: String, fixed rawFixed: String) {
+        clearAutomaticTrailingSpace()
+        // The proxy trims the model's reply, so put back the original's
+        // leading and trailing whitespace (newlines, an automatic space).
+        let fixed = Self.preservingOuterWhitespace(of: original, in: rawFixed)
         if original != fixed {
+            if document?.entireText == nil, fixTarget() != original {
+                // The paragraph changed while Fix was running. Deleting
+                // `original.count` characters now would eat the wrong text.
+                failFix()
+                return
+            }
             if document?.replaceEntireText(fixed) == true {
                 undoStack.append(.replace(deleted: original, inserted: fixed))
                 redoStack.removeAll()
@@ -357,8 +433,10 @@ public final class KeyboardEngine {
     }
 
     private func replaceHarvested(_ original: String, with fixed: String) {
-        let after = document?.documentContextAfterInput ?? ""
-        document?.adjustTextPosition(byCharacterOffset: (after as NSString).length)
+        // Move only to the end of the current paragraph, never past a newline,
+        // then delete exactly the paragraph text Fix harvested.
+        let afterInParagraph = Self.paragraphTail(of: document?.documentContextAfterInput)
+        document?.adjustTextPosition(byCharacterOffset: (afterInParagraph as NSString).length)
         for _ in original {
             document?.deleteBackward()
         }
@@ -377,13 +455,52 @@ public final class KeyboardEngine {
         document?.insertText(next)
     }
 
-    private func currentDocumentText() -> String {
+    /// The text Fix sends and replaces. In the keyboard extension
+    /// (`UITextDocumentProxy`) that is only the paragraph the cursor is in:
+    /// the proxy can only delete backwards and insert, so harvesting across
+    /// newlines meant Fix deleted earlier lines (in Notes, back into the
+    /// title line) and re-inserted everything there, where it picked up the
+    /// title style. The in-app test field can replace its whole text, so it
+    /// keeps whole-field Fix.
+    private func fixTarget() -> String {
         if let entire = document?.entireText {
             return entire
         }
-        return (document?.documentContextBeforeInput ?? "")
-            + (document?.selectedText ?? "")
-            + (document?.documentContextAfterInput ?? "")
+        let selected = document?.selectedText ?? ""
+        guard !selected.contains(where: \.isNewline) else {
+            // A multi-paragraph selection cannot be replaced safely with
+            // deleteBackward; fix nothing rather than merge paragraphs.
+            return ""
+        }
+        return Self.paragraphHead(of: document?.documentContextBeforeInput)
+            + selected
+            + Self.paragraphTail(of: document?.documentContextAfterInput)
+    }
+
+    /// Text before the cursor back to (not including) the previous newline.
+    static func paragraphHead(of before: String?) -> String {
+        guard let before else { return "" }
+        if let newline = before.lastIndex(where: \.isNewline) {
+            return String(before[before.index(after: newline)...])
+        }
+        return before
+    }
+
+    /// Text after the cursor up to (not including) the next newline.
+    static func paragraphTail(of after: String?) -> String {
+        guard let after else { return "" }
+        if let newline = after.firstIndex(where: \.isNewline) {
+            return String(after[..<newline])
+        }
+        return after
+    }
+
+    static func preservingOuterWhitespace(of original: String, in fixed: String) -> String {
+        let core = fixed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !core.isEmpty else { return fixed }
+        let leading = original.prefix(while: \.isWhitespace)
+        let trailing = String(original.reversed().prefix(while: \.isWhitespace).reversed())
+        return String(leading) + core + trailing
     }
 
     private func presentFixNotice(_ notice: FixNotice) {

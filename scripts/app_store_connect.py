@@ -1043,16 +1043,12 @@ def assign_individual_testers(token: str, build_id: str, tester_ids: list[str]) 
             )
             added += 1
         except ASCHTTPError as exc:
-            outcome = nonfatal_tester_assignment(exc)
-            if outcome == "already":
+            if tester_cannot_be_assigned(exc):
+                # Public-link (anonymous) testers cannot be entitled to a
+                # build one by one; their invite state was already checked.
+                print(f"build {build_id}: cannot assign tester {tester_id} individually; skipped", file=sys.stderr)
                 continue
-            if outcome == "cannot-assign":
-                print(
-                    "WARNING individual tester "
-                    f"{tester_id} cannot be assigned "
-                    "(409 Tester(s) cannot be assigned). Continuing.",
-                    file=sys.stderr,
-                )
+            if ignore_already_exists(exc):
                 continue
             raise
     return added
@@ -1162,6 +1158,26 @@ def entitle_every_tester(token: str, identifier: str, latest: dict, groups: list
     print(f"entitled {added} tester(s) to build {latest['number']}")
 
 
+def external_group_has_build(token: str, group: dict, build: dict) -> bool:
+    """True when the external group already has this build and Apple has
+    approved it for external testing, so the group is up to date."""
+    if not external_build_ready(build):
+        return False
+    try:
+        ids = {item["id"] for item in group_builds(token, group["id"])}
+    except ASCHTTPError:
+        return False
+    return build["id"] in ids
+
+
+def submit_beta_review_if_needed(token: str, build: dict) -> str:
+    """Submit for Beta App Review only when Apple still needs a submission.
+    Resubmitting an approved or in-review build returns 422 INVALID_QC_STATE."""
+    if external_build_ready(build) or external_review_pending(build):
+        return "skipped"
+    return submit_beta_review(token, build["id"])
+
+
 def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
     groups = list_beta_groups(token, identifier)
     if not groups:
@@ -1180,10 +1196,18 @@ def enforce_latest_only(token: str, identifier: str, latest: dict) -> None:
                 print(f"{kind} group {group['name']}: already receives every build")
                 continue
             if not group["is_internal"]:
-                review = submit_beta_review(token, latest["id"])
+                if external_group_has_build(token, group, latest):
+                    print(f"{kind} group {group['name']}: up to date on build {latest['number']}")
+                    continue
+                review = submit_beta_review_if_needed(token, latest)
                 if review == "submitted":
                     print(
                         f"{kind} group {group['name']}: submitted build {latest['number']} for Beta Review"
+                    )
+                elif review == "skipped":
+                    print(
+                        f"{kind} group {group['name']}: build {latest['number']} already "
+                        f"{latest.get('external_build_state')}; no Beta Review submission needed"
                     )
             assigned = assign_build_to_group(token, group["id"], latest["id"])
             if assigned == "automatic":

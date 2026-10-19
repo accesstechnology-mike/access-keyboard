@@ -9,6 +9,18 @@ public enum LayoutFactory {
         returnKeyType: UIReturnKeyType,
         letterLayout: LetterLayout = .qwerty
     ) -> KeyboardLayout {
+        if letterLayout == .frequency, mode != .alphabetic {
+            // Motor plan: the frequency board's 123 / #+= pages keep the same
+            // grid, so Space, Shift, delete, return, globe and hide never move.
+            let rows = frequencyRows(
+                shift: shift,
+                needsGlobe: needsInputModeSwitchKey,
+                returnKeyType: returnKeyType,
+                layoutClass: layoutClass,
+                mode: mode
+            )
+            return stamped(rows: rows, mode: mode, letterLayout: letterLayout, layoutClass: layoutClass)
+        }
         switch layoutClass {
         case .compact:
             return compactLayout(
@@ -149,9 +161,9 @@ public enum LayoutFactory {
                 KeyboardRow(keys: chars("1234567890") + [backspace(compact: false, width: .unit(1.5))]),
                 KeyboardRow(keys: chars("-/:;()$&@\"") + [returnKey(returnKeyType, compact: false, width: .unit(1.6))]),
                 KeyboardRow(keys: [
-                    modeKey("#+=", .symbols, width: .unit(1.6))
+                    modeKey("#+=", .symbols, width: .unit(1.4))
                 ] + chars(".,?!'") + [
-                    modeKey("#+=", .symbols, width: .unit(1.6))
+                    modeKey("#+=", .symbols, width: .unit(1.4))
                 ]),
                 KeyboardRow(keys: iPadToolbar(mode: .numeric, needsGlobe: needsGlobe, pro: false))
             ]
@@ -160,9 +172,9 @@ public enum LayoutFactory {
                 KeyboardRow(keys: chars("[]{}#%^*+=") + [backspace(compact: false, width: .unit(1.5))]),
                 KeyboardRow(keys: chars("_\\|~<>€£¥·") + [returnKey(returnKeyType, compact: false, width: .unit(1.6))]),
                 KeyboardRow(keys: [
-                    modeKey("123", .numeric, width: .unit(1.6))
+                    modeKey("123", .numeric, width: .unit(1.4))
                 ] + chars(".,?!'") + [
-                    modeKey("123", .numeric, width: .unit(1.6))
+                    modeKey("123", .numeric, width: .unit(1.4))
                 ]),
                 KeyboardRow(keys: iPadToolbar(mode: .symbols, needsGlobe: needsGlobe, pro: false))
             ]
@@ -190,74 +202,65 @@ public enum LayoutFactory {
                     layoutClass: .iPadPro
                 )
             } else {
+                // 14-column block: every key is one grid cell except delete,
+                // return and right shift (two cells), so the rows line up
+                // column for column and the left/right edges are flush.
                 let map = LetterMaps.frameRows(for: letterLayout)
                 rows = [
-                    KeyboardRow(keys: numberRow(shift: shift) + [backspace(compact: false, width: .unit(1.8))]),
+                    KeyboardRow(keys: numberRow(shift: shift) + [backspace(compact: false, width: .unit(2))]),
                     KeyboardRow(keys: [
-                        tabKey()
+                        tabKey(width: .unit(1))
                     ] + letters(map.top, shift: shift) + [
                         punctuation("[", shifted: "{"),
                         punctuation("]", shifted: "}"),
                         punctuation("\\", shifted: "|")
                     ]),
                     KeyboardRow(keys: [
-                        capsLockKey(shift: shift)
+                        capsLockKey(shift: shift, width: .unit(1))
                     ] + letters(map.home, shift: shift) + [
                         punctuation(";", shifted: ":"),
                         punctuation("'", shifted: "\""),
-                        returnKey(returnKeyType, compact: false, width: .unit(1.7))
+                        returnKey(returnKeyType, compact: false, width: .unit(2))
                     ]),
                     KeyboardRow(keys: [
-                        shiftKey(compact: false, shift: shift, width: .unit(1.5)),
+                        shiftKey(compact: false, shift: shift, width: .unit(1)),
                         punctuation("`", shifted: "~")
                     ] + letters(map.bottom, shift: shift) + [
                         punctuation(",", shifted: "<"),
                         punctuation(".", shifted: ">"),
                         punctuation("/", shifted: "?"),
-                        shiftKey(compact: false, shift: shift, width: .unit(1.8))
+                        shiftKey(compact: false, shift: shift, width: .unit(2))
                     ]),
                     KeyboardRow(keys: iPadToolbar(mode: .alphabetic, needsGlobe: needsGlobe, pro: true))
                 ]
             }
         case .numeric:
+            // Same 14-column block as the letters page: delete, tab, return and
+            // the shift slots (here the #+= switch) keep identical cells.
             rows = [
-                KeyboardRow(keys: chars("1234567890-=") + [backspace(compact: false, width: .unit(1.8))]),
-                KeyboardRow(keys: [
-                    undoKey()
-                ] + chars("-/:;()$&@\"") + [
-                    returnKey(returnKeyType, compact: false, width: .unit(1.7))
+                KeyboardRow(keys: chars("1234567890-=") + [backspace(compact: false, width: .unit(2))]),
+                KeyboardRow(keys: [tabKey(width: .unit(1))] + chars("-/:;()$&@\"#%*")),
+                KeyboardRow(keys: [redoKey(width: .unit(1))] + chars(".,?!'_|~+<>") + [
+                    returnKey(returnKeyType, compact: false, width: .unit(2))
                 ]),
                 KeyboardRow(keys: [
-                    redoKey(),
-                    modeKey("#+=", .symbols, width: .unit(1.4))
-                ] + chars(".,?!'_|~") + [
-                    modeKey("#+=", .symbols, width: .unit(1.8))
-                ]),
-                KeyboardRow(keys: [
-                    modeKey("ABC", .alphabetic, width: .unit(1.5))
-                ] + chars("€£¥%…") + [
-                    modeKey("ABC", .alphabetic, width: .unit(1.8))
+                    modeKey("#+=", .symbols, width: .unit(1))
+                ] + chars("€£¥…•^`§°±¬") + [
+                    modeKey("#+=", .symbols, width: .unit(2))
                 ]),
                 KeyboardRow(keys: iPadToolbar(mode: .numeric, needsGlobe: needsGlobe, pro: true))
             ]
         case .symbols:
             rows = [
-                KeyboardRow(keys: chars("[]{}#%^*+=•") + [backspace(compact: false, width: .unit(1.8))]),
-                KeyboardRow(keys: [
-                    undoKey()
-                ] + chars("_\\|~<>€£¥·") + [
-                    returnKey(returnKeyType, compact: false, width: .unit(1.7))
+                KeyboardRow(keys: chars("[]{}#%^*+=•¬") + [backspace(compact: false, width: .unit(2))]),
+                KeyboardRow(keys: [tabKey(width: .unit(1))] + chars("_\\|~<>€£¥·§¡¿")),
+                KeyboardRow(keys: [redoKey(width: .unit(1))] + chars("–—«»°†‡※∞.±") + [
+                    returnKey(returnKeyType, compact: false, width: .unit(2))
                 ]),
                 KeyboardRow(keys: [
-                    redoKey(),
-                    modeKey("123", .numeric, width: .unit(1.4))
-                ] + chars(".§¡¿–—«»") + [
-                    modeKey("123", .numeric, width: .unit(1.8))
-                ]),
-                KeyboardRow(keys: [
-                    modeKey("ABC", .alphabetic, width: .unit(1.5))
-                ] + chars("°†‡※∞") + [
-                    modeKey("ABC", .alphabetic, width: .unit(1.8))
+                    modeKey("123", .numeric, width: .unit(1))
+                ] + chars("©®™✓¤¦µ÷×≈≠") + [
+                    modeKey("123", .numeric, width: .unit(2))
                 ]),
                 KeyboardRow(keys: iPadToolbar(mode: .symbols, needsGlobe: needsGlobe, pro: true))
             ]
@@ -276,8 +279,11 @@ public enum LayoutFactory {
         letterLayout: LetterLayout,
         layoutClass: LayoutClass
     ) -> KeyboardLayout {
-        if mode == .alphabetic, letterLayout == .frequency {
+        if letterLayout == .frequency {
             return KeyboardLayout(rows: rows, layoutClass: layoutClass, leftDocked: true)
+        }
+        if layoutClass == .iPadPro {
+            return KeyboardLayout(rows: rows, layoutClass: layoutClass, gridColumns: proGridColumns)
         }
         let reference = frameReference(for: layoutClass)
         return KeyboardLayout(
@@ -293,11 +299,14 @@ public enum LayoutFactory {
     /// same size and their number row aligned with the letter row. The values
     /// are verified against the live alphabetic layout by LayoutStabilityTests,
     /// which fails if the alphabetic frame ever drifts from these numbers.
+    /// Column count of the iPad Pro / 11" landscape block.
+    static let proGridColumns = 14
+
     static func frameReference(for layoutClass: LayoutClass) -> (weight: CGFloat, count: Int) {
         switch layoutClass {
         case .compact: return (10, 10)
         case .iPad: return (13.8, 13)
-        case .iPadPro: return (14.3, 13)
+        case .iPadPro: return (14, 13)
         }
     }
 
@@ -325,16 +334,23 @@ public enum LayoutFactory {
         shift: ShiftState,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        layoutClass: LayoutClass
+        layoutClass: LayoutClass,
+        mode: KeyboardMode = .alphabetic
     ) -> [KeyboardRow] {
         let compact = layoutClass == .compact
-        let letterRows = LetterMaps.frequencyLetterRows()
+        let letterRows: [String]
+        switch mode {
+        case .alphabetic: letterRows = LetterMaps.frequencyLetterRows()
+        case .numeric: letterRows = ["123456", "7890-/:", ";()$&@\"", ".,?!'#"]
+        case .symbols: letterRows = ["[]{}#%", "^*+=_\\|", "~<>€£¥·", "§¡¿•…°"]
+        }
         let rightCells = frequencyRightCells(
             rowCount: letterRows.count,
             columns: frequencyRightColumnCount(for: layoutClass),
             needsGlobe: needsGlobe,
             returnKeyType: returnKeyType,
-            compact: compact
+            compact: compact,
+            mode: mode
         )
 
         var rows: [KeyboardRow] = []
@@ -343,9 +359,13 @@ public enum LayoutFactory {
             if index == 0 {
                 keys.append(spaceCell())
             }
-            keys += letters(letterRow, shift: shift)
+            keys += mode == .alphabetic ? letters(letterRow, shift: shift) : chars(letterRow)
             if index == letterRows.count - 1 {
-                keys.append(shiftKey(compact: compact, shift: shift, width: .unit(1)))
+                switch mode {
+                case .alphabetic: keys.append(shiftKey(compact: compact, shift: shift, width: .unit(1)))
+                case .numeric: keys.append(modeKey("#+=", .symbols, width: .unit(1)))
+                case .symbols: keys.append(modeKey("123", .numeric, width: .unit(1)))
+                }
             }
             keys += rightCells[index]
             rows.append(KeyboardRow(keys: keys))
@@ -380,12 +400,15 @@ public enum LayoutFactory {
         columns: Int,
         needsGlobe: Bool,
         returnKeyType: UIReturnKeyType,
-        compact: Bool
+        compact: Bool,
+        mode: KeyboardMode = .alphabetic
     ) -> [[KeySpec]] {
         var functions: [KeySpec] = [
             backspace(compact: compact, width: .unit(1)),
             returnKey(returnKeyType, compact: compact, width: .unit(1)),
-            modeKey("123", .numeric, width: .unit(1))
+            mode == .alphabetic
+                ? modeKey("123", .numeric, width: .unit(1))
+                : modeKey("ABC", .alphabetic, width: .unit(1))
         ]
         if needsGlobe {
             functions.append(globe(width: .unit(1)))
@@ -436,15 +459,15 @@ public enum LayoutFactory {
     private static func iPadToolbar(mode: KeyboardMode, needsGlobe: Bool, pro: Bool) -> [KeySpec] {
         var keys: [KeySpec] = []
         if mode == .alphabetic {
-            keys.append(modeKey(".?123", .numeric, width: .unit(pro ? 1.4 : 1.5)))
+            keys.append(modeKey(".?123", .numeric, width: .unit(pro ? 2 : 1.5)))
         } else {
-            keys.append(modeKey("ABC", .alphabetic, width: .unit(pro ? 1.4 : 1.5)))
+            keys.append(modeKey("ABC", .alphabetic, width: .unit(pro ? 2 : 1.5)))
         }
         if needsGlobe {
-            keys.append(globe(width: .unit(1.1)))
+            keys.append(globe(width: .unit(pro ? 1 : 1.1)))
         }
         if pro {
-            keys.append(undoKey())
+            keys.append(undoKey(width: .unit(1)))
         }
         keys.append(space(width: .flexible))
         // The full stop already lives on the row above (the letter row's `,` `.`
@@ -452,11 +475,11 @@ public enum LayoutFactory {
         // stock iPad keyboard. A second period beside the space bar was
         // redundant, so it is removed to leave a single clear affordance.
         if mode == .alphabetic {
-            keys.append(modeKey(".?123", .numeric, width: .unit(1.4)))
+            keys.append(modeKey(".?123", .numeric, width: .unit(pro ? 2 : 1.4)))
         } else {
-            keys.append(modeKey("ABC", .alphabetic, width: .unit(1.4)))
+            keys.append(modeKey("ABC", .alphabetic, width: .unit(pro ? 2 : 1.4)))
         }
-        keys.append(dismissKey())
+        keys.append(dismissKey(width: .unit(pro ? 1 : 1.2)))
         return keys
     }
 
@@ -539,12 +562,12 @@ public enum LayoutFactory {
         KeySpec(action: .dismissKeyboard, display: .symbol("keyboard.chevron.compact.down"), width: width, style: .modifier)
     }
 
-    private static func undoKey() -> KeySpec {
-        KeySpec(action: .undo, display: .symbol("arrow.uturn.backward"), width: .unit(1.1), style: .modifier)
+    private static func undoKey(width: KeyWidth = .unit(1.1)) -> KeySpec {
+        KeySpec(action: .undo, display: .symbol("arrow.uturn.backward"), width: width, style: .modifier)
     }
 
-    private static func redoKey() -> KeySpec {
-        KeySpec(action: .redo, display: .symbol("arrow.uturn.forward"), width: .unit(1.1), style: .modifier)
+    private static func redoKey(width: KeyWidth = .unit(1.1)) -> KeySpec {
+        KeySpec(action: .redo, display: .symbol("arrow.uturn.forward"), width: width, style: .modifier)
     }
 
     private static func space(width: KeyWidth) -> KeySpec {

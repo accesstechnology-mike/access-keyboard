@@ -16,6 +16,25 @@ public enum LetterLayout: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Where predictions and Fix sit on a landscape iPad. Only a preference:
+/// every other board (portrait iPad, iPhone, a narrow/floating iPad board)
+/// keeps its usual placement whatever this says.
+public enum PredictionPlacement: String, CaseIterable, Identifiable, Sendable {
+    /// Left-hand column beside the keys (the default).
+    case preferSide = "side"
+    /// Horizontal bar above the keys, for hands that cover the left column.
+    case preferTop = "top"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .preferSide: return "Prefer side"
+        case .preferTop: return "Prefer top"
+        }
+    }
+}
+
 public enum ColourOption: String, CaseIterable, Identifiable, Sendable {
     case system
     case vowels

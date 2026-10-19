@@ -38,6 +38,10 @@ public enum KeyboardGeometry {
             let fillUnit = (usableWidth - gaps) / max(maxWeight, 1)
             return min(metrics.keyHeight, fillUnit)
         }
+        if let columns = layout.gridColumns, columns > 0 {
+            let gaps = CGFloat(columns - 1) * metrics.keySpacing
+            return (usableWidth - gaps) / CGFloat(columns)
+        }
         // Fixed frame reference (numeric/symbols reuse the alphabetic frame) so
         // key size stays constant across pages.
         if let refWeight = layout.referenceUnitWeight, let refCount = layout.referenceKeyCount {
@@ -53,65 +57,83 @@ public enum KeyboardGeometry {
     }
 
     /// The frames for one row, positioned at vertical offset `y`.
+    ///
+    /// Motor-plan rule: on a full-width (non-docked) board, a modifier at the
+    /// start of a row is pinned to the left edge and a modifier at the end is
+    /// pinned to the right edge, with the character keys centred between them.
+    /// So `delete`, `return`, `shift` and their page-switch stand-ins sit at
+    /// exactly the same place on every page (letters / 123 / #+=), whatever the
+    /// number of character keys in between.
     public static func framesForRow(
         _ row: KeyboardRow,
         y: CGFloat,
         usableWidth: CGFloat,
         unit: CGFloat,
         metrics: LayoutMetrics,
-        leftDocked: Bool
+        contentLeading: CGFloat,
+        leftDocked: Bool,
+        grid: Bool = false
     ) -> [CGRect] {
         let gap = metrics.keySpacing
-        let gaps = CGFloat(max(row.keys.count - 1, 0)) * gap
+        let count = row.keys.count
+        let gaps = CGFloat(max(count - 1, 0)) * gap
         let flexibleCount = row.keys.filter { $0.width == .flexible }.count
-        let fixed = row.keys.reduce(CGFloat(0)) { sum, spec in
-            if spec.width == .flexible { return sum }
-            return sum + weight(of: spec.width)
-        }
 
-        let leftover = usableWidth - fixed * unit - gaps
-        let flexWidth: CGFloat
-        let leading: CGFloat
-        if flexibleCount > 0 {
-            flexWidth = max(unit, leftover / CGFloat(flexibleCount))
-            leading = metrics.sideInset
+        func fixedWidth(_ spec: KeySpec) -> CGFloat {
+            let w = weight(of: spec.width)
+            return grid ? unit * w + max(w - 1, 0) * gap : unit * w
+        }
+        let fixedTotal = row.keys.reduce(CGFloat(0)) { sum, spec in
+            spec.width == .flexible ? sum : sum + fixedWidth(spec)
+        }
+        let leftover = usableWidth - fixedTotal - gaps
+        let flexWidth = flexibleCount > 0 ? max(unit, leftover / CGFloat(flexibleCount)) : 0
+        let widths = row.keys.map { $0.width == .flexible ? flexWidth : fixedWidth($0) }
+
+        var xs = Array(repeating: CGFloat(0), count: count)
+        if flexibleCount > 0 || count == 0 {
+            var cursor = contentLeading
+            for i in 0..<count { xs[i] = cursor; cursor += widths[i] + gap }
+        } else if leftDocked {
+            var cursor = contentLeading + row.leadingInsetUnits * unit
+            for i in 0..<count { xs[i] = cursor; cursor += widths[i] + gap }
         } else {
-            flexWidth = 0
-            let rowWidth = fixed * unit + gaps
-            if leftDocked {
-                // Flush left; leaves the right-hand area empty for scanners.
-                leading = metrics.sideInset + row.leadingInsetUnits * unit
-            } else {
-                leading = metrics.sideInset + max(0, (usableWidth - rowWidth) / 2) + row.leadingInsetUnits * unit
+            let pinFirst = count > 1 && row.keys[0].style != .letter
+            let pinLast = count > 1 && row.keys[count - 1].style != .letter
+            let lo = pinFirst ? 1 : 0
+            let hi = pinLast ? count - 1 : count
+            if pinFirst { xs[0] = contentLeading }
+            if pinLast { xs[count - 1] = contentLeading + usableWidth - widths[count - 1] }
+            let spanStart = pinFirst ? contentLeading + widths[0] + gap : contentLeading
+            let spanEnd = pinLast ? contentLeading + usableWidth - widths[count - 1] - gap : contentLeading + usableWidth
+            if hi > lo {
+                let middle = widths[lo..<hi].reduce(0, +) + CGFloat(hi - lo - 1) * gap
+                var cursor = spanStart + max(0, (spanEnd - spanStart - middle) / 2) + row.leadingInsetUnits * unit
+                for i in lo..<hi { xs[i] = cursor; cursor += widths[i] + gap }
             }
         }
-
-        var cursor = leading
-        var frames: [CGRect] = []
-        for spec in row.keys {
-            let keyWidth: CGFloat
-            if spec.width == .flexible {
-                keyWidth = flexWidth
-            } else {
-                keyWidth = unit * weight(of: spec.width)
-            }
-            frames.append(CGRect(x: cursor, y: y, width: keyWidth, height: metrics.keyHeight))
-            cursor += keyWidth + gap
-        }
-        return frames
+        return (0..<count).map { CGRect(x: xs[$0], y: y, width: widths[$0], height: metrics.keyHeight) }
     }
 
     /// Lays out an entire board, returning one frame array per row. Mirrors the
     /// order `KeyboardView.layoutKeys` places its buttons in.
+    ///
+    /// `reservedLeading` is the iPad prediction column plus the gap before the
+    /// first key. `reservedTop` is the prediction bar: keys start below it.
+    /// Compact boards pass a top reserve and no leading reserve; iPad boards
+    /// do the opposite, unless "Prefer top" moves a landscape iPad's
+    /// predictions into a bar.
     public static func frames(
         for layout: KeyboardLayout,
         metrics: LayoutMetrics,
         boundsWidth: CGFloat,
-        showsPredictions: Bool
+        reservedLeading: CGFloat = 0,
+        reservedTop: CGFloat = 0
     ) -> [[CGRect]] {
-        let usableWidth = boundsWidth - metrics.sideInset * 2
+        let contentLeading = metrics.sideInset + max(0, reservedLeading)
+        let usableWidth = boundsWidth - contentLeading - metrics.sideInset
         let unit = unitWidth(in: layout, usableWidth: usableWidth, metrics: metrics)
-        var y = metrics.topInset + (showsPredictions ? metrics.predictionBarHeight : 0)
+        var y = metrics.topInset + max(0, reservedTop)
         var rows: [[CGRect]] = []
         for row in layout.rows {
             rows.append(
@@ -121,7 +143,9 @@ public enum KeyboardGeometry {
                     usableWidth: usableWidth,
                     unit: unit,
                     metrics: metrics,
-                    leftDocked: layout.leftDocked
+                    contentLeading: contentLeading,
+                    leftDocked: layout.leftDocked,
+                    grid: layout.gridColumns != nil
                 )
             )
             y += metrics.keyHeight + metrics.rowSpacing
