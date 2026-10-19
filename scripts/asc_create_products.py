@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -131,10 +132,21 @@ def ref(kind: str, ident: str) -> dict:
 class Creator:
     """Thin wrapper so tests can inject a fake request function."""
 
-    def __init__(self, request, collect, token: str):
+    def __init__(self, request, collect, token: str, token_factory=None):
         self.request = request
         self.collect = collect
-        self.token = token
+        self._token = token
+        self._token_factory = token_factory
+        self._token_at = __import__("time").time()
+
+    @property
+    def token(self) -> str:
+        # App Store Connect tokens last 20 minutes; refresh well before that.
+        now = __import__("time").time()
+        if self._token_factory and now - self._token_at > 10 * 60:
+            self._token = self._token_factory()
+            self._token_at = now
+        return self._token
 
     def post(self, path: str, body: dict) -> dict:
         return self.request(self.token, path, method="POST", body=body)["data"]
@@ -167,6 +179,20 @@ class Creator:
             }})
         return group["id"]
 
+    def related_territories(self, path: str) -> set[str]:
+        items, _ = self.collect(self.token, path, {"limit": "200", "include": "territory"})
+        found = set()
+        for item in items:
+            tid = ((item.get("relationships") or {}).get("territory") or {}).get("data", {}) or {}
+            if tid.get("id"):
+                found.add(tid["id"])
+        return found
+
+    def post_many(self, path: str, bodies: list[dict]) -> None:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            for _ in pool.map(lambda body: self.post(path, body), bodies):
+                pass
+
     def create_subscription(self, group_id: str, item: Product, territories: list[str]) -> str:
         sub = self.post("/v1/subscriptions", {"data": {
             "type": "subscriptions",
@@ -177,21 +203,40 @@ class Creator:
             },
             "relationships": {"group": ref("subscriptionGroups", group_id)},
         }})
-        sid = sub["id"]
+        self.complete_subscription(sub["id"], item, territories, fresh=True)
+        return sub["id"]
+
+    def complete_subscription(self, sid: str, item: Product, territories: list[str], fresh: bool = False) -> None:
+        """Adds whatever is missing: localizations, availability, prices, trial. Safe to re-run."""
+        have_locales: set[str] = set()
+        if not fresh:
+            locs, _ = self.collect(self.token, f"/v1/subscriptions/{sid}/subscriptionLocalizations", {"limit": "200"})
+            have_locales = {l["attributes"]["locale"] for l in locs}
         for locale, (name, description) in item.localizations.items():
+            if locale in have_locales:
+                continue
             self.post("/v1/subscriptionLocalizations", {"data": {
                 "type": "subscriptionLocalizations",
                 "attributes": {"name": name, "locale": locale, "description": description},
                 "relationships": {"subscription": ref("subscriptions", sid)},
             }})
-        self.post("/v1/subscriptionAvailabilities", {"data": {
-            "type": "subscriptionAvailabilities",
-            "attributes": {"availableInNewTerritories": True},
-            "relationships": {
-                "subscription": ref("subscriptions", sid),
-                "availableTerritories": {"data": [{"type": "territories", "id": t} for t in territories]},
-            },
-        }})
+        has_availability = False
+        if not fresh:
+            try:
+                existing = self.request(self.token, f"/v1/subscriptions/{sid}/subscriptionAvailability")
+                has_availability = bool(existing.get("data"))
+            except Exception:
+                has_availability = False
+        if not has_availability:
+            self.post("/v1/subscriptionAvailabilities", {"data": {
+                "type": "subscriptionAvailabilities",
+                "attributes": {"availableInNewTerritories": True},
+                "relationships": {
+                    "subscription": ref("subscriptions", sid),
+                    "availableTerritories": {"data": [{"type": "territories", "id": t} for t in territories]},
+                },
+            }})
+        priced = set() if fresh else self.related_territories(f"/v1/subscriptions/{sid}/prices")
         points, _ = self.collect(self.token, f"/v1/subscriptions/{sid}/pricePoints",
                                  {"filter[territory]": BASE_TERRITORY, "limit": "8000"})
         base_point = pick_price_point(points, item.price_gbp)
@@ -199,29 +244,30 @@ class Creator:
         equal, _ = self.collect(self.token, f"/v1/subscriptionPricePoints/{base_point}/equalizations",
                                 {"limit": "8000", "include": "territory"})
         prices += [((e.get("relationships") or {}).get("territory", {}).get("data", {}).get("id"), e["id"]) for e in equal]
+        bodies = []
         for territory, point in prices:
-            if territory and territory not in territories:
+            if not territory or territory not in territories or territory in priced:
                 continue
-            self.post("/v1/subscriptionPrices", {"data": {
+            bodies.append({"data": {
                 "type": "subscriptionPrices",
                 "attributes": {"preserveCurrentPrice": False},
                 "relationships": {
                     "subscription": ref("subscriptions", sid),
                     "subscriptionPricePoint": ref("subscriptionPricePoints", point),
-                    **({"territory": ref("territories", territory)} if territory else {}),
+                    "territory": ref("territories", territory),
                 },
             }})
+        self.post_many("/v1/subscriptionPrices", bodies)
         if item.trial:
-            for territory in territories:
-                self.post("/v1/subscriptionIntroductoryOffers", {"data": {
-                    "type": "subscriptionIntroductoryOffers",
-                    "attributes": {"duration": item.trial, "offerMode": "FREE_TRIAL", "numberOfPeriods": 1},
-                    "relationships": {
-                        "subscription": ref("subscriptions", sid),
-                        "territory": ref("territories", territory),
-                    },
-                }})
-        return sid
+            offered = set() if fresh else self.related_territories(f"/v1/subscriptions/{sid}/introductoryOffers")
+            self.post_many("/v1/subscriptionIntroductoryOffers", [{"data": {
+                "type": "subscriptionIntroductoryOffers",
+                "attributes": {"duration": item.trial, "offerMode": "FREE_TRIAL", "numberOfPeriods": 1},
+                "relationships": {
+                    "subscription": ref("subscriptions", sid),
+                    "territory": ref("territories", territory),
+                },
+            }} for territory in territories if territory not in offered])
 
     def create_non_consumable(self, app_id: str, item: Product, territories: list[str]) -> str:
         iap = self.post("/v2/inAppPurchases", {"data": {
@@ -324,19 +370,27 @@ def main(argv: list[str] | None = None) -> int:
     import app_store_connect as asc  # credentials and HTTP helpers
 
     token = asc.fresh_token()
-    creator = Creator(asc.asc_request, asc.collect_resources, token)
+    creator = Creator(asc.asc_request, asc.collect_resources, token, asc.fresh_token)
     app_id = asc.app_id(token, BUNDLE_ID)
-    existing = creator.existing_product_ids(app_id)
-    clash = [item.product_id for item in items if item.product_id in existing]
-    if clash:
-        print(f"Already in App Store Connect, not touching anything: {', '.join(clash)}")
-        return 1
     territories = creator.territories()
-    group_id = creator.create_group(app_id)
+    groups, _ = creator.collect(token, f"/v1/apps/{app_id}/subscriptionGroups", {"limit": "200"})
+    group = next((g for g in groups if g["attributes"].get("referenceName") == GROUP_REFERENCE_NAME), None)
+    group_id = group["id"] if group else creator.create_group(app_id)
+    subs, _ = creator.collect(token, f"/v1/subscriptionGroups/{group_id}/subscriptions", {"limit": "200"})
+    existing_subs = {s["attributes"]["productId"]: s["id"] for s in subs}
+    iaps, _ = creator.collect(token, f"/v1/apps/{app_id}/inAppPurchasesV2", {"limit": "200"})
+    existing_iaps = {i["attributes"]["productId"]: i["id"] for i in iaps}
     for item in items:
         if item.kind == "subscription":
+            if item.product_id in existing_subs:
+                creator.complete_subscription(existing_subs[item.product_id], item, territories)
+                print(f"Completed existing {item.product_id}")
+                continue
             creator.create_subscription(group_id, item, territories)
         else:
+            if item.product_id in existing_iaps:
+                print(f"Already exists, left alone: {item.product_id}")
+                continue
             creator.create_non_consumable(app_id, item, territories)
         print(f"Created {item.product_id}")
     print("Done. Add a review screenshot to each product in App Store Connect before submitting.")

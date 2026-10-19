@@ -77,5 +77,31 @@ class ProductPlanTests(unittest.TestCase):
         self.assertEqual(offers[0]["data"]["attributes"]["offerMode"], "FREE_TRIAL")
 
 
+    def test_resume_only_adds_missing_prices_and_trials(self):
+        posts = []
+
+        def request(token, path, params=None, method="GET", body=None):
+            if method == "GET":
+                return {"data": {"id": "avail"}}
+            posts.append((path, body))
+            return {"data": {"id": f"id{len(posts)}"}}
+
+        def collect(token, path, params=None):
+            if path.endswith("/subscriptionLocalizations"):
+                return [{"attributes": {"locale": "en-GB"}}, {"attributes": {"locale": "en-US"}}], []
+            if path.endswith("/prices") or path.endswith("/introductoryOffers"):
+                return [{"id": "p", "relationships": {"territory": {"data": {"id": "GBR"}}}}], []
+            if path.endswith("/equalizations"):
+                return [{"id": "usa399", "relationships": {"territory": {"data": {"id": "USA"}}}}], []
+            return [{"id": "gbr399", "attributes": {"customerPrice": "3.99"}}], []
+
+        creator = acp.Creator(request, collect, "t")
+        monthly = [i for i in acp.products() if i.product_id.endswith("monthly")][0]
+        creator.complete_subscription("s", monthly, ["GBR", "USA"])
+        self.assertEqual([p for p, _ in posts], ["/v1/subscriptionPrices", "/v1/subscriptionIntroductoryOffers"])
+        self.assertEqual(posts[0][1]["data"]["relationships"]["territory"]["data"]["id"], "USA")
+        self.assertEqual(posts[1][1]["data"]["relationships"]["territory"]["data"]["id"], "USA")
+
+
 if __name__ == "__main__":
     unittest.main()
