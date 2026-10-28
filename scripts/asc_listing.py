@@ -35,7 +35,7 @@ COPYRIGHT = "2026 access: technology"
 SUPPORT_URL = "https://accesstechnology.co.uk/contact"
 MARKETING_URL = "https://accesstechnology.co.uk/"
 PRIVACY_URL = "https://access-keyboard.vercel.app/privacy.html"
-SUBTITLE = "Large keys, iPhone and iPad"
+SUBTITLE = "Large keys for easier typing"
 PRIMARY_CATEGORY = "UTILITIES"
 SECONDARY_CATEGORY = "PRODUCTIVITY"
 # Excluded from availability: China mainland (generative AI services need a
