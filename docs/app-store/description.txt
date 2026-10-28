@@ -1,7 +1,7 @@
-access: keyboard is a free assistive keyboard for iPhone and iPad, made by access: technology. It starts from the layout you already know and keeps the keys large and clear.
+access: keyboard is a free assistive keyboard, made by access: technology. It starts from the layout you already know and keeps the keys large and clear.
 
 LAYOUTS AND COLOURS
-QWERTY is the starting layout. ABC order and a frequency layout are optional. Coloured vowels, Beth colours and high-contrast themes are optional. The keys use a clear literacy font. iPhone gets a compact board. iPad and iPad Pro get larger boards.
+QWERTY is the starting layout. ABC order and a frequency layout are optional. Coloured vowels, Beth colours and high-contrast themes are optional. The keys use a clear literacy font. Phones get a compact board. Tablets get larger boards.
 
 FAMILIAR TYPING
 Move the cursor with two fingers anywhere on the keyboard. Hold delete to remove letters, then words. Tap space twice for a full stop. Hold a letter for accents. VoiceOver reads each key.
