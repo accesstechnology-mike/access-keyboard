@@ -15,7 +15,7 @@ public struct Prediction: Equatable {
 
 enum PredictionLexicon {
     static func contains(_ word: String) -> Bool {
-        wordRanks[word.lowercased()] != nil
+        PredictionProvider.wordRanks[word.lowercased()] != nil
     }
 
     /// en-GB when the device has it, then the person's preferred language.
