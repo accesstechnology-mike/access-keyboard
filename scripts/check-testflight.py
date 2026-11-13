@@ -22,7 +22,7 @@ TEAM = "A688GUK8XK"
 BUNDLE_ID = "app.access.keyboard.6M3Z27M69P"
 EXTENSION_BUNDLE_ID = "app.access.keyboard.6M3Z27M69P.extension"
 APP_GROUP = "group.6M3Z27M69P.app.access.keyboard"
-MARKETING_VERSION = "1.0"
+MARKETING_VERSION = "1.0.1"
 
 
 def error(message: str) -> None:
@@ -260,6 +260,26 @@ def check_privacy_page() -> None:
         error("privacy page does not say purchases are handled by Apple")
 
 
+def live_proxy_problem(status: int, body) -> str | None:
+    """None when the live proxy is healthy.
+
+    A 200 means a legacy shared-secret Fix still works. A 401
+    signed_data_required means the secret was accepted and production has
+    turned legacy access off, which is the intended state after 6 Nov 2026.
+    """
+    error_code = body.get("error") if isinstance(body, dict) else None
+    if status == 401 and error_code == "signed_data_required":
+        return None
+    if status == 200:
+        corrected = body.get("text") if isinstance(body, dict) else None
+        if not isinstance(corrected, str) or not corrected.strip():
+            return f"live Fix proxy returned {status} {body!r}"
+        if "cat" not in corrected.lower():
+            return f"live Fix proxy changed the meaning: {corrected!r}"
+        return None
+    return f"live Fix proxy returned HTTP {status} {error_code or body!r}"
+
+
 def check_live_proxy() -> None:
     secret = load_fix_proxy_secret()
     if not secret:
@@ -276,22 +296,27 @@ def check_live_proxy() -> None:
     )
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
-            body = json.loads(response.read().decode())
+            raw = response.read().decode()
             status = response.status
     except urllib.error.HTTPError as exc:
-        error(f"live Fix proxy returned HTTP {exc.code}")
-        return
+        raw = exc.read().decode(errors="replace")
+        status = exc.code
     except urllib.error.URLError as exc:
         error(f"live Fix proxy is unreachable: {exc.reason}")
         return
 
-    corrected = body.get("text") if isinstance(body, dict) else None
-    if status != 200 or not corrected:
-        error(f"live Fix proxy returned {status} {body!r}")
+    try:
+        body = json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        body = raw
+    problem = live_proxy_problem(status, body)
+    if problem:
+        error(problem)
         return
-    if "cat" not in corrected.lower():
-        error(f"live Fix proxy changed the meaning: {corrected!r}")
+    if status == 401:
+        note("live Fix proxy accepted the secret and requires signed StoreKit data")
         return
+    corrected = body.get("text") if isinstance(body, dict) else ""
     note(f"live Fix proxy corrected sample text to {corrected!r}")
 
 
