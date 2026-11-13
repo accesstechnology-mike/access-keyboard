@@ -29,7 +29,7 @@ struct AboutView: View {
                 Group {
                     labeled("Who it’s for", "People with motor, cognitive, vision or other access needs who want a keyboard they can extend, without learning a new key map first.")
                     labeled("Privacy", privacyText)
-                    labeled("VoiceOver", "Every key is a keyboard accessibility element with a spoken label (Shift, Delete, Next Keyboard, and so on).")
+                    labeled("VoiceOver", "Every key is a keyboard accessibility element with a spoken label (Shift, Delete, Next Keyboard, and so on). VoiceOver and Switch Control activate the key. Accents on a letter are extra actions.")
                     labeled("What matches iOS/iPadOS", "Size-class layouts (compact iPhone, 11-inch iPad, 12.9/13-inch Pro), number row on large boards, tab, caps lock, shift-for-symbols, long-press accents, double-space full stop, hold-delete that moves from letters to words, two-finger cursor movement anywhere on the keyboard, and the globe key Apple requires.")
                 }
             }

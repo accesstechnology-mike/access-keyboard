@@ -13,6 +13,8 @@ public enum FixNotice: Equatable {
     case offline
     case secureField
     case unavailable
+    /// The correction service or its counter is down. Typing is unchanged.
+    case serviceDown
     case subscribe
     case consent
     /// The server says this Apple Account has used its free Fixes this month.
@@ -34,6 +36,8 @@ public enum FixNotice: Equatable {
             return "Passwords are not sent."
         case .unavailable:
             return "Fix isn’t set up in this build. Typing still works."
+        case .serviceDown:
+            return "Fix is unavailable right now. Try again later. Typing still works."
         case .subscribe:
             return "Get Pro in the access: keyboard app to use Fix. Typing still works."
         case .freeLimit:
@@ -50,7 +54,7 @@ public enum FixNotice: Equatable {
     /// Hints that should disappear on the next keystroke. Consent stays until Allow or Not now.
     public var isTransient: Bool {
         switch self {
-        case .fullAccess, .offline, .secureField, .unavailable, .subscribe, .freeLimit, .dailyLimit, .busy:
+        case .fullAccess, .offline, .secureField, .unavailable, .serviceDown, .subscribe, .freeLimit, .dailyLimit, .busy:
             return true
         case .none, .consent:
             return false
@@ -69,18 +73,25 @@ public enum FixError: Error, Equatable {
     case dailyLimitReached
     /// HTTP 429 with `{"error":"rate_limited"}`.
     case rateLimited
+    /// The proxy reached OpenAI or the usage counter and got a failure (502/503/504).
+    case serviceUnavailable
 
     /// Maps a proxy response that was not a success to an error.
     public static func fromProxy(status: Int, body: Data?) -> FixError {
-        guard status == 429 else { return .requestFailed }
         let code = body
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             .flatMap { $0["error"] as? String }
-        switch code {
-        case "free_limit": return .freeLimitReached
-        case "daily_limit": return .dailyLimitReached
-        default: return .rateLimited
+        if status == 429 {
+            switch code {
+            case "free_limit": return .freeLimitReached
+            case "daily_limit": return .dailyLimitReached
+            default: return .rateLimited
+            }
         }
+        if status == 502 || status == 503 || status == 504 {
+            return .serviceUnavailable
+        }
+        return .requestFailed
     }
 }
 

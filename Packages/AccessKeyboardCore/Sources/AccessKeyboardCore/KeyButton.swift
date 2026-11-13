@@ -13,6 +13,8 @@ final class KeyButton: UIControl {
     var onRepeat: ((KeySpec, KeyRepeatPhase) -> Void)?
     var onDrag: ((KeySpec, CGPoint) -> Void)?
     var onFinishLongPress: ((KeySpec) -> Void)?
+    /// VoiceOver accent actions insert here. Nil for keys with no accents.
+    var onAccessibilityInsert: ((String) -> Void)?
 
     private let label = UILabel()
     private let secondaryLabel = UILabel()
@@ -225,6 +227,19 @@ final class KeyButton: UIControl {
         isHighlighted = false
     }
 
+    /// `UIControl` does not activate on VoiceOver or Switch Control by itself.
+    /// Letters commit on release, matching a tap. Delete commits once, matching
+    /// a press, and does not start auto-repeat.
+    override func accessibilityActivate() -> Bool {
+        if spec.action == .backspace {
+            onPress?(spec)
+        } else {
+            onPress?(spec)
+            onRelease?(spec)
+        }
+        return true
+    }
+
     private func scheduleLongPress() {
         longPressTimer = Timer.scheduledTimer(withTimeInterval: spec.action == .capsLock ? 0.35 : 0.45, repeats: false) { [weak self] _ in
             Task { @MainActor in
@@ -344,6 +359,27 @@ final class KeyButton: UIControl {
         isAccessibilityElement = true
         accessibilityTraits = .keyboardKey
         accessibilityLabel = accessibilityTitle
+        accessibilityCustomActions = accentActions
+    }
+
+    private var accentActions: [UIAccessibilityCustomAction]? {
+        guard case .character = spec.action else { return nil }
+        let base: String
+        if case .text(let value) = display {
+            base = value
+        } else if case .character(let text) = spec.action {
+            base = text
+        } else {
+            return nil
+        }
+        let accents = AccentMap.displaying(AccentMap.accents(for: base), uppercase: shift.isUppercase)
+        guard !accents.isEmpty else { return nil }
+        return accents.map { accent in
+            UIAccessibilityCustomAction(name: accent) { [weak self] _ in
+                self?.onAccessibilityInsert?(accent)
+                return true
+            }
+        }
     }
 
     private var accessibilityTitle: String {

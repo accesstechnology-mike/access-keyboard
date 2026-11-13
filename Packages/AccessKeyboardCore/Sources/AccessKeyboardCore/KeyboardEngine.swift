@@ -238,7 +238,10 @@ public final class KeyboardEngine {
                 self.presentFixNotice(.dailyLimit)
             } catch FixError.rateLimited {
                 self.presentFixNotice(.busy)
+            } catch FixError.serviceUnavailable {
+                self.presentFixNotice(.serviceDown)
             } catch {
+                // Includes a missing network (URLError). The field is left as typed.
                 self.failFix()
             }
         }

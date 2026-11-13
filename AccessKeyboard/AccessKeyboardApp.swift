@@ -8,6 +8,8 @@ struct AccessKeyboardApp: App {
 
     init() {
         KeyboardPreferences.persistMigratedColourOptionIfNeeded()
+        MetricKitDiagnostics.shared.start()
+        DiagnosticsLog.memory("launch", category: "app")
     }
 
     var body: some Scene {
@@ -15,8 +17,10 @@ struct AccessKeyboardApp: App {
             RootView()
                 .environmentObject(subscriptions)
                 .task { subscriptions.start() }
-                .onChange(of: scenePhase) { _, phase in
+                .onChange(of: scenePhase, initial: true) { _, phase in
                     guard phase == .active else { return }
+                    ReviewPrompt.recordLaunch()
+                    DiagnosticsLog.memory("active", category: "app")
                     Task { await subscriptions.refresh() }
                 }
         }

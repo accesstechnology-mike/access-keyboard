@@ -3,11 +3,17 @@ import UIKit
 import AccessKeyboardCore
 
 struct TypingViewControllerRepresentable: UIViewControllerRepresentable {
+    var onReviewMoment: () -> Void
+
     func makeUIViewController(context: Context) -> TypingViewController {
-        TypingViewController()
+        let controller = TypingViewController()
+        controller.onReviewMoment = onReviewMoment
+        return controller
     }
 
-    func updateUIViewController(_ uiViewController: TypingViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: TypingViewController, context: Context) {
+        uiViewController.onReviewMoment = onReviewMoment
+    }
 }
 
 final class TypingTextView: UITextView {
@@ -26,6 +32,8 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
     private let keyboardView = KeyboardView()
     private let document: TextViewDocument
     private var keyboardHeightConstraint: NSLayoutConstraint?
+    private var lastCharacterCount = 0
+    var onReviewMoment: (() -> Void)?
 
     init() {
         let editor = TypingTextView()
@@ -118,6 +126,7 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
     override func viewWillDisappear(_ animated: Bool) {
         textView.locksFirstResponder = false
         super.viewWillDisappear(animated)
+        onReviewMoment?()
     }
 
     override func viewDidLayoutSubviews() {
@@ -127,6 +136,15 @@ final class TypingViewController: UIViewController, KeyboardHost, UITextViewDele
     }
 
     func textViewDidChange(_ textView: UITextView) {
+        let count = textView.text.count
+        let delta = count - lastCharacterCount
+        lastCharacterCount = count
+        if delta > 0 {
+            ReviewPrompt.recordTypedCharacters(delta)
+            if let last = textView.text.last, ".!?".contains(last) {
+                onReviewMoment?()
+            }
+        }
         keyboardView.engine.documentDidChange()
     }
 

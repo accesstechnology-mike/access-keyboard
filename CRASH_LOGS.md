@@ -38,16 +38,39 @@ causes without a real report or a memory trace.
 
 ## Reading this build's logging
 
-`KeyboardViewController` logs through `os.Logger` with
-`subsystem: app.access.keyboard`, `category: extension`:
+Logging goes through `os.Logger` with `subsystem: app.access.keyboard`.
+Nothing is uploaded. MetricKit summaries and these memory lines stay in the
+unified log and in the crash reports Apple already delivers to App Store
+Connect and Xcode Organizer. That does not add a diagnostics privacy-label
+category.
+
+`KeyboardViewController` uses category `extension` (`DiagnosticsLog` /
+`ResidentMemory`):
 
 - `viewDidLoad fullAccess=… mem=…MB` — one line each time the keyboard is
   brought up. A `mem` value that starts higher every time the keyboard reopens
   hints at state leaking across presentations.
-- `memory warning mem=…MB — releasing transient resources` — iOS asked the
-  extension to shed memory. If a crash/disappearance follows shortly after one
-  of these, it is almost certainly a jetsam kill and the fix is to reduce the
-  memory high-water mark, not to chase a logic bug.
+- `viewWillAppear mem=…MB` — one line each time the keyboard is shown again.
+- `memory warning — releasing transient resources mem=…MB` — iOS asked the
+  extension to shed memory. A value at or above 40 MB is logged at error
+  level, because keyboard extensions are jetsam-killed somewhere around
+  40–60 MB. If a crash/disappearance follows shortly after one of these, it
+  is almost certainly a jetsam kill and the fix is to reduce the memory
+  high-water mark, not to chase a logic bug.
+
+The host app (category `app`) logs `launch` and `active` with the same
+footprint. Category `metrickit` is the host app's `MXMetricManager` subscriber:
+
+- `metric … peakMB=…` — the peak memory MetricKit reported for a past period.
+- `diagnostics crashes=… hangs=… cpu=… disk=…` — how many diagnostic records
+  arrived. Each crash line includes the build, exception type, signal, and a
+  short termination reason. Call stacks are not copied into the log; the full
+  stack is in Organizer.
+
+The keyboard extension does not subscribe to MetricKit. Reports are delivered
+to the containing app, and a second subscriber would sit in the extension's
+memory budget. An extension jetsam still shows up as a `mem=` line here and,
+when Apple includes it, as a MetricKit crash the next time the app launches.
 
 Filter in Console.app with:
 

@@ -33,7 +33,7 @@ On **both** App IDs, enable App Groups and tick `group.6M3Z27M69P.app.access.key
 1. Open [App Store Connect](https://appstoreconnect.apple.com) → **My Apps** → **+**.
 2. Platform: **iOS**.
 3. Name: `access: keyboard`.
-4. Primary language: English (UK) if that is the team default, otherwise English (US). The keyboard’s primary language is `en-US`.
+4. Primary language: English (UK). The keyboard’s `PrimaryLanguage` is `en-GB`.
 5. Bundle ID: `app.access.keyboard.6M3Z27M69P`.
 6. SKU: use the bundle ID (`app.access.keyboard.6M3Z27M69P`) unless you already have a SKU scheme.
 7. User Access: Full Access.
@@ -198,7 +198,7 @@ git push origin sync-testflight-<short-reason>
 ## After the first build
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
-- `MARKETING_VERSION` is `1.0`, matching the App Store Connect version record. Change it only for a user-visible version change, and change the App Store version to match.
+- App Store version 1.0 build 22 went live on 6 Nov 2026. This tree is 1.0.1 build 23 (`MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` on the app and the extension). Change the marketing version only for a user-visible version change, and change the App Store version to match before any upload. Do not upload from this note; an upload is a separate decision.
 - Testers only ever get the latest build. Uploads and **Run workflow** expire every older one.
 - A tester who still sees an old build and “No TestFlight builds are available” is `REVOKED` or `NOT_INVITED`. Delete them and send a new EMAIL invite. Do not expire older builds until every emailed tester is `INVITED`, `ACCEPTED`, or `INSTALLED`.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.

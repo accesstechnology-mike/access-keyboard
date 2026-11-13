@@ -312,6 +312,25 @@ final class FixEngineTests: XCTestCase {
         XCTAssertEqual(engine.fixNotice, .none, "The hint goes on the next keystroke")
     }
 
+    func testServiceOutageShowsAHintAndKeepsTheText() async {
+        let (engine, document) = makeEngine(text: "teh")
+        engine.entitleForTests()
+        engine.fixConsentRequired = false
+        engine.fixClient = MockFixClient { _ in throw FixError.serviceUnavailable }
+
+        engine.requestFix()
+        await waitUntilIdle(engine)
+
+        XCTAssertEqual(engine.fixNotice, .serviceDown)
+        XCTAssertEqual(engine.fixStatus, .idle)
+        XCTAssertEqual(document.text, "teh")
+        XCTAssertTrue(engine.fixNotice.message.contains("unavailable"))
+        XCTAssertTrue(engine.fixNotice.message.contains("Typing still works"))
+        engine.handle(.character("!"))
+        XCTAssertEqual(document.text, "teh!")
+        XCTAssertEqual(engine.fixNotice, .none)
+    }
+
     func testDailyLimitAndRateLimitShowTheirOwnHints() async {
         for (error, notice) in [(FixError.dailyLimitReached, FixNotice.dailyLimit), (.rateLimited, .busy)] {
             let (engine, _) = makeEngine(text: "teh")
@@ -347,7 +366,10 @@ final class FixEngineTests: XCTestCase {
         XCTAssertEqual(FixError.fromProxy(status: 429, body: body("daily_limit")), .dailyLimitReached)
         XCTAssertEqual(FixError.fromProxy(status: 429, body: body("rate_limited")), .rateLimited)
         XCTAssertEqual(FixError.fromProxy(status: 429, body: nil), .rateLimited)
-        XCTAssertEqual(FixError.fromProxy(status: 502, body: body("upstream_failed")), .requestFailed)
+        XCTAssertEqual(FixError.fromProxy(status: 502, body: body("upstream_failed")), .serviceUnavailable)
+        XCTAssertEqual(FixError.fromProxy(status: 503, body: body("usage_unavailable")), .serviceUnavailable)
+        XCTAssertEqual(FixError.fromProxy(status: 504, body: body("timeout")), .serviceUnavailable)
+        XCTAssertEqual(FixError.fromProxy(status: 504, body: body("network")), .serviceUnavailable)
         XCTAssertEqual(FixError.fromProxy(status: 401, body: nil), .requestFailed)
     }
 

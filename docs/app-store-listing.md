@@ -1,6 +1,6 @@
 # App Store listing draft: access: keyboard
 
-Draft for the first public App Store release. This is not a private or unlisted release. The binary is the universal iPhone and iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS and iPadOS 18). Do not treat this file as already entered in App Store Connect.
+Version 1.0 build 22 went live on the App Store on 6 Nov 2026. The binary is the universal iPhone and iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS and iPadOS 18). The next binary in this repo is 1.0.1 build 23. Do not treat an edit here as a change already made in App Store Connect.
 
 Fix ships in v1. `FeatureFlags.fixConsentRequired` is **on**, so the first Fix asks Allow / Not now before any text is sent.
 
@@ -19,71 +19,52 @@ Source for the review notes and privacy answers: `TESTFLIGHT.md`.
 
 The app never hard-codes prices or trial wording. The paywall uses StoreKit `displayPrice` and the introductory offer StoreKit returns. The limits live in `SubscriptionConfig` (app copy) and in the Fix service env vars (enforcement; see `proxy/README.md`).
 
-## TODO: Mike in App Store Connect
+## Shipped with 1.0
 
-- **Paid Apps agreement, banking and tax.** In-app purchases cannot be submitted until the Paid Apps agreement is active and banking and tax are complete.
-- **Products.** `scripts/asc_create_products.py` creates them. It is a dry run unless run with `--apply`; nothing has been created yet. It makes:
-  - Subscription group `access: keyboard Pro`.
-  - `app.access.keyboard.6M3Z27M69P.pro.yearly` (£29.99, level 1) and `app.access.keyboard.6M3Z27M69P.pro.monthly` (£3.99, level 2), each with a 14-day free trial.
-  - Non-consumable `app.access.keyboard.6M3Z27M69P.pro.lifetime` (£79.99).
-  - UK base prices, equalised elsewhere, available in all territories, en-GB and en-US names.
-- **Review screenshots.** Each product needs a screenshot of the paywall before it can be submitted. The script does not upload one.
-- **Free access for chosen people.** Use offer codes in App Store Connect once the app is Ready for Distribution and the products are approved. The app has a Redeem Code button on the Pro screen and in Settings.
-- **Fix service.** Add an Upstash Redis (or Vercel KV) database to the Vercel project before release, so the 30 a month and 100 a day limits are enforced. Without it, Fix works but is not counted.
-- **Privacy page deploy.** The source is `proxy/public/privacy.html`. App Store Connect should use `https://access-keyboard.vercel.app/privacy.html`. The live page updates when the Vercel project deploys from `main`. Confirm the deployed page matches this repo before review.
-- **Support URL.** Proposed below from the company site. Confirm or replace it before submission.
+Left here so the next version does not rediscover them. Nothing in this list is an instruction to change App Store Connect from this branch.
+
+- **Products.** Live: subscription group `access: keyboard Pro`, `app.access.keyboard.6M3Z27M69P.pro.yearly` (£29.99), `app.access.keyboard.6M3Z27M69P.pro.monthly` (£3.99), each with a 14-day free trial, and non-consumable `app.access.keyboard.6M3Z27M69P.pro.lifetime` (£79.99). `scripts/asc_create_products.py` is a dry run unless `--apply`.
+- **Review screenshots.** The in-app purchase screenshots used for 1.0 are on `cursor/app-store-listing-d49e` (`docs/app-store/review/`). The **Review screenshots** workflow is not on `main`. All eight runs on 19 Oct 2026 failed or were cancelled. The last failure (`39274007820`, commit `edc4e93`) was `simctl bootstatus` timing out for iPhone 17 Pro Max and iPad Pro 13-inch (M5) on OS 26.5. Do not re-enable that workflow until a Mac run can boot those simulators.
+- **Listing copy that shipped** is in `docs/app-store/`. Subtitle `Large keys for easier typing` (App Review 5.2.5, 28 Oct: no Apple product names in the subtitle, description, or promotional text). Those files were on `cursor/app-store-listing-d49e` and were not on `main`.
+- **Free access for chosen people.** Offer codes, once the products are approved. The app has a Redeem Code button on the Pro screen and in Settings.
+- **Fix service.** The proxy enforces 30 a month and 100 a day when Upstash is configured (`proxy/README.md`). If the counter is down, an identified Fix is refused with `usage_unavailable` instead of being given away uncounted.
+- **Privacy page.** Source `proxy/public/privacy.html`. Live URL `https://access-keyboard.vercel.app/privacy.html`, updated when `main` deploys.
 
 ## Identity
 
 | Field | Value |
 | --- | --- |
 | Name | `access: keyboard` |
-| Subtitle | `Large keys, iPhone and iPad` |
+| Subtitle | `Large keys for easier typing` |
 | Bundle ID | `app.access.keyboard.6M3Z27M69P` |
 | SKU | `app.access.keyboard.6M3Z27M69P` |
 | Primary category | Utilities |
 | Secondary category | Productivity (optional) |
-| Primary language | English (UK), unless the App Store Connect record is already English (US). The keyboard’s `PrimaryLanguage` is `en-US`. |
+| Primary language | English (UK). The keyboard’s `PrimaryLanguage` is `en-GB`. |
 | Copyright | Access Technology North Limited |
-| Version | `1.0` (marketing version in the Xcode project; matches the App Store Connect version record) |
+| Version | `1.0` is the live App Store version (build 22, 6 Nov 2026). This repo is `1.0.1` build 23, not yet submitted. |
 | Price | Free. In-app purchases: Pro Monthly £3.99, Pro Yearly £29.99 (both with a 14-day free trial), Pro Lifetime £79.99. |
 
-Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). Promotional text is under 170 characters. Keywords are 79 characters (limit 100).
+Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). The promotional text and keywords below are the ones that shipped; the files in `docs/app-store/` are the same text.
 
 ## Promotional text
 
 170 characters maximum.
 
 ```
-A free assistive keyboard for iPhone and iPad, with large keys and a literacy font. Fix corrects your typing: 30 free a month, or more with Pro.
+A free assistive keyboard with large keys and a literacy font. Fix corrects your typing: 30 free Fixes a month, or up to 100 a day with Pro.
 ```
 
 ## Description
 
-```
-access: keyboard is a free assistive keyboard for iPhone and iPad. It starts from the layout you already know and keeps the keys large.
-
-It works on iOS and iPadOS 18. iPhone gets a compact board. iPad and iPad Pro get larger boards. QWERTY is the starting layout. ABC order and a frequency grid are optional. Coloured vowels, Beth colours and high-contrast themes are optional. The keys use a literacy font.
-
-Move the cursor with two fingers anywhere on the keyboard, as on the system keyboard. Hold delete to remove letters, then words. Tap space twice for a full stop. Hold a letter for accents. VoiceOver reads each key.
-
-Predictions learn the words you use. That learning stays on your device.
-
-The keyboard and predictions are free, for good.
-
-Fix corrects spelling and grammar in the paragraph you are typing in. It is free for 30 Fixes a month. Pro gives you up to 100 Fixes a day. Pro is monthly or yearly, each with a 14-day free trial, or a single Lifetime payment.
-
-How Fix works: when you tap Fix, that paragraph is sent to an AI service (OpenAI) through our server to be corrected. Each Fix costs us money, which is why it has limits and Pro is paid. Nothing is sent until you tap Fix, and the first time you are asked to allow it. Our server does not keep your text. Keystrokes are not sent. Password fields are skipped.
-
-To use it in other apps: Settings > General > Keyboard > Keyboards > Add New Keyboard > access: keyboard.
-```
+The description that shipped is `docs/app-store/description.txt`. It does not name iPhone, iPad, or iOS, which is what App Review 5.2.5 required on 28 Oct 2026. It still says the keyboard and predictions are free, Fix is 30 a month, and Pro is £3.99 a month, £29.99 a year, or Lifetime £79.99.
 
 ## Keywords
 
 100 characters maximum, comma-separated. The app name already contains “access” and “keyboard”, so those words are left out.
 
 ```
-assistive,accessibility,AAC,eye gaze,literacy,large keys,switch,contrast,typing
+assistive,accessibility,literacy,dyslexia,large keys,high contrast,spelling,grammar,motor,typing
 ```
 
 ## URLs
@@ -127,14 +108,14 @@ Tracking: **No**.
 | Question | Answer |
 | --- | --- |
 | Other User Content | Collected, for App Functionality, not linked, not tracking. The paragraph being corrected, only when the user taps Fix, after Allow. |
-| Purchases (Purchase History) | **Decision for Mike.** Each Fix now sends Apple-signed StoreKit data (app transaction, and the Pro transaction if any) so the Fix service can count use. The service keeps a count keyed by `appTransactionId` or `originalTransactionId` for up to 32 days. That most likely means declaring Purchase History, App Functionality, not tracking. Whether it is "linked" needs Mike's call. The privacy manifests (`PrivacyInfo.xcprivacy`) do not declare it yet. |
+| Purchases (Purchase History) | Collected, for App Functionality, **linked**, not tracking. Each Fix sends Apple-signed StoreKit data so the service can count use. The service keeps a count keyed by `appTransactionId` or `originalTransactionId` for up to 32 days. Both `PrivacyInfo.xcprivacy` files declare `NSPrivacyCollectedDataTypePurchaseHistory` with linked true. Linked is true because the retained count is stored against that stable Apple identifier. The paragraph text stays Other User Content, not linked. If the live nutrition label says Purchase History is not linked, change the label to match, or say so and the manifest bool can be flipped. This repo does not edit App Store Connect. |
 | Third party | Yes. `https://access-keyboard.vercel.app/api/fix` forwards the paragraph to OpenAI with `store` disabled. The service does not keep the text. Ordinary keystrokes stay on the device. Password fields are skipped. |
 | Colour settings and learned predictions | On-device only (App Group `group.6M3Z27M69P.app.access.keyboard` and UserDefaults). Not collected. |
 | Payment | Handled by Apple. Not collected by the app. |
 
 ## App Review notes
 
-Paste this into App Review.
+The notes that shipped with 1.0 are `docs/app-store/review-notes.txt`. The block below matches them in substance. For 1.0.1, add that predictions default to UK spellings (`en-GB`) and that Fix says when the correction service or its counter is unavailable.
 
 ```
 access: keyboard is an assistive keyboard for iPhone and iPad. There is no account or login.

@@ -13,6 +13,38 @@ public struct Prediction: Equatable {
     }
 }
 
+enum PredictionLexicon {
+    static func contains(_ word: String) -> Bool {
+        wordRanks[word.lowercased()] != nil
+    }
+
+    /// en-GB when the device has it, then the person's preferred language.
+    /// The keyboard's primary language is English (UK). A US-language device
+    /// still gets UK spellings from `BritishEnglish` when the checker only
+    /// knows en-US.
+    static func preferredCheckerLanguage(available: [String], devicePreferred: [String]) -> String {
+        func resolve(_ identifier: String) -> String? {
+            let normalized = identifier.replacingOccurrences(of: "-", with: "_")
+            if let match = available.first(where: { $0.replacingOccurrences(of: "-", with: "_") == normalized }) {
+                return match
+            }
+            return nil
+        }
+        for candidate in ["en_GB"] + devicePreferred {
+            if let match = resolve(candidate) {
+                return match
+            }
+        }
+        if let english = available.first(where: {
+            let id = $0.replacingOccurrences(of: "-", with: "_")
+            return id == "en" || id.hasPrefix("en_")
+        }) {
+            return english
+        }
+        return available.first ?? "en_GB"
+    }
+}
+
 enum PredictionProvider {
     /// Number of predicted words the column can show. Kept in one place so the
     /// provider and `PredictionColumnGeometry` agree on how many rows to fill.
@@ -36,7 +68,7 @@ enum PredictionProvider {
         let range = NSRange(location: 0, length: (word as NSString).length)
         let completions = checker.completions(forPartialWordRange: range, in: word, language: language) ?? []
         for (index, completion) in completions.enumerated() {
-            let candidate = matchingCase(completion, prefix: word)
+            let candidate = matchingCase(BritishEnglish.prefer(completion), prefix: word)
             let key = candidate.lowercased()
             guard key.hasPrefix(word.lowercased()), key != word.lowercased() else { continue }
             if scored.contains(where: { $0.word.lowercased() == key }) { continue }
@@ -167,7 +199,7 @@ enum PredictionProvider {
         ]
         var seen = Set([word.lowercased()])
         for guess in guesses where result.count < maxSuggestions {
-            let value = matchingCase(guess, prefix: word)
+            let value = matchingCase(BritishEnglish.prefer(guess), prefix: word)
             let key = value.lowercased()
             guard seen.insert(key).inserted else { continue }
             result.append(Prediction(displayText: value, insertion: value, isVerbatim: false))
@@ -215,22 +247,13 @@ enum PredictionProvider {
     }
 
     private static func lexiconLanguage() -> String {
-        let available = UITextChecker.availableLanguages
-        let availableSet = Set(available)
-        for preferred in Locale.preferredLanguages {
-            let identifier = preferred.replacingOccurrences(of: "-", with: "_")
-            if availableSet.contains(identifier) {
-                return identifier
-            }
-            let prefix = String(identifier.prefix(while: { $0 != "_" && $0 != "-" }))
-            if let match = available.first(where: { $0.hasPrefix(prefix) }) {
-                return match
-            }
-        }
-        return available.first ?? "en"
+        PredictionLexicon.preferredCheckerLanguage(
+            available: UITextChecker.availableLanguages,
+            devicePreferred: Locale.preferredLanguages
+        )
     }
 
-    private static let wordRanks: [String: Int] = {
+    fileprivate static let wordRanks: [String: Int] = {
         guard let url = Bundle.module.url(forResource: "google-10000-english-usa", withExtension: "txt"),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
             return [:]
@@ -238,8 +261,12 @@ enum PredictionProvider {
         var ranks: [String: Int] = [:]
         ranks.reserveCapacity(10_000)
         for (index, line) in text.split(whereSeparator: \.isNewline).enumerated() {
-            let word = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard !word.isEmpty, ranks[word] == nil else { continue }
+            let raw = line.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !raw.isEmpty else { continue }
+            // The file is US English, most frequent first. UK spellings replace
+            // the US form and keep the better (earlier) rank when both exist.
+            let word = BritishEnglish.prefer(raw)
+            guard ranks[word] == nil else { continue }
             ranks[word] = index
         }
         return ranks
