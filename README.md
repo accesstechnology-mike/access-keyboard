@@ -25,7 +25,7 @@ Beth mode stays in the Settings colour list under the name Beth. The colours are
 
 ## Subscription
 
-One subscription covers the whole keyboard, including Fix. It is sold only in the containing app. The keyboard reads a record in the App Group and never shows a purchase screen. Configuration, including the product IDs Mike must create, is `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift`.
+The keyboard and predictions are free. Fix is free for 30 Fixes a month; Pro (monthly, yearly, or Lifetime) raises that to 100 Fixes a day. Pro is sold only in the containing app. The keyboard reads a record in the App Group and never shows a purchase screen. Configuration, including the product IDs, is `Packages/AccessKeyboardCore/Sources/AccessKeyboardCore/SubscriptionConfig.swift`.
 
 | Value | Default |
 | --- | --- |

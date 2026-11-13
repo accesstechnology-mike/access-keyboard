@@ -125,9 +125,13 @@ async function handleAuthorised(request, config, { verifier, store, fetchImpl, n
         }
       }
     } catch (error) {
-      // A store outage must not stop people typing; log and carry on.
+      // The counter is how the free month and the Pro day are enforced. If it
+      // is down, an identified install must not get an uncounted Fix. A legacy
+      // request has no identity to count, so it still proceeds.
       console.error(`fix usage_store=error ${error?.message ?? ""}`);
-      if (config.requireUsageStore) return json({ error: "misconfigured" }, 503);
+      if (identity || config.requireUsageStore) {
+        return json({ error: "usage_unavailable" }, 503);
+      }
       grant = null;
     }
   }

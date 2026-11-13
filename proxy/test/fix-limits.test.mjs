@@ -45,6 +45,7 @@ function harness(overrides = {}) {
     now: () => clock.now,
     fetch: async (url, init) => {
       calls.push(JSON.parse(init.body));
+      if (overrides.fetchThrows) throw overrides.fetchThrows;
       if (overrides.upstreamFails) return Response.json({ error: { type: "server_error" } }, { status: 500 });
       return Response.json({ output_text: "the" });
     },
@@ -178,7 +179,9 @@ test("signed data that does not verify is rejected, not treated as legacy", asyn
 
 test("a failed Fix does not use up the allowance", async () => {
   const failing = harness({ upstreamFails: true, config: { freeFixesPerMonth: 1 } });
-  assert.equal((await handleFixRequest(fixRequest(freeHeaders()), failing.deps)).status, 502);
+  const denied = await handleFixRequest(fixRequest(freeHeaders()), failing.deps);
+  assert.equal(denied.status, 502);
+  assert.equal((await denied.json()).error, "upstream_failed");
   assert.equal((await handleFixRequest(fixRequest(freeHeaders()), failing.deps)).status, 502);
   const store = failing.deps.store;
   const working = harness({ store, config: { freeFixesPerMonth: 1 } });
@@ -209,10 +212,34 @@ test("with no usage store, Fix still works unless the store is required", async 
   assert.equal((await handleFixRequest(fixRequest(freeHeaders()), strict.deps)).status, 503);
 });
 
-test("a usage store outage does not stop Fix", async () => {
+test("an Upstash outage refuses an identified Fix instead of skipping the counter", async () => {
+  const broken = { kind: "broken", increment: async () => { throw new Error("down"); }, decrement: async () => 0 };
+  const { deps, calls } = harness({ store: broken });
+  const response = await handleFixRequest(fixRequest(freeHeaders()), deps);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "usage_unavailable");
+  assert.equal(calls.length, 0, "OpenAI is not called when the Fix cannot be counted");
+});
+
+test("an Upstash outage still serves a legacy request that has no allowance", async () => {
   const broken = { kind: "broken", increment: async () => { throw new Error("down"); }, decrement: async () => 0 };
   const { deps } = harness({ store: broken });
-  assert.equal((await handleFixRequest(fixRequest(freeHeaders()), deps)).status, 200);
+  const response = await handleFixRequest(fixRequest(), deps);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).text, "the");
+});
+
+test("an OpenAI timeout is a 504 and does not use up the allowance", async () => {
+  const { deps, calls } = harness({
+    config: { freeFixesPerMonth: 1 },
+    fetchThrows: Object.assign(new Error("timed out"), { name: "TimeoutError" }),
+  });
+  const timedOut = await handleFixRequest(fixRequest(freeHeaders()), deps);
+  assert.equal(timedOut.status, 504);
+  assert.equal((await timedOut.json()).error, "timeout");
+  assert.equal(calls.length, 1);
+  const again = harness({ store: deps.store, config: { freeFixesPerMonth: 1 } });
+  assert.equal((await handleFixRequest(fixRequest(freeHeaders()), again.deps)).status, 200);
 });
 
 test("Upstash store sends INCR with a first-write expiry", async () => {

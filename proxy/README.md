@@ -37,9 +37,16 @@ Limits reset at 00:00 UTC (the free month on the 1st).
 | 429 | `daily_limit` | 100 Pro Fixes used today (`limit`, `resetsAt`) |
 | 429 | `rate_limited` | Too many requests this minute (`Retry-After`) |
 | 401 | `unauthorized` / `invalid_entitlement` / `signed_data_required` | Secret wrong, signed data forged, or legacy access off |
+| 502 | `upstream_failed` | OpenAI responded with an error. The allowance is refunded. |
+| 503 | `usage_unavailable` | The usage counter (Upstash) is down, so an identified Fix is refused rather than given away uncounted. |
+| 503 | `misconfigured` | The proxy is missing its secret, model, or a required usage store. |
+| 504 | `timeout` / `network` | OpenAI did not answer. The allowance is refunded. |
 
-A Fix that fails upstream is refunded. A usage store outage is logged and Fix
-carries on, unless `FIX_REQUIRE_USAGE_STORE=true`.
+A Fix that fails upstream is refunded. If the usage store throws and the request
+has a verified install or Pro identity, the proxy returns `usage_unavailable`
+and does not call OpenAI. A legacy request (shared secret only, no signed data)
+still proceeds, because there is no allowance to enforce. A missing store is
+still allowed unless `FIX_REQUIRE_USAGE_STORE=true`.
 
 ## Environment
 

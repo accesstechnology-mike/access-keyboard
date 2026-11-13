@@ -178,6 +178,13 @@ private final class PredictionCell: UIControl {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Suggestions are custom controls. VoiceOver and Switch Control activate
+    /// them here; a finger still uses the touch-up target.
+    override func accessibilityActivate() -> Bool {
+        sendActions(for: .touchUpInside)
+        return true
+    }
+
     func apply(
         text: String,
         fontSize: CGFloat,
