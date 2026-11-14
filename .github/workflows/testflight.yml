@@ -1,5 +1,9 @@
 name: TestFlight
 
+# TestFlight only. This workflow does not create an App Store version or
+# submit for App Review. Shipping to the App Store is app-store.yml.
+# See RELEASING.md.
+
 on:
   workflow_dispatch:
   push:

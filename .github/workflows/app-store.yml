@@ -1,0 +1,107 @@
+name: App Store
+
+# Ships access: keyboard to the App Store. TestFlight-only uploads stay on
+# testflight.yml. See RELEASING.md.
+#
+#   release-*                          archive, upload, TestFlight latest-only,
+#                                      then submit the App Store version
+#   Actions -> App Store -> Run workflow
+#                                      submit an already-uploaded build
+#                                      (version, build number, optional dry run)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version to submit, for example 1.0.1"
+        required: true
+        type: string
+      build:
+        description: "Build number already uploaded to App Store Connect, for example 23"
+        required: true
+        type: string
+      dry_run:
+        description: "Read App Store Connect and print the plan. Do not submit."
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "release-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-release
+  cancel-in-progress: false
+
+jobs:
+  submit-existing:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store submit
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write App Store Connect key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+
+      - name: Submit the App Store version
+        shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+          SUBMIT_VERSION: ${{ inputs.version }}
+          SUBMIT_BUILD: ${{ inputs.build }}
+          SUBMIT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+          cmd=(python3 scripts/submit_app_store.py --version "$SUBMIT_VERSION" --build "$SUBMIT_BUILD")
+          if [ "$SUBMIT_DRY_RUN" = "true" ]; then
+            cmd+=(--dry-run)
+          fi
+          "${cmd[@]}"
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'release-')
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check App Store submit
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Write local secrets
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          AK_FIX_PROXY_SECRET: ${{ secrets.AK_FIX_PROXY_SECRET }}
+        run: |
+          umask 077
+          mkdir -p secrets
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > secrets/AuthKey.p8
+          printf 'AK_FIX_PROXY_SECRET = %s\n' "$AK_FIX_PROXY_SECRET" > Secrets.xcconfig
+
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+        run: sh scripts/upload-testflight.sh
+
+      - name: Submit the App Store version
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: secrets/AuthKey.p8
+        run: python3 scripts/submit_app_store.py --from-project

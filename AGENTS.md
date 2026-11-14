@@ -34,6 +34,15 @@ Apple will not replace a binary already on a device (iPhone or iPad). After a ne
 
 GitHub’s TestFlight workflow **#5** is the 21 August upload of `e64d5ef` (typing gestures). Slack/GitHub “TestFlight #5 / e64d5ef / cursor bot” is that old run, not a new one. Check `gh run list --workflow=testflight.yml` for the live run number and SHA.
 
+## App Store
+
+`testflight-*` does **not** submit for App Review. Shipping is a separate pipeline, documented in `RELEASING.md`.
+
+- `release-*` archives a new build and then submits that marketing version to the App Store. Do not push it unless someone asked to archive and submit. It spends a Development certificate, same as `testflight-*`.
+- An already-uploaded build is submitted with **Actions → App Store → Run workflow** (`version` and `build`, `dry_run` off). There is no tag for that. Do not run the workflow unless someone asked to submit.
+- What's New is `release-notes/<version>.txt` (en-GB only). Do not invent the text. Do not change any other App Store listing field from the submit script.
+- 1.0.1 build 23 is already uploaded. The command, after this is on `main`, is `gh workflow run "App Store" --ref main -f version=1.0.1 -f build=23 -f dry_run=false`.
+
 ## External testers
 
 External testers do **not** need an App Store Connect seat, so this is the path for people like `kit@accesstechnology.co.uk` — use it before ever inviting anyone as a MARKETING user. The external group **External Testers** (id `4d494793-b8c2-40c0-b5c1-3c261f654b40`) now exists with public link **https://testflight.apple.com/join/cCNnMmM6** (that URL is the "code" for an iPad). Kit is on it, Apple `state=INVITED`. Build 13 is `externalBuildState=IN_BETA_TESTING`, i.e. approved for external testing, so external testers can install now.
