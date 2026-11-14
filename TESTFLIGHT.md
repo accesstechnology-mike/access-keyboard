@@ -185,8 +185,9 @@ That archives Release, bumps `CURRENT_PROJECT_VERSION` past the latest TestFligh
 
 Agents start GitHub Actions by pushing a tag (see `AGENTS.md`). Do not claim Actions cannot be started from this environment.
 
-- `testflight-*` archives a new build on `macos-26`, then runs `latest-only`. Do not do this just to fix testers; repeated archives exhaust Apple Development certificates.
+- `testflight-*` archives a new build on `macos-26`, then runs `latest-only`. It does not create an App Store version and does not submit for App Review. Do not do this just to fix testers; repeated archives exhaust Apple Development certificates.
 - `sync-testflight-*` runs `latest-only` on Ubuntu only. Use it to reinvite testers onto the live build.
+- `release-*` is the App Store pipeline (archive, upload, then submit). It is documented in `RELEASING.md`, not here.
 
 ```sh
 git tag sync-testflight-<short-reason>
@@ -198,7 +199,7 @@ git push origin sync-testflight-<short-reason>
 ## After the first build
 
 - Each new upload needs a new `CURRENT_PROJECT_VERSION` on the app **and** the extension.
-- App Store version 1.0 build 22 went live on 6 Nov 2026. This tree is 1.0.1 build 23 (`MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` on the app and the extension). Change the marketing version only for a user-visible version change, and change the App Store version to match before any upload. Do not upload from this note; an upload is a separate decision.
+- App Store version 1.0 build 22 went live on 6 Nov 2026. This tree is 1.0.1 build 23 (`MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` on the app and the extension). What's New for 1.0.1 is `release-notes/1.0.1.txt`. Submitting that build is the App Store workflow in `RELEASING.md`. Change the marketing version only for a user-visible version change, and change the App Store version to match before any upload. Do not upload from this note; an upload is a separate decision.
 - Testers only ever get the latest build. Uploads and **Run workflow** expire every older one.
 - A tester who still sees an old build and “No TestFlight builds are available” is `REVOKED` or `NOT_INVITED`. Delete them and send a new EMAIL invite. Do not expire older builds until every emailed tester is `INVITED`, `ACCEPTED`, or `INSTALLED`.
 - If Fix starts failing for testers, check the Vercel deployment, `OPENAI_API_KEY`, and `FIX_PROXY_SECRET` on that project. A 401 means the app secret and the Vercel env var do not match.

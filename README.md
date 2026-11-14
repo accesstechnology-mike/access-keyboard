@@ -70,3 +70,11 @@ See [`TESTFLIGHT.md`](TESTFLIGHT.md) for the full build-and-distribute workflow
 and [`AGENTS.md`](AGENTS.md) for the automated tag-driven CI notes. Both device
 families (iPhone + iPad) are offered the build once App Store Connect advertises
 iPhone availability.
+
+## Releasing
+
+`testflight-*` uploads a TestFlight build and does not submit to the App Store.
+`release-*` uploads and then submits the App Store version. An already-uploaded
+build, including 1.0.1 build 23, is submitted from **Actions → App Store**
+without a new archive. What's New text lives in `release-notes/<version>.txt`.
+The tag and workflow table is [`RELEASING.md`](RELEASING.md).

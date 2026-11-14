@@ -1,6 +1,6 @@
 # App Store listing draft: access: keyboard
 
-Version 1.0 build 22 went live on the App Store on 6 Nov 2026. The binary is the universal iPhone and iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS and iPadOS 18). The next binary in this repo is 1.0.1 build 23. Do not treat an edit here as a change already made in App Store Connect.
+Version 1.0 build 22 went live on the App Store on 6 Nov 2026. The binary is the universal iPhone and iPad keyboard (`TARGETED_DEVICE_FAMILY = "1,2"`, iOS and iPadOS 18). The next binary in this repo is 1.0.1 build 23. What's New for that version is `release-notes/1.0.1.txt`. Submitting it is the App Store workflow in `RELEASING.md`. Do not treat an edit here as a change already made in App Store Connect.
 
 Fix ships in v1. `FeatureFlags.fixConsentRequired` is **on**, so the first Fix asks Allow / Not now before any text is sent.
 
@@ -42,7 +42,7 @@ Left here so the next version does not rediscover them. Nothing in this list is 
 | Secondary category | Productivity (optional) |
 | Primary language | English (UK). The keyboard’s `PrimaryLanguage` is `en-GB`. |
 | Copyright | Access Technology North Limited |
-| Version | `1.0` is the live App Store version (build 22, 6 Nov 2026). This repo is `1.0.1` build 23, not yet submitted. |
+| Version | `1.0` is the live App Store version (build 22, 6 Nov 2026). This repo is `1.0.1` build 23. What's New is `release-notes/1.0.1.txt`. Submission is `RELEASING.md`. |
 | Price | Free. In-app purchases: Pro Monthly £3.99, Pro Yearly £29.99 (both with a 14-day free trial), Pro Lifetime £79.99. |
 
 Subtitle is 27 characters (limit 30). Name is 16 characters (limit 30). The promotional text and keywords below are the ones that shipped; the files in `docs/app-store/` are the same text.

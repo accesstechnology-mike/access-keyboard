@@ -1,0 +1,1 @@
+Predictions now use UK spellings. If Fix can't reach the correction service, or can't count a Fix, it tells you and your typing stays as it is. VoiceOver and Switch Control can now activate each key.
